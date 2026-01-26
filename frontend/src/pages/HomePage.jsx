@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { bookApi } from '../api/bookApi';
-import { categoryApi } from '../api/categoryApi';
-import BookCard from '../components/books/BookCard';
+import { useState, useEffect } from "react";
+import { bookApi } from "../api/bookApi";
+import { categoryApi } from "../api/categoryApi";
+import BookCard from "../components/books/BookCard";
+import SliderCarousel from "../components/common/SliderCarousel";
 
 const HomePage = () => {
   const [books, setBooks] = useState([]);
@@ -9,11 +10,11 @@ const HomePage = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    category: '',
-    minPrice: '',
-    maxPrice: '',
-    author: '',
-    page: 1
+    category: "",
+    minPrice: "",
+    maxPrice: "",
+    author: "",
+    page: 1,
   });
   const [pagination, setPagination] = useState(null);
 
@@ -30,13 +31,13 @@ const HomePage = () => {
     try {
       setLoading(true);
       const cleanFilters = Object.fromEntries(
-        Object.entries(filters).filter(([_, v]) => v !== '')
+        Object.entries(filters).filter(([_, v]) => v !== ""),
       );
       const response = await bookApi.getPublicBooks(cleanFilters);
       setBooks(response.data.books);
       setPagination(response.data.pagination);
     } catch (error) {
-      console.error('Error fetching books:', error);
+      console.error("Error fetching books:", error);
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ const HomePage = () => {
       const response = await bookApi.getNewestBooks(6);
       setNewestBooks(response.data.books);
     } catch (error) {
-      console.error('Error fetching newest books:', error);
+      console.error("Error fetching newest books:", error);
     }
   };
 
@@ -56,7 +57,7 @@ const HomePage = () => {
       const response = await categoryApi.getCategories();
       setCategories(response.data.categories);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error("Error fetching categories:", error);
     }
   };
 
@@ -64,7 +65,7 @@ const HomePage = () => {
     setFilters({
       ...filters,
       [e.target.name]: e.target.value,
-      page: 1
+      page: 1,
     });
   };
 
@@ -75,6 +76,9 @@ const HomePage = () => {
 
   return (
     <div style={styles.container}>
+      {/* Slider Carousel */}
+      <SliderCarousel />
+
       {/* Newest Books Section */}
       {newestBooks.length > 0 && (
         <section style={styles.section}>
@@ -137,7 +141,7 @@ const HomePage = () => {
       {/* All Books */}
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>All Books</h2>
-        
+
         {loading ? (
           <div style={styles.loading}>Loading...</div>
         ) : books.length === 0 ? (
@@ -156,19 +160,26 @@ const HomePage = () => {
                 <button
                   onClick={() => handlePageChange(filters.page - 1)}
                   disabled={filters.page === 1}
-                  style={{...styles.pageButton, ...(filters.page === 1 && styles.disabled)}}
+                  style={{
+                    ...styles.pageButton,
+                    ...(filters.page === 1 && styles.disabled),
+                  }}
                 >
                   Previous
                 </button>
-                
+
                 <span style={styles.pageInfo}>
                   Page {pagination.currentPage} of {pagination.totalPages}
                 </span>
-                
+
                 <button
                   onClick={() => handlePageChange(filters.page + 1)}
                   disabled={filters.page === pagination.totalPages}
-                  style={{...styles.pageButton, ...(filters.page === pagination.totalPages && styles.disabled)}}
+                  style={{
+                    ...styles.pageButton,
+                    ...(filters.page === pagination.totalPages &&
+                      styles.disabled),
+                  }}
                 >
                   Next
                 </button>
@@ -183,87 +194,87 @@ const HomePage = () => {
 
 const styles = {
   container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '2rem'
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "2rem",
   },
   section: {
-    marginBottom: '3rem'
+    marginBottom: "3rem",
   },
   sectionTitle: {
-    fontSize: '2rem',
-    color: '#2c3e50',
-    marginBottom: '1.5rem'
+    fontSize: "2rem",
+    color: "#2c3e50",
+    marginBottom: "1.5rem",
   },
   filterSection: {
-    backgroundColor: '#fff',
-    padding: '1.5rem',
-    borderRadius: '8px',
-    marginBottom: '2rem',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    backgroundColor: "#fff",
+    padding: "1.5rem",
+    borderRadius: "8px",
+    marginBottom: "2rem",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
   },
   filterTitle: {
-    fontSize: '1.2rem',
-    marginBottom: '1rem',
-    color: '#2c3e50'
+    fontSize: "1.2rem",
+    marginBottom: "1rem",
+    color: "#2c3e50",
   },
   filters: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '1rem'
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "1rem",
   },
   select: {
-    padding: '0.75rem',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '1rem'
+    padding: "0.75rem",
+    border: "1px solid #ddd",
+    borderRadius: "4px",
+    fontSize: "1rem",
   },
   input: {
-    padding: '0.75rem',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '1rem'
+    padding: "0.75rem",
+    border: "1px solid #ddd",
+    borderRadius: "4px",
+    fontSize: "1rem",
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-    gap: '1.5rem'
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+    gap: "1.5rem",
   },
   loading: {
-    textAlign: 'center',
-    padding: '2rem',
-    fontSize: '1.2rem',
-    color: '#7f8c8d'
+    textAlign: "center",
+    padding: "2rem",
+    fontSize: "1.2rem",
+    color: "#7f8c8d",
   },
   empty: {
-    textAlign: 'center',
-    padding: '2rem',
-    fontSize: '1.2rem',
-    color: '#7f8c8d'
+    textAlign: "center",
+    padding: "2rem",
+    fontSize: "1.2rem",
+    color: "#7f8c8d",
   },
   pagination: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '1rem',
-    marginTop: '2rem'
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "1rem",
+    marginTop: "2rem",
   },
   pageButton: {
-    padding: '0.5rem 1rem',
-    backgroundColor: '#3498db',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
+    padding: "0.5rem 1rem",
+    backgroundColor: "#3498db",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
   },
   disabled: {
-    backgroundColor: '#bdc3c7',
-    cursor: 'not-allowed'
+    backgroundColor: "#bdc3c7",
+    cursor: "not-allowed",
   },
   pageInfo: {
-    color: '#34495e',
-    fontWeight: '500'
-  }
+    color: "#34495e",
+    fontWeight: "500",
+  },
 };
 
 export default HomePage;
