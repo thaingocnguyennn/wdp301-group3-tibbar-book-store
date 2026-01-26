@@ -13,6 +13,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import BooksManagement from "./pages/admin/BooksManagement";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
 import SlidersManagement from "./pages/admin/SlidersManagement";
+import UsersManagement from "./pages/admin/UsersManagement";
 import Wishlist from "./pages/Wishlist";
 import CartPage from "./pages/CartPage";
 
@@ -129,6 +130,15 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <SlidersManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute adminOnly>
+              <UsersManagement />
             </ProtectedRoute>
           }
         />

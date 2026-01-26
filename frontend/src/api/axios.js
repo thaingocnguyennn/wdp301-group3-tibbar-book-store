@@ -22,12 +22,27 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and account locking
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle locked account (403 Forbidden)
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message || '';
+      
+      // If account is locked, logout and redirect
+      if (message.toLowerCase().includes('locked') || message.toLowerCase().includes('disabled')) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        alert('Your account has been disabled. Please contact support.');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+    }
+
+    // Handle token refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&

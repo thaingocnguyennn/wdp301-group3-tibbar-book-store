@@ -2,8 +2,7 @@ export const ROLES = {
   GUEST: 'guest',
   CUSTOMER: 'customer',
   ADMIN: 'admin',
-  MANAGER: 'manager',
-  SHIPPER: 'shipper'
+  MANAGER: 'manager'
 };
 
 export const BOOK_VISIBILITY = {

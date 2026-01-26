@@ -11,3 +11,25 @@ export const userApi = {
     return response.data;
   }
 };
+
+export const adminUserApi = {
+  getAllUsers: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.role) params.append('role', filters.role);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.search) params.append('search', filters.search);
+    
+    const response = await axiosInstance.get(`/admin/users?${params.toString()}`);
+    return response.data;
+  },
+
+  updateUserRole: async (userId, role) => {
+    const response = await axiosInstance.put(`/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  toggleUserStatus: async (userId) => {
+    const response = await axiosInstance.patch(`/admin/users/${userId}/toggle-status`);
+    return response.data;
+  }
+};

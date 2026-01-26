@@ -51,6 +51,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserRole = (newRole) => {
+    if (user) {
+      const updatedUser = { ...user, role: newRole };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
   const isAuthenticated = !!user;
 
@@ -63,7 +71,8 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         login,
         register,
-        logout
+        logout,
+        updateUserRole
       }}
     >
       {children}

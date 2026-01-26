@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
   address: addressSchema,
+  isActive: {
+    type: Boolean,
+    default: true
+  },
   refreshToken: {
     type: String,
     select: false

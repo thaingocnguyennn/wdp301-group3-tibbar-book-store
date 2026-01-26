@@ -30,19 +30,19 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
+        <Link to="/admin/users" style={styles.card}>
+          <div style={styles.icon}>👥</div>
+          <h3 style={styles.cardTitle}>Users</h3>
+          <p style={styles.cardDesc}>
+            Manage user accounts and roles
+          </p>
+        </Link>
+
         <div style={{ ...styles.card, ...styles.disabled }}>
           <div style={styles.icon}>📦</div>
           <h3 style={styles.cardTitle}>Orders</h3>
           <p style={styles.cardDesc}>
             View and manage customer orders (Coming Soon)
-          </p>
-        </div>
-
-        <div style={{ ...styles.card, ...styles.disabled }}>
-          <div style={styles.icon}>👥</div>
-          <h3 style={styles.cardTitle}>Users</h3>
-          <p style={styles.cardDesc}>
-            Manage user accounts and roles (Coming Soon)
           </p>
         </div>
       </div>
