@@ -93,21 +93,28 @@ const BookCard = ({ book }) => {
 const styles = {
   card: {
     backgroundColor: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
     overflow: 'hidden',
-    cursor: 'pointer'
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    cursor: 'pointer',
+    border: '1px solid #f0f0f0',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%'
   },
   imageContainer: {
     width: '100%',
-    height: '250px',
-    backgroundColor: '#f5f5f5',
+    height: '280px',
+    overflow: 'hidden',
+    backgroundColor: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
     position: 'relative'
   },
   image: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover'
+    objectFit: 'cover',
+    transition: 'transform 0.3s ease'
   },
   placeholder: {
     width: '100%',
@@ -116,9 +123,15 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '5rem',
-    color: '#bdc3c7'
+    color: '#bdc3c7',
+    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
   },
-  content: { padding: '1rem' },
+  content: {
+    padding: '1.25rem',
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1'
+  },
   title: {
     fontSize: '1.1rem',
     fontWeight: '600',
@@ -126,38 +139,52 @@ const styles = {
   },
   author: {
     color: '#7f8c8d',
-    fontSize: '0.9rem'
+    fontSize: '0.9rem',
+    margin: '0 0 0.75rem 0'
   },
   category: {
-    backgroundColor: '#ecf0f1',
-    padding: '0.25rem 0.75rem',
+    display: 'inline-block',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: '#fff',
+    padding: '0.35rem 0.85rem',
     borderRadius: '12px',
-    fontSize: '0.8rem'
+    fontSize: '0.75rem',
+    marginBottom: '1rem',
+    fontWeight: '600'
   },
   footer: {
     display: 'flex',
     justifyContent: 'space-between',
-    marginTop: '1rem'
+    alignItems: 'center',
+    marginTop: 'auto'
   },
   price: {
-    fontSize: '1.2rem',
-    fontWeight: 'bold',
-    color: '#27ae60'
+    fontSize: '1.35rem',
+    fontWeight: '700',
+    color: '#667eea'
   },
   button: {
-    backgroundColor: '#3498db',
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: '#fff',
-    padding: '0.5rem 1rem',
-    borderRadius: '4px',
-    textDecoration: 'none'
+    padding: '0.6rem 1.2rem',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    border: 'none',
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
   },
   outOfStock: {
     backgroundColor: '#e74c3c',
     color: '#fff',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '4px',
+    padding: '0.35rem 0.85rem',
+    borderRadius: '8px',
     fontSize: '0.8rem',
-    marginTop: '0.5rem'
+    marginTop: '0.5rem',
+    fontWeight: '600'
   }
 };
 

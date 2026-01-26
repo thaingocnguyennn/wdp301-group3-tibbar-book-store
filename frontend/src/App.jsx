@@ -2,7 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import Navbar from './components/common/Navbar';
+import Footer from './components/common/Footer';
 import HomePage from './pages/HomePage';
+import NewestPage from './pages/NewestPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import BookDetailPage from './pages/BookDetailPage';
@@ -53,6 +55,7 @@ function AppContent() {
       <Routes>
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
 
         {/* Auth Routes - Redirect to home if already logged in */}
@@ -116,6 +119,7 @@ function AppContent() {
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Footer />
     </div>
   );
 }

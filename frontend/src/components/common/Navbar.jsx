@@ -22,6 +22,7 @@ const Navbar = () => {
 
         <div style={styles.links}>
           <Link to="/" style={styles.link}>Home</Link>
+          <Link to="/newest" style={styles.link}>✨ Newest</Link>
 
           {isAdmin && (
             <Link to="/admin/dashboard" style={styles.link}>Admin Dashboard</Link>
@@ -56,9 +57,12 @@ const Navbar = () => {
 
 const styles = {
   nav: {
-    backgroundColor: '#2c3e50',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     padding: '1rem 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+    position: 'sticky',
+    top: '0',
+    zIndex: '1000'
   },
   container: {
     maxWidth: '1200px',
@@ -69,10 +73,11 @@ const styles = {
     alignItems: 'center'
   },
   logo: {
-    fontSize: '1.5rem',
+    fontSize: '1.6rem',
     fontWeight: 'bold',
     color: '#fff',
-    textDecoration: 'none'
+    textDecoration: 'none',
+    transition: 'all 0.3s ease'
   },
   links: {
     display: 'flex',
@@ -80,23 +85,30 @@ const styles = {
     alignItems: 'center'
   },
   link: {
-    color: '#ecf0f1',
+    color: '#fff',
     textDecoration: 'none',
-    transition: 'color 0.2s'
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+    padding: '0.5rem 0',
+    borderBottom: '2px solid transparent'
   },
   button: {
-    backgroundColor: '#3498db',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     color: '#fff',
-    border: 'none',
-    padding: '0.5rem 1rem',
-    borderRadius: '4px',
+    border: '2px solid #fff',
+    padding: '0.6rem 1.2rem',
+    borderRadius: '8px',
     cursor: 'pointer',
     textDecoration: 'none',
-    fontSize: '1rem'
+    fontSize: '1rem',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    backdropFilter: 'blur(10px)'
   },
   user: {
-    color: '#ecf0f1',
-    fontSize: '0.9rem'
+    color: '#fff',
+    fontSize: '0.95rem',
+    fontWeight: '500'
   }
 };
 
