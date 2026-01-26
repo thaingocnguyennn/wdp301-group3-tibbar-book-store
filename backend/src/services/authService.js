@@ -35,6 +35,11 @@ class AuthService {
       throw ApiError.unauthorized(MESSAGES.INVALID_CREDENTIALS);
     }
 
+    // Check if account is active
+    if (!user.isActive) {
+      throw ApiError.forbidden('Your account has been locked. Please contact support.');
+    }
+
     const accessToken = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
 

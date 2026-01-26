@@ -55,7 +55,7 @@ const Navbar = () => {
               </button>
 
               <span style={styles.user}>
-                👤 {user?.firstName || user?.email}
+                👤 {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
               </span>
             </>
           ) : (
