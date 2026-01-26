@@ -1,9 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { Heart } from 'lucide-react';
+import { useWishlist } from '../../hooks/useWishlist';
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const { wishlist } = useWishlist();
 
   const handleLogout = async () => {
     await logout();
@@ -19,18 +22,25 @@ const Navbar = () => {
 
         <div style={styles.links}>
           <Link to="/" style={styles.link}>Home</Link>
-          
+
           {isAdmin && (
             <Link to="/admin/dashboard" style={styles.link}>Admin Dashboard</Link>
           )}
-
           {isAuthenticated ? (
             <>
               <Link to="/profile" style={styles.link}>Profile</Link>
+
+              <Link to="/wishlist" style={styles.link}>
+                Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
+              </Link>
+
               <button onClick={handleLogout} style={styles.button}>
                 Logout
               </button>
-              <span style={styles.user}>👤 {user?.firstName || user?.email}</span>
+
+              <span style={styles.user}>
+                👤 {user?.firstName || user?.email}
+              </span>
             </>
           ) : (
             <>

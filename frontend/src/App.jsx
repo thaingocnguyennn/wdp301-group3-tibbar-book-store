@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import BooksManagement from './pages/admin/BooksManagement';
 import CategoriesManagement from './pages/admin/CategoriesManagement';
+import Wishlist from './pages/Wishlist';
 
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -53,7 +54,7 @@ function AppContent() {
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<HomePage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
-        
+
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
           path="/login"
@@ -71,7 +72,7 @@ function AppContent() {
             </PublicRoute>
           }
         />
-        
+
         {/* Protected Routes - Authentication required */}
         <Route
           path="/profile"
@@ -81,6 +82,8 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/wishlist" element={<Wishlist />} />
+
 
         {/* Admin Routes - Admin role required */}
         <Route

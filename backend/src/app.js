@@ -8,7 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import bookRoutes from './routes/bookRoutes.js';
 import adminBookRoutes from './routes/adminBookRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
-
+import wishlistRoutes from './routes/wishlistRoutes.js';
 import errorHandler from './middlewares/errorHandler.js';
 import ApiResponse from './utils/ApiResponse.js';
 import { HTTP_STATUS } from './config/constants.js';
@@ -47,7 +47,7 @@ app.use('/api/books', bookRoutes);
 app.use('/api/categories', categoryRoutes); // Public categories
 app.use('/api/admin/books', adminBookRoutes);
 app.use('/api/admin/categories', categoryRoutes); // Admin categories (same routes, protected)
-
+app.use('/api/wishlist', wishlistRoutes);
 // 404 Handler
 app.use('*', (req, res) => {
   return ApiResponse.error(
