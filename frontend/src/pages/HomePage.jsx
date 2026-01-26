@@ -1,24 +1,32 @@
-import { useState, useEffect } from 'react';
-import { bookApi } from '../api/bookApi';
-import { categoryApi } from '../api/categoryApi';
-import BookCard from '../components/books/BookCard';
-import Slider from '../components/common/Slider';
+import { useState, useEffect, useMemo } from "react";
+import { bookApi } from "../api/bookApi";
+import { categoryApi } from "../api/categoryApi";
+import { sliderApi } from "../api/sliderApi";
+import BookCard from "../components/books/BookCard";
+import Slider from "../components/common/Slider";
 
 const HomePage = () => {
   const [books, setBooks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sliders, setSliders] = useState([]);
   const [filters, setFilters] = useState({
-    category: '',
-    minPrice: '',
-    maxPrice: '',
-    author: '',
-    page: 1
+    category: "",
+    minPrice: "",
+    maxPrice: "",
+    author: "",
+    page: 1,
   });
   const [pagination, setPagination] = useState(null);
 
+  const serverBaseUrl = useMemo(() => {
+    const api = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    return api.replace(/\/api\/?$/, "");
+  }, []);
+
   useEffect(() => {
     fetchCategories();
+    fetchSliders();
   }, []);
 
   useEffect(() => {
@@ -29,13 +37,13 @@ const HomePage = () => {
     try {
       setLoading(true);
       const cleanFilters = Object.fromEntries(
-        Object.entries(filters).filter(([_, v]) => v !== '')
+        Object.entries(filters).filter(([_, v]) => v !== ""),
       );
       const response = await bookApi.getPublicBooks(cleanFilters);
       setBooks(response.data.books);
       setPagination(response.data.pagination);
     } catch (error) {
-      console.error('Error fetching books:', error);
+      console.error("Error fetching books:", error);
     } finally {
       setLoading(false);
     }
@@ -46,7 +54,26 @@ const HomePage = () => {
       const response = await categoryApi.getCategories();
       setCategories(response.data.categories);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error("Error fetching categories:", error);
+    }
+  };
+
+  const fetchSliders = async () => {
+    try {
+      const response = await sliderApi.getPublicSliders();
+      const sliderData = response.data.sliders || [];
+      const mapped = sliderData.map((item) => ({
+        backgroundImage: item.imageUrl
+          ? `${serverBaseUrl}${item.imageUrl}`
+          : undefined,
+        title: item.title || "",
+        subtitle: item.subtitle || "",
+        ctaText: item.ctaText || "",
+        ctaLink: item.ctaLink || "",
+      }));
+      setSliders(mapped);
+    } catch (error) {
+      console.error("Error fetching sliders:", error);
     }
   };
 
@@ -54,7 +81,7 @@ const HomePage = () => {
     setFilters({
       ...filters,
       [e.target.name]: e.target.value,
-      page: 1
+      page: 1,
     });
   };
 
@@ -67,7 +94,7 @@ const HomePage = () => {
     <div style={styles.container}>
       {/* Slider Section */}
       <section style={styles.sliderWrapper}>
-        <Slider />
+        <Slider images={sliders} />
       </section>
 
       {/* Filters */}
@@ -150,7 +177,10 @@ const HomePage = () => {
                 <button
                   onClick={() => handlePageChange(filters.page - 1)}
                   disabled={filters.page === 1}
-                  style={{ ...styles.pageButton, ...(filters.page === 1 && styles.disabled) }}
+                  style={{
+                    ...styles.pageButton,
+                    ...(filters.page === 1 && styles.disabled),
+                  }}
                 >
                   ← Previous
                 </button>
@@ -162,7 +192,11 @@ const HomePage = () => {
                 <button
                   onClick={() => handlePageChange(filters.page + 1)}
                   disabled={filters.page === pagination.totalPages}
-                  style={{ ...styles.pageButton, ...(filters.page === pagination.totalPages && styles.disabled) }}
+                  style={{
+                    ...styles.pageButton,
+                    ...(filters.page === pagination.totalPages &&
+                      styles.disabled),
+                  }}
                 >
                   Next →
                 </button>
@@ -177,164 +211,164 @@ const HomePage = () => {
 
 const styles = {
   container: {
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-    minHeight: '100vh'
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+    minHeight: "100vh",
   },
   banner: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#fff',
-    padding: '4rem 2rem',
-    marginBottom: '3rem',
-    boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
-    borderRadius: '0 0 20px 20px'
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "#fff",
+    padding: "4rem 2rem",
+    marginBottom: "3rem",
+    boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
+    borderRadius: "0 0 20px 20px",
   },
   bannerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    textAlign: 'center'
+    maxWidth: "1200px",
+    margin: "0 auto",
+    textAlign: "center",
   },
   bannerTitle: {
-    fontSize: '3rem',
-    fontWeight: '700',
-    marginBottom: '0.5rem',
-    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    fontSize: "3rem",
+    fontWeight: "700",
+    marginBottom: "0.5rem",
+    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
   },
   bannerSubtitle: {
-    fontSize: '1.3rem',
-    fontWeight: '300',
-    opacity: '0.95'
+    fontSize: "1.3rem",
+    fontWeight: "300",
+    opacity: "0.95",
   },
   sliderWrapper: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '2rem 2rem 0 2rem'
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "2rem 2rem 0 2rem",
   },
   section: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 2rem',
-    marginBottom: '3rem'
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "0 2rem",
+    marginBottom: "3rem",
   },
   sectionHeader: {
-    marginBottom: '2rem'
+    marginBottom: "2rem",
   },
   sectionTitle: {
-    fontSize: '2rem',
-    color: '#2c3e50',
-    marginBottom: '0.75rem',
-    fontWeight: '700'
+    fontSize: "2rem",
+    color: "#2c3e50",
+    marginBottom: "0.75rem",
+    fontWeight: "700",
   },
   titleUnderline: {
-    width: '60px',
-    height: '4px',
-    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '2px'
+    width: "60px",
+    height: "4px",
+    background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+    borderRadius: "2px",
   },
   filterSection: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 2rem',
-    marginBottom: '2rem'
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "0 2rem",
+    marginBottom: "2rem",
   },
   filterHeader: {
-    marginBottom: '1.5rem'
+    marginBottom: "1.5rem",
   },
   filterTitle: {
-    fontSize: '1.3rem',
-    marginBottom: '0.5rem',
-    color: '#2c3e50',
-    fontWeight: '600'
+    fontSize: "1.3rem",
+    marginBottom: "0.5rem",
+    color: "#2c3e50",
+    fontWeight: "600",
   },
   filters: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '1rem',
-    backgroundColor: '#fff',
-    padding: '1.5rem',
-    borderRadius: '12px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.08)'
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "1rem",
+    backgroundColor: "#fff",
+    padding: "1.5rem",
+    borderRadius: "12px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
   },
   select: {
-    padding: '0.75rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    backgroundColor: '#fff',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    color: '#2c3e50'
+    padding: "0.75rem",
+    border: "2px solid #e0e0e0",
+    borderRadius: "8px",
+    fontSize: "1rem",
+    backgroundColor: "#fff",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    color: "#2c3e50",
   },
   input: {
-    padding: '0.75rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    backgroundColor: '#fff',
-    transition: 'all 0.3s ease',
-    color: '#2c3e50'
+    padding: "0.75rem",
+    border: "2px solid #e0e0e0",
+    borderRadius: "8px",
+    fontSize: "1rem",
+    backgroundColor: "#fff",
+    transition: "all 0.3s ease",
+    color: "#2c3e50",
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    gap: '2rem'
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: "2rem",
   },
   loading: {
-    textAlign: 'center',
-    padding: '3rem 2rem',
-    fontSize: '1.2rem',
-    color: '#667eea'
+    textAlign: "center",
+    padding: "3rem 2rem",
+    fontSize: "1.2rem",
+    color: "#667eea",
   },
   spinner: {
-    width: '50px',
-    height: '50px',
-    border: '4px solid #e0e0e0',
-    borderTop: '4px solid #667eea',
-    borderRadius: '50%',
-    margin: '0 auto 1rem',
-    animation: 'spin 1s linear infinite'
+    width: "50px",
+    height: "50px",
+    border: "4px solid #e0e0e0",
+    borderTop: "4px solid #667eea",
+    borderRadius: "50%",
+    margin: "0 auto 1rem",
+    animation: "spin 1s linear infinite",
   },
   empty: {
-    textAlign: 'center',
-    padding: '3rem 2rem',
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.08)'
+    textAlign: "center",
+    padding: "3rem 2rem",
+    backgroundColor: "#fff",
+    borderRadius: "12px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
   },
   emptySmall: {
-    color: '#95a5a6',
-    fontSize: '0.95rem',
-    marginTop: '0.5rem'
+    color: "#95a5a6",
+    fontSize: "0.95rem",
+    marginTop: "0.5rem",
   },
   pagination: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '1.5rem',
-    marginTop: '2rem'
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "1.5rem",
+    marginTop: "2rem",
   },
   pageButton: {
-    padding: '0.75rem 1.5rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+    padding: "0.75rem 1.5rem",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "600",
+    transition: "all 0.3s ease",
+    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
   },
   disabled: {
-    backgroundColor: '#bdc3c7',
-    background: '#bdc3c7',
-    cursor: 'not-allowed',
-    boxShadow: 'none',
-    opacity: '0.6'
+    backgroundColor: "#bdc3c7",
+    background: "#bdc3c7",
+    cursor: "not-allowed",
+    boxShadow: "none",
+    opacity: "0.6",
   },
   pageInfo: {
-    color: '#2c3e50',
-    fontWeight: '600',
-    fontSize: '1rem'
-  }
+    color: "#2c3e50",
+    fontWeight: "600",
+    fontSize: "1rem",
+  },
 };
 
 export default HomePage;
