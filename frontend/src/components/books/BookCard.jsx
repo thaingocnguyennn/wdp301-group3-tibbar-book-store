@@ -1,6 +1,34 @@
 import { Link } from 'react-router-dom';
+import { useWishlist } from '../../context/WishlistContext';
+import { useAuth } from '../../hooks/useAuth';
 
 const BookCard = ({ book }) => {
+  const { isAuthenticated } = useAuth();
+  const { wishlist = [], add } = useWishlist(); // ❌ KHÔNG remove
+
+  if (!book) return null;
+
+  const isWishlisted = Array.isArray(wishlist)
+  ? wishlist.some(b => b._id === book._id)
+  : false;
+
+
+
+  const handleAddWishlist = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      alert('Please login to use wishlist');
+      return;
+    }
+
+    if (isWishlisted) return;
+
+    await add(book._id);
+  };
+
+
   return (
     <div style={styles.card}>
       <div style={styles.imageContainer}>
@@ -9,18 +37,46 @@ const BookCard = ({ book }) => {
         ) : (
           <div style={styles.placeholder}>📖</div>
         )}
+
+        {/* ❤️ ADD WISHLIST ICON */}
+        <button
+          type="button"
+          onClick={handleAddWishlist}
+          disabled={isWishlisted}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            cursor: isWishlisted ? 'default' : 'pointer',
+            fontSize: '1.2rem',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: isWishlisted ? 0.6 : 1
+          }}
+        >
+          {isWishlisted ? '❤️' : '🤍'}
+        </button>
       </div>
 
       <div style={styles.content}>
         <h3 style={styles.title}>{book.title}</h3>
         <p style={styles.author}>by {book.author}</p>
-        
-        {book.category && (
+
+        {book.category?.name && (
           <span style={styles.category}>{book.category.name}</span>
         )}
 
         <div style={styles.footer}>
-          <span style={styles.price}>${book.price.toFixed(2)}</span>
+          <span style={styles.price}>
+            ${typeof book.price === 'number' ? book.price.toFixed(2) : '0.00'}
+          </span>
           <Link to={`/books/${book._id}`} style={styles.button}>
             View Details
           </Link>
@@ -40,14 +96,13 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     overflow: 'hidden',
-    transition: 'transform 0.2s',
     cursor: 'pointer'
   },
   imageContainer: {
     width: '100%',
     height: '250px',
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#f5f5f5',
+    position: 'relative'
   },
   image: {
     width: '100%',
@@ -63,40 +118,29 @@ const styles = {
     fontSize: '5rem',
     color: '#bdc3c7'
   },
-  content: {
-    padding: '1rem'
-  },
+  content: { padding: '1rem' },
   title: {
     fontSize: '1.1rem',
     fontWeight: '600',
-    margin: '0 0 0.5rem 0',
-    color: '#2c3e50',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    marginBottom: '0.5rem'
   },
   author: {
     color: '#7f8c8d',
-    fontSize: '0.9rem',
-    margin: '0 0 0.5rem 0'
+    fontSize: '0.9rem'
   },
   category: {
-    display: 'inline-block',
     backgroundColor: '#ecf0f1',
-    color: '#34495e',
     padding: '0.25rem 0.75rem',
     borderRadius: '12px',
-    fontSize: '0.8rem',
-    marginBottom: '1rem'
+    fontSize: '0.8rem'
   },
   footer: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginTop: '1rem'
   },
   price: {
-    fontSize: '1.25rem',
+    fontSize: '1.2rem',
     fontWeight: 'bold',
     color: '#27ae60'
   },
@@ -105,11 +149,9 @@ const styles = {
     color: '#fff',
     padding: '0.5rem 1rem',
     borderRadius: '4px',
-    textDecoration: 'none',
-    fontSize: '0.9rem'
+    textDecoration: 'none'
   },
   outOfStock: {
-    display: 'inline-block',
     backgroundColor: '#e74c3c',
     color: '#fff',
     padding: '0.25rem 0.75rem',
