@@ -1,6 +1,34 @@
 import { Link } from 'react-router-dom';
+import { useWishlist } from '../../context/WishlistContext';
+import { useAuth } from '../../hooks/useAuth';
 
 const BookCard = ({ book }) => {
+  const { isAuthenticated } = useAuth();
+  const { wishlist = [], add } = useWishlist(); // ❌ KHÔNG remove
+
+  if (!book) return null;
+
+  const isWishlisted = Array.isArray(wishlist)
+  ? wishlist.some(b => b._id === book._id)
+  : false;
+
+
+
+  const handleAddWishlist = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      alert('Please login to use wishlist');
+      return;
+    }
+
+    if (isWishlisted) return;
+
+    await add(book._id);
+  };
+
+
   return (
     <div style={styles.card}>
       <div style={styles.imageContainer}>
@@ -9,18 +37,46 @@ const BookCard = ({ book }) => {
         ) : (
           <div style={styles.placeholder}>📖</div>
         )}
+
+        {/* ❤️ ADD WISHLIST ICON */}
+        <button
+          type="button"
+          onClick={handleAddWishlist}
+          disabled={isWishlisted}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            cursor: isWishlisted ? 'default' : 'pointer',
+            fontSize: '1.2rem',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: isWishlisted ? 0.6 : 1
+          }}
+        >
+          {isWishlisted ? '❤️' : '🤍'}
+        </button>
       </div>
 
       <div style={styles.content}>
         <h3 style={styles.title}>{book.title}</h3>
         <p style={styles.author}>by {book.author}</p>
 
-        {book.category && (
+        {book.category?.name && (
           <span style={styles.category}>{book.category.name}</span>
         )}
 
         <div style={styles.footer}>
-          <span style={styles.price}>${book.price.toFixed(2)}</span>
+          <span style={styles.price}>
+            ${typeof book.price === 'number' ? book.price.toFixed(2) : '0.00'}
+          </span>
           <Link to={`/books/${book._id}`} style={styles.button}>
             View Details
           </Link>
@@ -79,11 +135,7 @@ const styles = {
   title: {
     fontSize: '1.1rem',
     fontWeight: '600',
-    margin: '0 0 0.5rem 0',
-    color: '#2c3e50',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    marginBottom: '0.5rem'
   },
   author: {
     color: '#7f8c8d',
@@ -126,7 +178,6 @@ const styles = {
     boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
   },
   outOfStock: {
-    display: 'inline-block',
     backgroundColor: '#e74c3c',
     color: '#fff',
     padding: '0.35rem 0.85rem',

@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import BooksManagement from './pages/admin/BooksManagement';
 import CategoriesManagement from './pages/admin/CategoriesManagement';
+import Wishlist from './pages/Wishlist';
 
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -84,6 +85,8 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/wishlist" element={<Wishlist />} />
+
 
         {/* Admin Routes - Admin role required */}
         <Route
