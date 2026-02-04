@@ -6,11 +6,24 @@ const CartPage = () => {
   const { cart, update, remove } = useCart();
   const navigate = useNavigate();
 
-  const total = useMemo(() => {
-    return (cart.items || []).reduce((sum, item) => {
+  const totals = useMemo(() => {
+    const subtotal = (cart.items || []).reduce((sum, item) => {
       const price = item.book?.price || 0;
       return sum + price * item.quantity;
     }, 0);
+
+    // Free shipping if subtotal > 200,000 VND
+    const SHIPPING_FEE = 30000;
+    const FREE_SHIPPING_THRESHOLD = 200000;
+    const shippingFee = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+    const total = subtotal + shippingFee;
+
+    return {
+      subtotal,
+      shippingFee,
+      total,
+      isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
+    };
   }, [cart.items]);
 
   if (!cart.items || cart.items.length === 0) {
@@ -54,7 +67,7 @@ const CartPage = () => {
                   <h3 style={styles.itemTitle}>{item.book?.title}</h3>
                   <p style={styles.itemAuthor}>by {item.book?.author}</p>
                   <p style={styles.itemPrice}>
-                    ${item.book?.price?.toFixed(2)}
+                    {item.book?.price?.toLocaleString('vi-VN')}₫
                   </p>
                 </div>
               </div>
@@ -90,19 +103,33 @@ const CartPage = () => {
           <h2 style={styles.summaryTitle}>Order Summary</h2>
           <div style={styles.summaryRow}>
             <span>Subtotal</span>
-            <strong>${total.toFixed(2)}</strong>
+            <strong>{totals.subtotal.toLocaleString('vi-VN')}₫</strong>
           </div>
           <div style={styles.summaryRow}>
             <span>Shipping</span>
-            <strong>Free</strong>
+            <strong>
+              {totals.isFreeShipping ? (
+                <span style={{color: '#27ae60'}}>Free ✓</span>
+              ) : (
+                `${totals.shippingFee.toLocaleString('vi-VN')}₫`
+              )}
+            </strong>
           </div>
+          {!totals.isFreeShipping && totals.subtotal > 0 && (
+            <div style={styles.freeShippingNotice}>
+              💡 Add {(200000 - totals.subtotal).toLocaleString('vi-VN')}₫ more for free shipping
+            </div>
+          )}
           <div style={styles.summaryDivider}></div>
           <div style={styles.summaryRow}>
-            <span>Total</span>
-            <strong>${total.toFixed(2)}</strong>
+            <span style={{fontSize: '1.2rem', fontWeight: '700'}}>Total</span>
+            <strong style={{fontSize: '1.2rem'}}>{totals.total.toLocaleString('vi-VN')}₫</strong>
           </div>
-          <button style={styles.checkoutButton} disabled>
-            Checkout (Coming Soon)
+          <button 
+            style={styles.checkoutButton} 
+            onClick={() => navigate("/checkout")}
+          >
+            Proceed to Checkout
           </button>
         </div>
       </div>
@@ -248,15 +275,27 @@ const styles = {
     backgroundColor: "#ecf0f1",
     margin: "1rem 0",
   },
+  freeShippingNotice: {
+    fontSize: "0.85rem",
+    color: "#667eea",
+    backgroundColor: "#f0f3ff",
+    padding: "0.75rem",
+    borderRadius: "6px",
+    marginTop: "0.5rem",
+    marginBottom: "0.5rem",
+    textAlign: "center",
+  },
   checkoutButton: {
     marginTop: "1rem",
     width: "100%",
-    backgroundColor: "#95a5a6",
+    backgroundColor: "#667eea",
     color: "#fff",
     padding: "0.9rem",
     border: "none",
     borderRadius: "8px",
-    cursor: "not-allowed",
+    cursor: "pointer",
+    fontSize: "1rem",
+    fontWeight: "600",
   },
   primaryButton: {
     backgroundColor: "#667eea",

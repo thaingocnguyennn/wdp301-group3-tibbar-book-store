@@ -28,9 +28,14 @@ export const authenticate = async (req, res, next) => {
       throw ApiError.forbidden('Your account has been locked. Please contact support.');
     }
 
+    // Attach full user object to request for easier access
     req.user = {
-      userId: decoded.userId,
-      role: user.role // Use the role from database to ensure it's up-to-date
+      _id: user._id,
+      userId: user._id, // Keep for backward compatibility
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive
     };
 
     next();

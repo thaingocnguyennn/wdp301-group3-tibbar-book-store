@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import { WishlistProvider } from "./context/WishlistContext";
 import { useAuth } from "./hooks/useAuth";
 import Navbar from "./components/common/Navbar";
 import Footer from "./components/common/Footer";
@@ -16,6 +18,9 @@ import SlidersManagement from "./pages/admin/SlidersManagement";
 import UsersManagement from "./pages/admin/UsersManagement";
 import Wishlist from "./pages/Wishlist";
 import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
+import PaymentReturnPage from "./pages/PaymentReturnPage";
 
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -96,6 +101,25 @@ function AppContent() {
         />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        
+        {/* Checkout Routes */}
+        <Route
+          path="/checkout"
+          element={
+            <ProtectedRoute>
+              <CheckoutPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order-success/:orderNumber"
+          element={
+            <ProtectedRoute>
+              <OrderSuccessPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/checkout/payment-return" element={<PaymentReturnPage />} />
 
         {/* Admin Routes - Admin role required */}
         <Route
@@ -155,7 +179,11 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <CartProvider>
+          <WishlistProvider>
+            <AppContent />
+          </WishlistProvider>
+        </CartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

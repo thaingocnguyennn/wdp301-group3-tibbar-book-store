@@ -15,6 +15,8 @@ import wishlistRoutes from "./routes/wishlistRoutes.js";
 import sliderRoutes from "./routes/sliderRoutes.js";
 import adminSliderRoutes from "./routes/adminSliderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
+import vietqrPaymentRoutes from "./routes/vietqrPaymentRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
@@ -62,6 +64,9 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/sliders", sliderRoutes);
 app.use("/api/admin/sliders", adminSliderRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/payments/vietqr", vietqrPaymentRoutes);
+
 // 404 Handler
 app.use("*", (req, res) => {
   return ApiResponse.error(

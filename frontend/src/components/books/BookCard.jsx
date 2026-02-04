@@ -75,7 +75,7 @@ const BookCard = ({ book }) => {
 
         <div style={styles.footer}>
           <span style={styles.price}>
-            ${typeof book.price === 'number' ? book.price.toFixed(2) : '0.00'}
+            {typeof book.price === 'number' ? book.price.toLocaleString('vi-VN') : '0'}₫
           </span>
           <Link to={`/books/${book._id}`} style={styles.button}>
             View Details

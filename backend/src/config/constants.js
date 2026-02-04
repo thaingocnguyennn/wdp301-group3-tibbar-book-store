@@ -61,3 +61,15 @@ export const PAGINATION = {
   DEFAULT_LIMIT: 12,
   MAX_LIMIT: 100
 };
+
+// Book price constraints (VND)
+export const BOOK_PRICE = {
+  MIN: 50000,
+  MAX: 120000
+};
+
+// Shipping fee (VND)
+export const SHIPPING = {
+  FEE: 30000,
+  FREE_THRESHOLD: 200000
+};
