@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { categoryApi } from '../../api/categoryApi';
-
+import { useNavigate } from 'react-router-dom';
 const CategoriesManagement = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,7 +11,7 @@ const CategoriesManagement = () => {
     description: ''
   });
   const [message, setMessage] = useState('');
-
+  const navigate = useNavigate();
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -39,11 +39,22 @@ const CategoriesManagement = () => {
         await categoryApi.createCategory(formData);
         setMessage('Category created successfully');
       }
-      
+
       resetForm();
       fetchCategories();
+
+
+      setTimeout(() => {
+        setMessage('');
+      }, 5000);
+
     } catch (error) {
       setMessage(error.response?.data?.message || 'Operation failed');
+
+
+      setTimeout(() => {
+        setMessage('');
+      }, 5000);
     }
   };
 
@@ -56,17 +67,6 @@ const CategoriesManagement = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
-
-    try {
-      await categoryApi.deleteCategory(id);
-      setMessage('Category deleted successfully');
-      fetchCategories();
-    } catch (error) {
-      setMessage(error.response?.data?.message || 'Failed to delete category');
-    }
-  };
 
   const resetForm = () => {
     setFormData({ name: '', description: '' });
@@ -77,7 +77,11 @@ const CategoriesManagement = () => {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Categories Management</h1>
+        <div style={styles.headerLeft}>
+
+          <h1 style={styles.title}>Categories Management</h1>
+        </div>
+
         <button
           onClick={() => setShowForm(!showForm)}
           style={styles.addButton}
@@ -86,17 +90,18 @@ const CategoriesManagement = () => {
         </button>
       </div>
 
+
       {message && <div style={styles.message}>{message}</div>}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.form}>
-          <h3>{editingCategory ? 'Edit Category' : 'Add New Category'}</h3>
-          
+          <h3>{editingCategory ? 'Update Category' : 'Add New Category'}</h3>
+
           <input
             type="text"
             placeholder="Category Name *"
             value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
             style={styles.input}
           />
@@ -104,7 +109,7 @@ const CategoriesManagement = () => {
           <textarea
             placeholder="Description"
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             style={styles.textarea}
             rows="4"
           />
@@ -142,12 +147,7 @@ const CategoriesManagement = () => {
                 >
                   Edit
                 </button>
-                <button
-                  onClick={() => handleDelete(category._id)}
-                  style={styles.deleteBtn}
-                >
-                  Delete
-                </button>
+
               </div>
             </div>
           ))
@@ -273,15 +273,7 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer'
   },
-  deleteBtn: {
-    flex: 1,
-    backgroundColor: '#e74c3c',
-    color: '#fff',
-    padding: '0.5rem',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
-  },
+
   loading: {
     textAlign: 'center',
     padding: '2rem',
@@ -293,7 +285,9 @@ const styles = {
     padding: '2rem',
     gridColumn: '1 / -1',
     color: '#7f8c8d'
-  }
+  },
+  
+
 };
 
 export default CategoriesManagement;

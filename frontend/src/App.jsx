@@ -1,15 +1,21 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { useAuth } from './hooks/useAuth';
-import Navbar from './components/common/Navbar';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import BookDetailPage from './pages/BookDetailPage';
-import ProfilePage from './pages/ProfilePage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import BooksManagement from './pages/admin/BooksManagement';
-import CategoriesManagement from './pages/admin/CategoriesManagement';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./hooks/useAuth";
+import Navbar from "./components/common/Navbar";
+import Footer from "./components/common/Footer";
+import HomePage from "./pages/HomePage";
+import NewestPage from "./pages/NewestPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import BookDetailPage from "./pages/BookDetailPage";
+import ProfilePage from "./pages/ProfilePage";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import BooksManagement from "./pages/admin/BooksManagement";
+import CategoriesManagement from "./pages/admin/CategoriesManagement";
+import SlidersManagement from "./pages/admin/SlidersManagement";
+import UsersManagement from "./pages/admin/UsersManagement";
+import Wishlist from "./pages/Wishlist";
+import CartPage from "./pages/CartPage";
 
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -20,7 +26,13 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: window.location.pathname }} replace />;
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: window.location.pathname }}
+        replace
+      />
+    );
   }
 
   if (adminOnly && !isAdmin) {
@@ -52,8 +64,9 @@ function AppContent() {
       <Routes>
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
-        
+
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
           path="/login"
@@ -71,7 +84,7 @@ function AppContent() {
             </PublicRoute>
           }
         />
-        
+
         {/* Protected Routes - Authentication required */}
         <Route
           path="/profile"
@@ -81,6 +94,8 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/wishlist" element={<Wishlist />} />
 
         {/* Admin Routes - Admin role required */}
         <Route
@@ -110,9 +125,28 @@ function AppContent() {
           }
         />
 
+        <Route
+          path="/admin/sliders"
+          element={
+            <ProtectedRoute adminOnly>
+              <SlidersManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute adminOnly>
+              <UsersManagement />
+            </ProtectedRoute>
+          }
+        />
+
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Footer />
     </div>
   );
 }
@@ -129,17 +163,17 @@ function App() {
 
 const styles = {
   app: {
-    minHeight: '100vh',
-    backgroundColor: '#ecf0f1'
+    minHeight: "100vh",
+    backgroundColor: "#ecf0f1",
   },
   loading: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    fontSize: '1.5rem',
-    color: '#7f8c8d'
-  }
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100vh",
+    fontSize: "1.5rem",
+    color: "#7f8c8d",
+  },
 };
 
 export default App;
