@@ -97,8 +97,8 @@ const BookDetailPage = () => {
           )}
 
           <div style={styles.priceSection}>
-            <span style={styles.price}>${book.price.toFixed(2)}</span>
-            <p style={styles.priceNote}>Free shipping on orders over $50</p>
+            <span style={styles.price}>{book.price.toLocaleString('vi-VN')}₫</span>
+            <p style={styles.priceNote}>Free shipping on orders over 200,000₫</p>
           </div>
 
           <div style={styles.divider}></div>

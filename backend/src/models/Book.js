@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { BOOK_VISIBILITY } from '../config/constants.js';
+import { BOOK_VISIBILITY, BOOK_PRICE } from '../config/constants.js';
 
 const bookSchema = new mongoose.Schema({
   title: {
@@ -27,7 +27,8 @@ const bookSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: [true, 'Price is required'],
-    min: [0, 'Price cannot be negative']
+    min: [BOOK_PRICE.MIN, `Price must be at least ${BOOK_PRICE.MIN.toLocaleString('vi-VN')} VND`],
+    max: [BOOK_PRICE.MAX, `Price cannot exceed ${BOOK_PRICE.MAX.toLocaleString('vi-VN')} VND`]
   },
   stock: {
     type: Number,
