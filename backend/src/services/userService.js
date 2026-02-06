@@ -5,7 +5,7 @@ import { MESSAGES, ROLES } from '../config/constants.js';
 class UserService {
   async getProfile(userId) {
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
@@ -90,16 +90,22 @@ class UserService {
     }
 
     user.isActive = !user.isActive;
-    
+
     // If locking the account, clear refresh token to invalidate session
     if (!user.isActive) {
       user.refreshToken = null;
     }
-    
+
     await user.save();
 
     return user;
   }
+  async getShippers() {
+    return User.find({ role: "shipper" })
+      .select("email role createdAt")
+      .sort({ createdAt: -1 });
+  }
+
 }
 
 export default new UserService();

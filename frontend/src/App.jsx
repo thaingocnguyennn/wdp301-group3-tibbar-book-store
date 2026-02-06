@@ -21,7 +21,9 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccessPage from "./pages/OrderSuccessPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
-
+import AdminWishlist from "./pages/admin/AdminWishlist";
+import AdminShippers from "./pages/admin/AdminShippers";
+import AdminRevenue from "./pages/admin/AdminRevenue";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, isAdmin, loading } = useAuth();
@@ -101,7 +103,7 @@ function AppContent() {
         />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
-        
+
         {/* Checkout Routes */}
         <Route
           path="/checkout"
@@ -162,10 +164,13 @@ function AppContent() {
           path="/admin/users"
           element={
             <ProtectedRoute adminOnly>
-              <UsersManagement />
+              <UsersManagement />x
             </ProtectedRoute>
           }
         />
+        <Route path="/admin/wishlist" element={<AdminWishlist />} />
+        <Route path="/admin/shippers" element={<AdminShippers />} />
+        <Route path="/admin/revenue" element={<AdminRevenue />} />
 
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />

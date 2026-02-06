@@ -32,6 +32,15 @@ class UserController {
       next(error);
     }
   }
+  getShippers = async (req, res, next) => {
+    try {
+      const shippers = await userService.getShippers();
+      res.json({ shippers });
+    } catch (err) {
+      next(err);
+    }
+  };
+
 }
 
 export default new UserController();

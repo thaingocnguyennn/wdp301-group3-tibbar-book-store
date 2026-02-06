@@ -8,5 +8,10 @@ const router = express.Router();
 
 router.get('/me', authenticate, authorize(ROLES.CUSTOMER, ROLES.ADMIN), userController.getProfile);
 router.put('/me', authenticate, authorize(ROLES.CUSTOMER, ROLES.ADMIN), userController.updateProfile);
+router.get(
+    "/admin/shippers",
+    authenticate,
+    userController.getShippers
+);
 
 export default router;

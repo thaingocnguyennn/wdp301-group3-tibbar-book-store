@@ -1,5 +1,4 @@
 import Wishlist from '../models/Wishlist.js';
-import Book from '../models/Book.js';
 import ApiError from '../utils/ApiError.js';
 import mongoose from 'mongoose';
 
@@ -19,7 +18,7 @@ class WishlistService {
 
     const wishlist = await Wishlist.findOneAndUpdate(
       { user: userId },
-      { $addToSet: { books: bookId } }, // ✅ CHỐNG TRÙNG TUYỆT ĐỐI
+      { $addToSet: { books: bookId } }, //CHỐNG TRÙNG TUYỆT ĐỐI
       { new: true, upsert: true }
     ).populate('books');
 
@@ -39,6 +38,39 @@ class WishlistService {
     return wishlist;
 
   }
+  async getWishlistStats() {
+    const stats = await Wishlist.aggregate([
+      { $unwind: "$books" },
+      {
+        $group: {
+          _id: "$books",
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: "books",
+          localField: "_id",
+          foreignField: "_id",
+          as: "book"
+        }
+      },
+      { $unwind: "$book" },
+      {
+        $project: {
+          _id: 0,
+          bookId: "$book._id",
+          title: "$book.title",
+          author: "$book.author",
+          count: 1
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    return stats;
+  }
+
 }
 
 export default new WishlistService();

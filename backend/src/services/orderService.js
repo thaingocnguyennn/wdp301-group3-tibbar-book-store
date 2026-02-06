@@ -25,9 +25,9 @@ class OrderService {
   // Validate cart before creating order
   async validateCartForCheckout(userId) {
     console.log("🔍 [OrderService] Validating cart for user:", userId);
-    
+
     const cart = await Cart.findOne({ user: userId }).populate("items.book");
-    
+
     console.log("📦 [OrderService] Cart found:", {
       cartExists: !!cart,
       itemsCount: cart?.items?.length || 0,
@@ -155,19 +155,19 @@ class OrderService {
       total: totals.total,
       ipAddress
     });
-    
+
     const paymentResult = await paymentProvider.createPayment({
       orderNumber,
       total: totals.total,
       ipAddress,
     });
-    
+
     console.log("✅ [OrderService] Payment created:", {
       paymentMethod: paymentResult.paymentMethod,
       paymentStatus: paymentResult.paymentStatus,
       hasQrCode: !!paymentResult.qrCodeUrl
     });
-    
+
     console.log("✅ [OrderService] Payment created:", {
       paymentMethod: paymentResult.paymentMethod,
       paymentStatus: paymentResult.paymentStatus,
@@ -205,7 +205,7 @@ class OrderService {
 
     // Populate order details
     await order.populate("items.book user");
-    
+
     console.log("🎉 [OrderService] Order created successfully:", {
       orderNumber: order.orderNumber,
       orderId: order._id,
@@ -300,7 +300,7 @@ class OrderService {
 
     // Update order payment status
     order.paymentStatus = confirmResult.paymentStatus;
-    
+
     if (confirmResult.success) {
       order.transactionId = confirmResult.transactionId || order.transactionId;
       order.paidAt = new Date();
@@ -371,7 +371,7 @@ class OrderService {
     order.paymentStatus = "PAID";
     order.paidAt = new Date();
     order.orderStatus = "PROCESSING";
-    
+
     await order.save();
 
     console.log("✅ [OrderService] VietQR payment confirmed:", {
@@ -381,6 +381,42 @@ class OrderService {
 
     return { order, message: "Payment confirmed successfully" };
   }
+  async getRevenue(range) {
+    const filter = { status: "completed" };
+
+    const now = new Date();
+
+    if (range === "today") {
+      filter.createdAt = {
+        $gte: new Date(now.setHours(0, 0, 0, 0))
+      };
+    }
+
+    if (range === "month") {
+      filter.createdAt = {
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1)
+      };
+    }
+
+    if (range === "year") {
+      filter.createdAt = {
+        $gte: new Date(now.getFullYear(), 0, 1)
+      };
+    }
+
+    const orders = await Order.find(filter);
+
+    const totalRevenue = orders.reduce(
+      (sum, order) => sum + order.totalPrice,
+      0
+    );
+
+    return {
+      totalRevenue,
+      totalOrders: orders.length
+    };
+  }
+
 }
 
 export default new OrderService();
