@@ -33,6 +33,15 @@ class WishlistController {
       next(err);
     }
   };
+  getWishlistStats = async (req, res, next) => {
+    try {
+      const stats = await wishlistService.getWishlistStats();
+      res.json({ stats });
+    } catch (err) {
+      next(err);
+    }
+  };
+
 }
 
 export default new WishlistController();

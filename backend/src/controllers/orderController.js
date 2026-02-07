@@ -151,7 +151,7 @@ class OrderController {
   async confirmVietQRPayment(req, res, next) {
     try {
       const { orderNumber } = req.params;
-      
+
       const result = await orderService.confirmVietQRPayment(orderNumber);
 
       return ApiResponse.success(
@@ -164,6 +164,17 @@ class OrderController {
       next(error);
     }
   }
+  getRevenue = async (req, res, next) => {
+    try {
+      const { range } = req.query;
+      const data = await orderService.getRevenue(range);
+
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  };
+
 }
 
 export default new OrderController();

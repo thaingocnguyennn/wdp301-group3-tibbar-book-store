@@ -1,6 +1,8 @@
 import express from "express";
 import orderController from "../controllers/orderController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
+import { authorize } from "../middlewares/roleMiddleware.js";
+import { ROLES } from "../config/constants.js";
 
 const router = express.Router();
 
@@ -30,5 +32,12 @@ router.get("/:id", orderController.getOrderById);
 
 // Cancel order
 router.patch("/:id/cancel", orderController.cancelOrder);
+
+router.get(
+    "/admin/revenue",
+    authenticate,
+    authorize(ROLES.ADMIN),
+    orderController.getRevenue
+);
 
 export default router;
