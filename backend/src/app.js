@@ -14,6 +14,7 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import wishlistRoutes from "./routes/wishlistRoutes.js";
 import sliderRoutes from "./routes/sliderRoutes.js";
 import adminSliderRoutes from "./routes/adminSliderRoutes.js";
+import adminOrderRoutes from "./routes/adminOrderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import vietqrPaymentRoutes from "./routes/vietqrPaymentRoutes.js";
@@ -63,6 +64,7 @@ app.use("/api/admin/categories", categoryRoutes); // Admin categories (same rout
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/sliders", sliderRoutes);
 app.use("/api/admin/sliders", adminSliderRoutes);
+app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments/vietqr", vietqrPaymentRoutes);

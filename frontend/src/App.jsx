@@ -24,6 +24,7 @@ import PaymentReturnPage from "./pages/PaymentReturnPage";
 import AdminWishlist from "./pages/admin/AdminWishlist";
 import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
+import OrdersManagement from "./pages/admin/OrdersManagement";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, isAdmin, loading } = useAuth();
@@ -156,6 +157,15 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <SlidersManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/orders"
+          element={
+            <ProtectedRoute adminOnly>
+              <OrdersManagement />
             </ProtectedRoute>
           }
         />

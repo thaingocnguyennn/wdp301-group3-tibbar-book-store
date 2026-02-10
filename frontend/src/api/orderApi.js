@@ -65,3 +65,20 @@ export const orderApi = {
     return response.data;
   },
 };
+
+export const adminOrderApi = {
+  getAllOrders: async (params = {}) => {
+    const response = await axiosInstance.get("/admin/orders", { params });
+    return response.data;
+  },
+
+  getOrderById: async (orderId) => {
+    const response = await axiosInstance.get(`/admin/orders/${orderId}`);
+    return response.data;
+  },
+
+  updateOrderStatus: async (orderId, status) => {
+    const response = await axiosInstance.patch(`/admin/orders/${orderId}/status`, { status });
+    return response.data;
+  },
+};
