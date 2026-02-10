@@ -193,12 +193,26 @@ class OrderService {
       transactionId: paymentResult.transactionId || null,
     });
 
-    // Update book stock
+    // Update book stock safely (prevent overselling)
     for (const item of validItems) {
-      await Book.findByIdAndUpdate(item.book._id, {
-        $inc: { stock: -item.quantity },
-      });
+      const updatedBook = await Book.findOneAndUpdate(
+        {
+          _id: item.book._id,
+          stock: { $gte: item.quantity }, // only update if enough stock
+        },
+        {
+          $inc: { stock: -item.quantity },
+        },
+        { new: true }
+      );
+
+      if (!updatedBook) {
+        throw ApiError.badRequest(
+          `Product "${item.book.title}" is out of stock or not enough quantity available.`
+        );
+      }
     }
+
 
     // Clear cart only after successful order creation
     await Cart.findByIdAndUpdate(cart._id, { items: [] });
