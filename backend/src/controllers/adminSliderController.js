@@ -26,10 +26,7 @@ class AdminSliderController {
 
       const payload = {
         imageUrl: `/uploads/sliders/${req.file.filename}`,
-        title: req.body.title || "",
-        subtitle: req.body.subtitle || "",
-        ctaText: req.body.ctaText || "",
-        ctaLink: req.body.ctaLink || "",
+       
         visibility: req.body.visibility || "public",
       };
 
@@ -46,10 +43,7 @@ class AdminSliderController {
   async updateSlider(req, res, next) {
     try {
       const updatePayload = {
-        title: req.body.title,
-        subtitle: req.body.subtitle,
-        ctaText: req.body.ctaText,
-        ctaLink: req.body.ctaLink,
+        
         visibility: req.body.visibility,
       };
 

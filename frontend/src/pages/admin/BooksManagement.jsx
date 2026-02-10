@@ -8,6 +8,8 @@ const BooksManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imageInputKey, setImageInputKey] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -83,12 +85,23 @@ const BooksManagement = () => {
       return;
     }
 
+    const payload = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        payload.append(key, value);
+      }
+    });
+
+    if (imageFile) {
+      payload.append('image', imageFile);
+    }
+
     try {
       if (editingBook) {
-        await bookApi.updateBook(editingBook._id, formData);
+        await bookApi.updateBook(editingBook._id, payload);
         setMessage('Book updated successfully');
       } else {
-        await bookApi.createBook(formData);
+        await bookApi.createBook(payload);
         setMessage('Book created successfully');
       }
       
@@ -113,6 +126,7 @@ const BooksManagement = () => {
       publishedDate: book.publishedDate ? book.publishedDate.split('T')[0] : '',
       visibility: book.visibility
     });
+    setImageFile(null);
     setShowForm(true);
   };
 
@@ -154,6 +168,8 @@ const BooksManagement = () => {
     setEditingBook(null);
     setShowForm(false);
     setPriceError('');
+    setImageFile(null);
+    setImageInputKey((prev) => prev + 1);
   };
 
   return (
@@ -259,10 +275,10 @@ const BooksManagement = () => {
           </div>
 
           <input
-            type="text"
-            placeholder="Image URL"
-            value={formData.imageUrl}
-            onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
+            key={imageInputKey}
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
             style={styles.input}
           />
 
