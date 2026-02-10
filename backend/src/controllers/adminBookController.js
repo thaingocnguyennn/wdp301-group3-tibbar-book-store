@@ -20,7 +20,13 @@ class AdminBookController {
 
   async createBook(req, res, next) {
     try {
-      const book = await bookService.createBook(req.body);
+      const payload = { ...req.body };
+
+      if (req.file) {
+        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      }
+
+      const book = await bookService.createBook(payload);
 
       return ApiResponse.success(
         res,
@@ -35,7 +41,13 @@ class AdminBookController {
 
   async updateBook(req, res, next) {
     try {
-      const book = await bookService.updateBook(req.params.id, req.body);
+      const payload = { ...req.body };
+
+      if (req.file) {
+        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      }
+
+      const book = await bookService.updateBook(req.params.id, payload);
 
       return ApiResponse.success(
         res,

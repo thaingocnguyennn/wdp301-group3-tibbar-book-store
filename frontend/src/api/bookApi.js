@@ -23,12 +23,22 @@ export const bookApi = {
   },
 
   createBook: async (bookData) => {
-    const response = await axiosInstance.post('/admin/books', bookData);
+    const isFormData = bookData instanceof FormData;
+    const response = await axiosInstance.post(
+      '/admin/books',
+      bookData,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    );
     return response.data;
   },
 
   updateBook: async (id, bookData) => {
-    const response = await axiosInstance.put(`/admin/books/${id}`, bookData);
+    const isFormData = bookData instanceof FormData;
+    const response = await axiosInstance.put(
+      `/admin/books/${id}`,
+      bookData,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    );
     return response.data;
   },
 
