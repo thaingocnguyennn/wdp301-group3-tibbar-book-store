@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const ProfilePage = () => {
   const { user: authUser } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -19,6 +20,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [profileUser, setProfileUser] = useState(null);
 
   useEffect(() => {
     fetchProfile();
@@ -28,6 +30,7 @@ const ProfilePage = () => {
     try {
       const response = await userApi.getProfile();
       const user = response.data.user;
+      setProfileUser(user);
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
@@ -73,12 +76,40 @@ const ProfilePage = () => {
 
     try {
       await userApi.updateProfile(formData);
+      await fetchProfile();
       setMessage('Profile updated successfully!');
+      setIsEditing(false);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClick = () => {
+    setMessage('');
+    setError('');
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    if (profileUser) {
+      setFormData({
+        firstName: profileUser.firstName || '',
+        lastName: profileUser.lastName || '',
+        phone: profileUser.phone || '',
+        address: profileUser.address || {
+          street: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: ''
+        }
+      });
+    }
+    setMessage('');
+    setError('');
+    setIsEditing(false);
   };
 
   return (
@@ -93,110 +124,134 @@ const ProfilePage = () => {
 
         {message && <div style={styles.success}>{message}</div>}
         {error && <div style={styles.error}>{error}</div>}
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <h3 style={styles.sectionTitle}>Personal Information</h3>
-          
-          <div style={styles.row}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>First Name</label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                style={styles.input}
-              />
+        {!isEditing ? (
+          <div style={styles.detailsSection}>
+            <div style={styles.detailGroup}>
+              <div style={styles.detailItem}><strong>First Name:</strong> {profileUser?.firstName || '-'}</div>
+              <div style={styles.detailItem}><strong>Last Name:</strong> {profileUser?.lastName || '-'}</div>
+              <div style={styles.detailItem}><strong>Phone:</strong> {profileUser?.phone || '-'}</div>
             </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Last Name</label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                style={styles.input}
-              />
+            <div style={styles.detailGroup}>
+              <div style={styles.detailItem}><strong>Street:</strong> {profileUser?.address?.street || '-'}</div>
+              <div style={styles.detailItem}><strong>City:</strong> {profileUser?.address?.city || '-'}</div>
+              <div style={styles.detailItem}><strong>State:</strong> {profileUser?.address?.state || '-'}</div>
+              <div style={styles.detailItem}><strong>Zip Code:</strong> {profileUser?.address?.zipCode || '-'}</div>
+              <div style={styles.detailItem}><strong>Country:</strong> {profileUser?.address?.country || '-'}</div>
             </div>
+            <button type="button" style={styles.button} onClick={handleEditClick}>
+              Edit Profile
+            </button>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <h3 style={styles.sectionTitle}>Personal Information</h3>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              style={styles.input}
-            />
-          </div>
+            <div style={styles.row}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>First Name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
 
-          <h3 style={styles.sectionTitle}>Address</h3>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
+            </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Street</label>
-            <input
-              type="text"
-              name="address.street"
-              value={formData.address.street}
-              onChange={handleChange}
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.row}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>City</label>
+              <label style={styles.label}>Phone</label>
               <input
-                type="text"
-                name="address.city"
-                value={formData.address.city}
+                type="tel"
+                name="phone"
+                value={formData.phone}
                 onChange={handleChange}
                 style={styles.input}
               />
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>State</label>
-              <input
-                type="text"
-                name="address.state"
-                value={formData.address.state}
-                onChange={handleChange}
-                style={styles.input}
-              />
-            </div>
-          </div>
+            <h3 style={styles.sectionTitle}>Address</h3>
 
-          <div style={styles.row}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Zip Code</label>
+              <label style={styles.label}>Street</label>
               <input
                 type="text"
-                name="address.zipCode"
-                value={formData.address.zipCode}
+                name="address.street"
+                value={formData.address.street}
                 onChange={handleChange}
                 style={styles.input}
               />
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Country</label>
-              <input
-                type="text"
-                name="address.country"
-                value={formData.address.country}
-                onChange={handleChange}
-                style={styles.input}
-              />
-            </div>
-          </div>
+            <div style={styles.row}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>City</label>
+                <input
+                  type="text"
+                  name="address.city"
+                  value={formData.address.city}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
 
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Updating...' : 'Update Profile'}
-          </button>
-        </form>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>State</label>
+                <input
+                  type="text"
+                  name="address.state"
+                  value={formData.address.state}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+
+            <div style={styles.row}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Zip Code</label>
+                <input
+                  type="text"
+                  name="address.zipCode"
+                  value={formData.address.zipCode}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Country</label>
+                <input
+                  type="text"
+                  name="address.country"
+                  value={formData.address.country}
+                  onChange={handleChange}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+
+            <div style={styles.buttonRow}>
+              <button type="submit" disabled={loading} style={styles.button}>
+                {loading ? 'Updating...' : 'Update Profile'}
+              </button>
+              <button type="button" disabled={loading} style={styles.secondaryButton} onClick={handleCancel}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -238,6 +293,20 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '1rem'
   },
+  detailsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  detailGroup: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '0.75rem'
+  },
+  detailItem: {
+    fontSize: '0.95rem',
+    color: '#2c3e50'
+  },
   form: {
     display: 'flex',
     flexDirection: 'column',
@@ -275,6 +344,22 @@ const styles = {
     color: '#fff',
     padding: '0.75rem',
     border: 'none',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    marginTop: '1rem'
+  },
+  buttonRow: {
+    display: 'flex',
+    gap: '0.75rem',
+    alignItems: 'center'
+  },
+  secondaryButton: {
+    backgroundColor: '#ecf0f1',
+    color: '#2c3e50',
+    padding: '0.75rem',
+    border: '1px solid #dcdfe3',
     borderRadius: '4px',
     fontSize: '1rem',
     fontWeight: '500',
