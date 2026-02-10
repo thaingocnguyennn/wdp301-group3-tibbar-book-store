@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
 import Book from "../models/Book.js";
+import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
@@ -256,6 +257,104 @@ class OrderService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  // Admin: get all orders with filters
+  async getAllOrders({ page = 1, limit = 10, status, paymentStatus, search, userId } = {}) {
+    const skip = (page - 1) * limit;
+    const filter = {};
+
+    if (status && status !== "all") {
+      filter.orderStatus = status;
+    }
+
+    if (paymentStatus && paymentStatus !== "all") {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (userId) {
+      filter.user = userId;
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      const matchedUsers = await User.find({
+        $or: [
+          { email: searchRegex },
+          { firstName: searchRegex },
+          { lastName: searchRegex },
+        ],
+      }).select("_id");
+
+      const userIds = matchedUsers.map((user) => user._id);
+
+      filter.$or = [
+        { orderNumber: searchRegex },
+        ...(userIds.length ? [{ user: { $in: userIds } }] : []),
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .populate("items.book")
+        .populate("user", "email firstName lastName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(filter),
+    ]);
+
+    return {
+      orders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // Admin: get order by ID
+  async getOrderByIdAdmin(orderId) {
+    const order = await Order.findById(orderId)
+      .populate("items.book")
+      .populate("user", "email firstName lastName")
+      .lean();
+
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    return order;
+  }
+
+  // Admin: update order status
+  async updateOrderStatus(orderId, status) {
+    const allowedStatuses = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
+
+    if (!allowedStatuses.includes(status)) {
+      throw ApiError.badRequest("Invalid order status");
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    order.orderStatus = status;
+
+    if (status === "DELIVERED" && !order.deliveredAt) {
+      order.deliveredAt = new Date();
+    }
+
+    await order.save();
+
+    await order.populate("items.book user");
+
+    return order;
   }
 
   // Get order by ID

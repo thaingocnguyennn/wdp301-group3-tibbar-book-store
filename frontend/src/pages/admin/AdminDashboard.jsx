@@ -59,13 +59,13 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
-        <div style={{ ...styles.card, ...styles.disabled }}>
+        <Link to="/admin/orders" style={styles.card}>
           <div style={styles.icon}>📦</div>
           <h3 style={styles.cardTitle}>Orders</h3>
           <p style={styles.cardDesc}>
-            View and manage customer orders (Coming Soon)
+            View and manage customer orders
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );
@@ -100,10 +100,6 @@ const styles = {
       transform: "translateY(-4px)",
       boxShadow: "0 6px 12px rgba(0,0,0,0.15)",
     },
-  },
-  disabled: {
-    opacity: 0.6,
-    cursor: "not-allowed",
   },
   icon: {
     fontSize: "3rem",
