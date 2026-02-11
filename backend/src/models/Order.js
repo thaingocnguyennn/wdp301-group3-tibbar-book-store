@@ -47,7 +47,16 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
     items: [orderItemSchema],
-    
+    shipper: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    assignedAt: {
+      type: Date,
+      default: null,
+    },
+
     // Price breakdown
     subtotal: {
       type: Number,
@@ -65,7 +74,7 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    
+
     // Payment information
     paymentMethod: {
       type: String,
@@ -77,39 +86,39 @@ const orderSchema = new mongoose.Schema(
       enum: ["PENDING", "PAID", "FAILED", "REFUNDED"],
       default: "PENDING",
     },
-    
+
     // Order status
     orderStatus: {
       type: String,
       enum: ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"],
       default: "PENDING",
     },
-    
+
     // Shipping address (placeholder for future module)
     shippingAddress: {
       type: String,
       default: "MOCK_ADDRESS_ID",
     },
-    
+
     // Voucher (placeholder for future module)
     voucher: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Voucher",
       default: null,
     },
-    
+
     // Payment provider transaction ID (for VNPAY)
     transactionId: {
       type: String,
       default: null,
     },
-    
+
     // Notes
     notes: {
       type: String,
       default: "",
     },
-    
+
     // Timestamps for payment and delivery
     paidAt: {
       type: Date,

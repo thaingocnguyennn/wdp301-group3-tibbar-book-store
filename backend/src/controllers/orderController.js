@@ -174,6 +174,24 @@ class OrderController {
       next(err);
     }
   };
+  assignShipper = async (req, res, next) => {
+    try {
+      const { shipperId } = req.body;
+      const orderId = req.params.id;
+
+      const order = await orderService.assignShipper(orderId, shipperId);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Shipper assigned successfully",
+        { order }
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
 
 }
 

@@ -494,41 +494,74 @@ class OrderService {
 
     return { order, message: "Payment confirmed successfully" };
   }
+
   async getRevenue(range) {
-    const filter = { status: "completed" };
+    const filter = { orderStatus: "DELIVERED" };
 
     const now = new Date();
 
-    if (range === "today") {
-      filter.createdAt = {
-        $gte: new Date(now.setHours(0, 0, 0, 0))
-      };
-    }
-
     if (range === "month") {
-      filter.createdAt = {
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1)
-      };
-    }
-
-    if (range === "year") {
-      filter.createdAt = {
-        $gte: new Date(now.getFullYear(), 0, 1)
+      filter.deliveredAt = {
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
       };
     }
 
     const orders = await Order.find(filter);
 
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + order.totalPrice,
-      0
-    );
+    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+
+    // 👇 group theo ngày
+    const chartMap = {};
+
+    orders.forEach(order => {
+      const day = order.deliveredAt.toISOString().slice(0, 10); // yyyy-mm-dd
+      chartMap[day] = (chartMap[day] || 0) + order.total;
+    });
+
+    const chartData = Object.keys(chartMap).map(day => ({
+      date: day,
+      revenue: chartMap[day],
+    }));
 
     return {
       totalRevenue,
-      totalOrders: orders.length
+      totalOrders: orders.length,
+      chartData,
     };
   }
+
+
+
+  async assignShipper(orderId, shipperId) {
+    const shipper = await User.findById(shipperId);
+    if (!shipper || shipper.role?.toLowerCase() !== "shipper") {
+      throw ApiError.badRequest("Invalid shipper");
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    // ❌ Không cho assign lại
+    if (order.shipper) {
+      throw ApiError.badRequest("Order already assigned to a shipper");
+    }
+
+    order.shipper = shipperId;
+    order.assignedAt = new Date();
+
+    // ⭐ CHUYỂN TRẠNG THÁI SANG SHIPPED
+    order.orderStatus = "SHIPPED";
+
+    await order.save();
+    await order.populate("shipper", "email");
+
+    return order;
+  }
+
+
+
 
 }
 

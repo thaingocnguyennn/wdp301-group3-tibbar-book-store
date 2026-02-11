@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminOrderApi } from "../../api/orderApi";
+import axios from "../../api/axios";
 
 const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
 const PAYMENT_STATUSES = ["PENDING", "PAID", "FAILED", "REFUNDED"];
@@ -20,6 +21,8 @@ const OrdersManagement = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [shippers, setShippers] = useState([]);
+  const [selectedShipper, setSelectedShipper] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -86,10 +89,35 @@ const OrdersManagement = () => {
       setError(err.response?.data?.message || "Failed to update order status");
     }
   };
+  const handleAssignShipper = async () => {
+    if (!selectedOrder || !selectedShipper) return;
+
+    try {
+      setMessage("");
+      setError("");
+
+      await adminOrderApi.assignShipper(
+        selectedOrder._id,
+        selectedShipper
+      );
+
+      setMessage("Shipper assigned successfully");
+      fetchOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to assign shipper");
+    }
+  };
 
   const formatCurrency = (value) => {
     return Number(value || 0).toLocaleString("vi-VN") + " ₫";
   };
+  const fetchShippers = async () => {
+    const res = await axios.get("/users/admin/shippers");
+    setShippers(res.data.shippers || []);
+  };
+  useEffect(() => {
+    if (selectedOrder) fetchShippers();
+  }, [selectedOrder]);
 
   if (loading) {
     return (
@@ -98,6 +126,7 @@ const OrdersManagement = () => {
       </div>
     );
   }
+
 
   return (
     <div style={styles.container}>
@@ -261,6 +290,35 @@ const OrdersManagement = () => {
               </button>
             </div>
           </div>
+          {/* Assign Shipper */}
+          <div style={styles.statusRow}>
+            <label style={styles.label}>Assign Shipper</label>
+
+            <div style={styles.statusControls}>
+              <select
+                value={selectedShipper}
+                onChange={(e) => setSelectedShipper(e.target.value)}
+                style={styles.select}
+              >
+                <option value="">Select shipper</option>
+                {shippers.map((shipper) => (
+                  <option key={shipper._id} value={shipper._id}>
+                    {shipper.email}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                style={styles.actionButton}
+                disabled={!selectedShipper}
+                onClick={handleAssignShipper}
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+
 
           <h4 style={styles.itemsTitle}>Items</h4>
           <div style={styles.itemsTable}>
