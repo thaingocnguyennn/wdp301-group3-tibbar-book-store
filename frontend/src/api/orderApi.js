@@ -81,4 +81,12 @@ export const adminOrderApi = {
     const response = await axiosInstance.patch(`/admin/orders/${orderId}/status`, { status });
     return response.data;
   },
+  assignShipper: async (orderId, shipperId) => {
+    const response = await axiosInstance.patch(
+      `/orders/admin/orders/${orderId}/assign-shipper`,
+      { shipperId }
+    );
+    return response.data;
+  },
+
 };

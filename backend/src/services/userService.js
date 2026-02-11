@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, ROLES } from '../config/constants.js';
+import Order from "../models/Order.js";
 
 class UserService {
   async getProfile(userId) {
@@ -101,10 +102,41 @@ class UserService {
     return user;
   }
   async getShippers() {
-    return User.find({ role: "shipper" })
+    // 1️⃣ Lấy danh sách shipper
+    const shippers = await User.find({ role: "shipper" })
       .select("email role createdAt")
       .sort({ createdAt: -1 });
+
+    const shipperIds = shippers.map(s => s._id);
+
+    // 2️⃣ Đếm số order theo shipper
+    const orderCounts = await Order.aggregate([
+      {
+        $match: {
+          shipper: { $in: shipperIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$shipper",
+          total: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // 3️⃣ Map shipperId → total orders
+    const countMap = {};
+    orderCounts.forEach(item => {
+      countMap[item._id.toString()] = item.total;
+    });
+
+    // 4️⃣ Gộp dữ liệu
+    return shippers.map(shipper => ({
+      ...shipper.toObject(),
+      assignedOrders: countMap[shipper._id.toString()] || 0
+    }));
   }
+
 
 }
 

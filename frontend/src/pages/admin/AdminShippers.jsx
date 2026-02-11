@@ -30,22 +30,31 @@ const AdminShippers = () => {
               <tr>
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Role</th>
+                <th style={styles.th}>Assigned Orders</th>
                 <th style={styles.th}>Created At</th>
               </tr>
             </thead>
+
             <tbody>
               {shippers.map((shipper) => (
                 <tr key={shipper._id}>
                   <td style={styles.td}>{shipper.email}</td>
+
                   <td style={{ ...styles.td, ...styles.role }}>
                     {shipper.role}
                   </td>
+
+                  <td style={styles.td}>
+                    {shipper.assignedOrders}
+                  </td>
+
                   <td style={styles.td}>
                     {new Date(shipper.createdAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
             </tbody>
+
           </table>
         )}
       </div>

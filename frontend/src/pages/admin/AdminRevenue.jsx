@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import axios from "../../api/axios";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 const AdminRevenue = () => {
   const [revenue, setRevenue] = useState(0);
   const [ordersCount, setOrdersCount] = useState(0);
   const [range, setRange] = useState("all");
+  const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
     fetchRevenue();
@@ -15,10 +25,12 @@ const AdminRevenue = () => {
       const res = await axios.get(`/orders/admin/revenue?range=${range}`);
       setRevenue(res.data.totalRevenue);
       setOrdersCount(res.data.totalOrders);
+      setChartData(res.data.chartData || []);
     } catch (error) {
       console.error("Error fetching revenue:", error);
     }
   };
+
 
   return (
     <div style={styles.container}>
@@ -36,6 +48,24 @@ const AdminRevenue = () => {
           <option value="year">This Year</option>
         </select>
       </div>
+      <div style={{ marginTop: "3rem" }}>
+        <h2>📈 Revenue Chart</h2>
+
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="#27ae60"
+              strokeWidth={3}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
       <div style={styles.cards}>
         <div style={styles.card}>
@@ -46,7 +76,7 @@ const AdminRevenue = () => {
         </div>
 
         <div style={styles.card}>
-          <h3>Completed Orders</h3>
+          <h3> Delivered Orders</h3>
           <p style={styles.bigNumber}>
             {ordersCount}
           </p>

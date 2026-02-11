@@ -39,5 +39,11 @@ router.get(
     authorize(ROLES.ADMIN),
     orderController.getRevenue
 );
+router.patch(
+    "/admin/orders/:id/assign-shipper",
+    authorize(ROLES.ADMIN),
+    orderController.assignShipper
+);
+
 
 export default router;
