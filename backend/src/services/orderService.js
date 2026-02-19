@@ -7,6 +7,22 @@ import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
 
 class OrderService {
+  normalizeDateBoundary(dateString, isEndOfDay = false) {
+    const parsedDate = new Date(dateString);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw ApiError.badRequest("Invalid date filter format");
+    }
+
+    if (isEndOfDay) {
+      parsedDate.setHours(23, 59, 59, 999);
+    } else {
+      parsedDate.setHours(0, 0, 0, 0);
+    }
+
+    return parsedDate;
+  }
+
   // Calculate shipping fee based on subtotal
   calculateShippingFee(subtotalVnd) {
     // Free shipping for orders > 200,000 VND
@@ -260,7 +276,16 @@ class OrderService {
   }
 
   // Admin: get all orders with filters
-  async getAllOrders({ page = 1, limit = 10, status, paymentStatus, search, userId } = {}) {
+  async getAllOrders({
+    page = 1,
+    limit = 10,
+    status,
+    paymentStatus,
+    search,
+    userId,
+    fromDate,
+    toDate,
+  } = {}) {
     const skip = (page - 1) * limit;
     const filter = {};
 
@@ -274,6 +299,22 @@ class OrderService {
 
     if (userId) {
       filter.user = userId;
+    }
+
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+
+      if (fromDate) {
+        filter.createdAt.$gte = this.normalizeDateBoundary(fromDate);
+      }
+
+      if (toDate) {
+        filter.createdAt.$lte = this.normalizeDateBoundary(toDate, true);
+      }
+
+      if (filter.createdAt.$gte && filter.createdAt.$lte && filter.createdAt.$gte > filter.createdAt.$lte) {
+        throw ApiError.badRequest("fromDate must be earlier than or equal to toDate");
+      }
     }
 
     if (search && search.trim()) {

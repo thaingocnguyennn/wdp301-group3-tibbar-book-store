@@ -7,7 +7,7 @@ class AdminOrderController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      const { status, paymentStatus, search, userId } = req.query;
+      const { status, paymentStatus, search, userId, fromDate, toDate } = req.query;
 
       const result = await orderService.getAllOrders({
         page,
@@ -16,6 +16,8 @@ class AdminOrderController {
         paymentStatus,
         search,
         userId,
+        fromDate,
+        toDate,
       });
 
       return ApiResponse.success(
