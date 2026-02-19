@@ -15,6 +15,7 @@ const BookDetailPage = () => {
   const [error, setError] = useState("");
   const [reviews, setReviews] = useState([]);
   const [reviewSummary, setReviewSummary] = useState({ averageRating: 0, totalReviews: 0 });
+  const [reviewPagination, setReviewPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
   const [reviewLoading, setReviewLoading] = useState(true);
   const [reviewError, setReviewError] = useState("");
   const [myReview, setMyReview] = useState(null);
@@ -24,7 +25,7 @@ const BookDetailPage = () => {
 
   useEffect(() => {
     fetchBook();
-    fetchReviews();
+    fetchReviews(1);
   }, [id]);
 
   useEffect(() => {
@@ -45,13 +46,16 @@ const BookDetailPage = () => {
     }
   };
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (page = 1) => {
     try {
       setReviewLoading(true);
       setReviewError("");
-      const response = await reviewApi.getBookReviews(id);
+      const response = await reviewApi.getBookReviews(id, page, 10);
       setReviews(response.data.reviews || []);
       setReviewSummary(response.data.summary || { averageRating: 0, totalReviews: 0 });
+      setReviewPagination(
+        response.data.pagination || { page: 1, totalPages: 1, total: 0, limit: 10 },
+      );
     } catch (err) {
       setReviewError(err.response?.data?.message || "Failed to load reviews");
     } finally {
@@ -114,7 +118,7 @@ const BookDetailPage = () => {
         await reviewApi.createReview(id, payload);
       }
 
-      await Promise.all([fetchReviews(), fetchMyReview()]);
+      await Promise.all([fetchReviews(1), fetchMyReview()]);
     } catch (err) {
       setReviewError(
         err.response?.data?.message || "Failed to submit review",
@@ -293,20 +297,46 @@ const BookDetailPage = () => {
               ) : reviews.length === 0 ? (
                 <p style={styles.reviewHint}>No reviews yet.</p>
               ) : (
-                reviews.map((review) => (
-                  <div key={review._id} style={styles.reviewItem}>
-                    <div style={styles.reviewHeader}>
-                      <strong>
-                        {review.user?.firstName || "User"} {review.user?.lastName || ""}
-                      </strong>
-                      <span style={styles.reviewStars}>{renderStars(review.rating)}</span>
+                <>
+                  {reviews.map((review) => (
+                    <div key={review._id} style={styles.reviewItem}>
+                      <div style={styles.reviewHeader}>
+                        <strong>
+                          {review.user?.firstName || "User"} {review.user?.lastName || ""}
+                        </strong>
+                        <span style={styles.reviewStars}>{renderStars(review.rating)}</span>
+                      </div>
+                      <p style={styles.reviewComment}>{review.comment || "(No comment)"}</p>
+                      <span style={styles.reviewDate}>
+                        {new Date(review.createdAt).toLocaleDateString()} {review.isEdited ? "• Edited" : ""}
+                      </span>
                     </div>
-                    <p style={styles.reviewComment}>{review.comment || "(No comment)"}</p>
-                    <span style={styles.reviewDate}>
-                      {new Date(review.createdAt).toLocaleDateString()} {review.isEdited ? "• Edited" : ""}
-                    </span>
-                  </div>
-                ))
+                  ))}
+
+                  {reviewPagination.totalPages > 1 && (
+                    <div style={styles.reviewPagination}>
+                      <button
+                        type="button"
+                        style={styles.reviewPageButton}
+                        disabled={reviewPagination.page <= 1}
+                        onClick={() => fetchReviews(reviewPagination.page - 1)}
+                      >
+                        Previous
+                      </button>
+                      <span style={styles.reviewPageInfo}>
+                        Page {reviewPagination.page} / {reviewPagination.totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        style={styles.reviewPageButton}
+                        disabled={reviewPagination.page >= reviewPagination.totalPages}
+                        onClick={() => fetchReviews(reviewPagination.page + 1)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -596,6 +626,27 @@ const styles = {
     color: "#7f8c8d",
     fontSize: "0.9rem",
     margin: 0,
+  },
+  reviewPagination: {
+    marginTop: "0.5rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.75rem",
+  },
+  reviewPageButton: {
+    border: "1px solid #ddd",
+    backgroundColor: "#fff",
+    borderRadius: "6px",
+    padding: "0.4rem 0.7rem",
+    cursor: "pointer",
+    color: "#2c3e50",
+    fontWeight: 600,
+  },
+  reviewPageInfo: {
+    color: "#34495e",
+    fontSize: "0.85rem",
+    fontWeight: 600,
   },
   addToCart: {
     flex: 1,
