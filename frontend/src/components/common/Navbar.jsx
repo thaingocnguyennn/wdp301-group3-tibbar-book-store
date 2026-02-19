@@ -42,6 +42,10 @@ const Navbar = () => {
                 Profile
               </Link>
 
+              <Link to="/orders" style={styles.link}>
+                My Orders
+              </Link>
+
               <Link to="/wishlist" style={styles.link}>
                 Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
               </Link>
@@ -55,7 +59,10 @@ const Navbar = () => {
               </button>
 
               <span style={styles.user}>
-                👤 {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
+                👤{" "}
+                {user?.role
+                  ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                  : "User"}
               </span>
             </>
           ) : (

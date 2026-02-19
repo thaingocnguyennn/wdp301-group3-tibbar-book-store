@@ -24,7 +24,7 @@ const PaymentReturnPage = () => {
 
       // Check if this is a VNPAY callback (has vnp_ parameters)
       const isVNPayCallback = Object.keys(params).some((key) =>
-        key.startsWith("vnp_")
+        key.startsWith("vnp_"),
       );
 
       if (!isVNPayCallback) {
@@ -52,7 +52,7 @@ const PaymentReturnPage = () => {
       if (payment.success) {
         setStatus("success");
         setMessage(payment.message || "Payment completed successfully!");
-        
+
         // Redirect to order success page after 3 seconds
         setTimeout(() => {
           navigate(`/order-success/${confirmedOrder.orderNumber}`, {
@@ -62,7 +62,8 @@ const PaymentReturnPage = () => {
       } else {
         setStatus("failed");
         setMessage(
-          payment.message || "Payment failed. Please try again or contact support."
+          payment.message ||
+            "Payment failed. Please try again or contact support.",
         );
       }
     } catch (error) {
@@ -70,7 +71,7 @@ const PaymentReturnPage = () => {
       setStatus("error");
       setMessage(
         error.response?.data?.message ||
-          "An error occurred while confirming payment. Please contact support."
+          "An error occurred while confirming payment. Please contact support.",
       );
     }
   };
@@ -163,7 +164,7 @@ const PaymentReturnPage = () => {
             <div style={styles.actions}>
               <button
                 style={styles.primaryButton}
-                onClick={() => navigate("/profile")}
+                onClick={() => navigate("/orders")}
               >
                 View My Orders
               </button>

@@ -139,11 +139,11 @@ const OrderSuccessPage = () => {
                   <span style={styles.itemTitle}>{item.title}</span>
                   <span style={styles.itemAuthor}>by {item.author}</span>
                   <span style={styles.itemPrice}>
-                    {item.price.toLocaleString('vi-VN')}₫ x {item.quantity}
+                    {item.price.toLocaleString("vi-VN")}₫ x {item.quantity}
                   </span>
                 </div>
                 <div style={styles.itemSubtotal}>
-                  {item.subtotal.toLocaleString('vi-VN')}₫
+                  {item.subtotal.toLocaleString("vi-VN")}₫
                 </div>
               </div>
             ))}
@@ -156,24 +156,24 @@ const OrderSuccessPage = () => {
           <div style={styles.summary}>
             <div style={styles.summaryRow}>
               <span>Subtotal</span>
-              <span>{order.subtotal.toLocaleString('vi-VN')}₫</span>
+              <span>{order.subtotal.toLocaleString("vi-VN")}₫</span>
             </div>
             <div style={styles.summaryRow}>
               <span>Discount</span>
-              <span>-{order.discount.toLocaleString('vi-VN')}₫</span>
+              <span>-{order.discount.toLocaleString("vi-VN")}₫</span>
             </div>
             <div style={styles.summaryRow}>
               <span>Shipping Fee</span>
               <span>
                 {order.shippingFee === 0
                   ? "Free"
-                  : `${order.shippingFee.toLocaleString('vi-VN')}₫`}
+                  : `${order.shippingFee.toLocaleString("vi-VN")}₫`}
               </span>
             </div>
             <div style={styles.summaryDivider}></div>
             <div style={styles.summaryTotal}>
               <strong>Total</strong>
-              <strong>{order.total.toLocaleString('vi-VN')}₫</strong>
+              <strong>{order.total.toLocaleString("vi-VN")}₫</strong>
             </div>
           </div>
         </div>
@@ -184,8 +184,8 @@ const OrderSuccessPage = () => {
             <h3 style={styles.infoBoxTitle}>💵 Payment Instructions</h3>
             <p style={styles.infoBoxText}>
               You have selected Cash on Delivery. Please prepare the exact
-              amount of <strong>{order.total.toLocaleString('vi-VN')}₫</strong> to pay when
-              you receive your order.
+              amount of <strong>{order.total.toLocaleString("vi-VN")}₫</strong>{" "}
+              to pay when you receive your order.
             </p>
           </div>
         )}
@@ -202,14 +202,11 @@ const OrderSuccessPage = () => {
         <div style={styles.actions}>
           <button
             style={styles.primaryButton}
-            onClick={() => navigate("/profile")}
+            onClick={() => navigate("/orders")}
           >
             View My Orders
           </button>
-          <button
-            style={styles.secondaryButton}
-            onClick={() => navigate("/")}
-          >
+          <button style={styles.secondaryButton} onClick={() => navigate("/")}>
             Continue Shopping
           </button>
         </div>

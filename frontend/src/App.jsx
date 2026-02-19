@@ -21,6 +21,8 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccessPage from "./pages/OrderSuccessPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
+import OrderHistoryPage from "./pages/OrderHistoryPage";
+import OrderDetailPage from "./pages/OrderDetailPage";
 import AdminWishlist from "./pages/admin/AdminWishlist";
 import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
@@ -102,6 +104,22 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute>
+              <OrderHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/:id"
+          element={
+            <ProtectedRoute>
+              <OrderDetailPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
 
@@ -122,7 +140,10 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-        <Route path="/checkout/payment-return" element={<PaymentReturnPage />} />
+        <Route
+          path="/checkout/payment-return"
+          element={<PaymentReturnPage />}
+        />
 
         {/* Admin Routes - Admin role required */}
         <Route
