@@ -7,7 +7,7 @@ class OrderController {
   async createOrder(req, res, next) {
     try {
       const userId = req.user._id;
-      const { paymentMethod, shippingAddressId, voucherId, notes } = req.body;
+      const { paymentMethod, shippingAddressId, voucherId, voucherCode, notes } = req.body;
       const ipAddress = req.headers["x-forwarded-for"] || req.connection.remoteAddress || "127.0.0.1";
 
       console.log("🛒 [OrderController] Create order request:", {
@@ -21,6 +21,7 @@ class OrderController {
         paymentMethod,
         shippingAddressId,
         voucherId,
+        voucherCode,
         notes,
         ipAddress,
       });
@@ -30,6 +31,24 @@ class OrderController {
         HTTP_STATUS.CREATED,
         "Order created successfully",
         result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async validateVoucher(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const { voucherCode } = req.body;
+
+      const result = await orderService.validateVoucherForCheckout(userId, voucherCode);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Voucher validated successfully",
+        result,
       );
     } catch (error) {
       next(error);

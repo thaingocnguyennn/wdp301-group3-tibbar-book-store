@@ -18,6 +18,9 @@ router.get("/payment/confirm", orderController.confirmPayment);
 // Confirm VietQR payment manually (Admin only)
 router.post("/vietqr/confirm/:orderNumber", orderController.confirmVietQRPayment);
 
+// Validate voucher for current cart
+router.post("/voucher/validate", orderController.validateVoucher);
+
 // Create new order (checkout)
 router.post("/", orderController.createOrder);
 

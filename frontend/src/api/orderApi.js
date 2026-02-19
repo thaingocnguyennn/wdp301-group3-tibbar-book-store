@@ -13,6 +13,14 @@ export const orderApi = {
     return response.data;
   },
 
+  // Validate voucher with current cart
+  validateVoucher: async (voucherCode) => {
+    const response = await axiosInstance.post("/orders/voucher/validate", {
+      voucherCode,
+    });
+    return response.data;
+  },
+
   // Get user's orders
   getUserOrders: async (page = 1, limit = 10) => {
     const response = await axiosInstance.get("/orders", {
