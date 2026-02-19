@@ -1,5 +1,6 @@
 import Book from '../models/Book.js';
 import Category from '../models/Category.js';
+import Order from '../models/Order.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, PAGINATION, BOOK_VISIBILITY, BOOK_PRICE } from '../config/constants.js';
 
@@ -67,6 +68,79 @@ class BookService {
       .lean();
 
     return books;
+  }
+
+  async getBestSellingBooks(limit = 8) {
+    const actualLimit = Math.min(Number(limit) || 8, PAGINATION.MAX_LIMIT);
+
+    const bestSellers = await Order.aggregate([
+      {
+        $match: {
+          orderStatus: 'DELIVERED'
+        }
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.book',
+          soldQuantity: { $sum: '$items.quantity' },
+          soldRevenue: { $sum: '$items.subtotal' }
+        }
+      },
+      { $sort: { soldQuantity: -1, soldRevenue: -1 } },
+      { $limit: actualLimit },
+      {
+        $lookup: {
+          from: 'books',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'book'
+        }
+      },
+      { $unwind: '$book' },
+      {
+        $match: {
+          'book.visibility': BOOK_VISIBILITY.PUBLIC
+        }
+      },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'book.category',
+          foreignField: '_id',
+          as: 'category'
+        }
+      },
+      {
+        $addFields: {
+          'book.category': {
+            $cond: [
+              { $gt: [{ $size: '$category' }, 0] },
+              {
+                _id: { $arrayElemAt: ['$category._id', 0] },
+                name: { $arrayElemAt: ['$category.name', 0] }
+              },
+              null
+            ]
+          }
+        }
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: [
+              '$book',
+              {
+                soldQuantity: '$soldQuantity',
+                soldRevenue: '$soldRevenue'
+              }
+            ]
+          }
+        }
+      }
+    ]);
+
+    return bestSellers;
   }
 
   async getBookById(bookId) {

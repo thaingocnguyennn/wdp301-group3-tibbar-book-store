@@ -7,6 +7,7 @@ import Slider from "../components/common/Slider";
 
 const HomePage = () => {
   const [books, setBooks] = useState([]);
+  const [bestSellingBooks, setBestSellingBooks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState([]);
@@ -27,6 +28,7 @@ const HomePage = () => {
   useEffect(() => {
     fetchCategories();
     fetchSliders();
+    fetchBestSellingBooks();
   }, []);
 
   useEffect(() => {
@@ -55,6 +57,15 @@ const HomePage = () => {
       setCategories(response.data.categories);
     } catch (error) {
       console.error("Error fetching categories:", error);
+    }
+  };
+
+  const fetchBestSellingBooks = async () => {
+    try {
+      const response = await bookApi.getBestSellingBooks(8);
+      setBestSellingBooks(response.data.books || []);
+    } catch (error) {
+      console.error("Error fetching best-selling books:", error);
     }
   };
 
@@ -144,6 +155,26 @@ const HomePage = () => {
             style={styles.input}
           />
         </div>
+      </section>
+
+      {/* Best Selling Books */}
+      <section style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>🔥 Best Selling Books</h2>
+          <div style={styles.titleUnderline}></div>
+        </div>
+
+        {bestSellingBooks.length === 0 ? (
+          <div style={styles.empty}>
+            <p>No best-selling data yet</p>
+          </div>
+        ) : (
+          <div style={styles.grid}>
+            {bestSellingBooks.map((book) => (
+              <BookCard key={book._id} book={book} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* All Books */}

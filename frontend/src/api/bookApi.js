@@ -11,6 +11,11 @@ export const bookApi = {
     return response.data;
   },
 
+  getBestSellingBooks: async (limit = 8) => {
+    const response = await axiosInstance.get('/books/best-selling', { params: { limit } });
+    return response.data;
+  },
+
   getBookById: async (id) => {
     const response = await axiosInstance.get(`/books/${id}`);
     return response.data;
