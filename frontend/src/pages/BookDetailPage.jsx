@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { bookApi } from "../api/bookApi";
+import { reviewApi } from "../api/reviewApi";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
 
@@ -12,10 +13,26 @@ const BookDetailPage = () => {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reviews, setReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState({ averageRating: 0, totalReviews: 0 });
+  const [reviewPagination, setReviewPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
+  const [reviewLoading, setReviewLoading] = useState(true);
+  const [reviewError, setReviewError] = useState("");
+  const [myReview, setMyReview] = useState(null);
+  const [ratingInput, setRatingInput] = useState(5);
+  const [commentInput, setCommentInput] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   useEffect(() => {
     fetchBook();
+    fetchReviews(1);
   }, [id]);
+
+  useEffect(() => {
+    if (isAuthenticated && id) {
+      fetchMyReview();
+    }
+  }, [id, isAuthenticated]);
 
   const fetchBook = async () => {
     try {
@@ -26,6 +43,41 @@ const BookDetailPage = () => {
       setError(err.response?.data?.message || "Book not found");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviews = async (page = 1) => {
+    try {
+      setReviewLoading(true);
+      setReviewError("");
+      const response = await reviewApi.getBookReviews(id, page, 10);
+      setReviews(response.data.reviews || []);
+      setReviewSummary(response.data.summary || { averageRating: 0, totalReviews: 0 });
+      setReviewPagination(
+        response.data.pagination || { page: 1, totalPages: 1, total: 0, limit: 10 },
+      );
+    } catch (err) {
+      setReviewError(err.response?.data?.message || "Failed to load reviews");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const fetchMyReview = async () => {
+    try {
+      const response = await reviewApi.getMyReviewForBook(id);
+      const review = response.data.review;
+      setMyReview(review || null);
+
+      if (review) {
+        setRatingInput(review.rating);
+        setCommentInput(review.comment || "");
+      } else {
+        setRatingInput(5);
+        setCommentInput("");
+      }
+    } catch (err) {
+      setMyReview(null);
     }
   };
 
@@ -42,6 +94,43 @@ const BookDetailPage = () => {
     } catch (err) {
       alert(err.response?.data?.message || "Failed to add to cart");
     }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated) {
+      alert("Please login to write a review");
+      navigate("/login", { state: { from: `/books/${id}` } });
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      setReviewError("");
+
+      const payload = {
+        rating: Number(ratingInput),
+        comment: commentInput.trim(),
+      };
+
+      if (myReview?._id) {
+        await reviewApi.updateReview(myReview._id, payload);
+      } else {
+        await reviewApi.createReview(id, payload);
+      }
+
+      await Promise.all([fetchReviews(1), fetchMyReview()]);
+    } catch (err) {
+      setReviewError(
+        err.response?.data?.message || "Failed to submit review",
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const renderStars = (rating) => {
+    const rounded = Math.round(Number(rating) || 0);
+    return "★★★★★".slice(0, rounded) + "☆☆☆☆☆".slice(rounded);
   };
 
   if (loading) {
@@ -146,6 +235,110 @@ const BookDetailPage = () => {
             >
               ← Continue Shopping
             </button>
+          </div>
+
+          <div style={styles.divider}></div>
+
+          <div style={styles.reviewSection}>
+            <h3 style={styles.sectionTitle}>⭐ Reviews & Ratings</h3>
+
+            <div style={styles.reviewSummary}>
+              <strong>{reviewSummary.averageRating?.toFixed(1) || "0.0"}/5</strong>
+              <span style={styles.reviewSummaryText}>
+                {renderStars(reviewSummary.averageRating)} • {reviewSummary.totalReviews || 0} review(s)
+              </span>
+            </div>
+
+            <div style={styles.myReviewBox}>
+              <h4 style={styles.myReviewTitle}>{myReview ? "Edit Your Review" : "Write a Review"}</h4>
+
+              <div style={styles.ratingRow}>
+                <label style={styles.infoLabel}>Rating</label>
+                <select
+                  value={ratingInput}
+                  onChange={(event) => setRatingInput(Number(event.target.value))}
+                  style={styles.ratingSelect}
+                >
+                  {[5, 4, 3, 2, 1].map((value) => (
+                    <option key={value} value={value}>
+                      {value} star{value > 1 ? "s" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <textarea
+                value={commentInput}
+                onChange={(event) => setCommentInput(event.target.value)}
+                placeholder="Share your experience about this book"
+                rows={4}
+                style={styles.reviewTextarea}
+              />
+
+              <button
+                type="button"
+                onClick={handleSubmitReview}
+                disabled={reviewSubmitting}
+                style={styles.reviewSubmitBtn}
+              >
+                {reviewSubmitting
+                  ? "Saving..."
+                  : myReview
+                    ? "Update My Review"
+                    : "Submit Review"}
+              </button>
+            </div>
+
+            {reviewError && <div style={styles.reviewError}>{reviewError}</div>}
+
+            <div style={styles.reviewList}>
+              {reviewLoading ? (
+                <p style={styles.reviewHint}>Loading reviews...</p>
+              ) : reviews.length === 0 ? (
+                <p style={styles.reviewHint}>No reviews yet.</p>
+              ) : (
+                <>
+                  {reviews.map((review) => (
+                    <div key={review._id} style={styles.reviewItem}>
+                      <div style={styles.reviewHeader}>
+                        <strong>
+                          {review.user?.firstName || "User"} {review.user?.lastName || ""}
+                        </strong>
+                        <span style={styles.reviewStars}>{renderStars(review.rating)}</span>
+                      </div>
+                      <p style={styles.reviewComment}>{review.comment || "(No comment)"}</p>
+                      <span style={styles.reviewDate}>
+                        {new Date(review.createdAt).toLocaleDateString()} {review.isEdited ? "• Edited" : ""}
+                      </span>
+                    </div>
+                  ))}
+
+                  {reviewPagination.totalPages > 1 && (
+                    <div style={styles.reviewPagination}>
+                      <button
+                        type="button"
+                        style={styles.reviewPageButton}
+                        disabled={reviewPagination.page <= 1}
+                        onClick={() => fetchReviews(reviewPagination.page - 1)}
+                      >
+                        Previous
+                      </button>
+                      <span style={styles.reviewPageInfo}>
+                        Page {reviewPagination.page} / {reviewPagination.totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        style={styles.reviewPageButton}
+                        disabled={reviewPagination.page >= reviewPagination.totalPages}
+                        onClick={() => fetchReviews(reviewPagination.page + 1)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -334,6 +527,126 @@ const styles = {
     display: "flex",
     gap: "1rem",
     paddingTop: "0.5rem",
+  },
+  reviewSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  },
+  reviewSummary: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+    color: "#2c3e50",
+  },
+  reviewSummaryText: {
+    color: "#7f8c8d",
+    fontSize: "0.9rem",
+  },
+  myReviewBox: {
+    border: "1px solid #e0e0e0",
+    borderRadius: "8px",
+    padding: "0.9rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.7rem",
+  },
+  myReviewTitle: {
+    margin: 0,
+    color: "#2c3e50",
+    fontSize: "1rem",
+  },
+  ratingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+  },
+  ratingSelect: {
+    padding: "0.45rem",
+    border: "1px solid #ddd",
+    borderRadius: "6px",
+  },
+  reviewTextarea: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "0.7rem",
+    border: "1px solid #ddd",
+    borderRadius: "6px",
+    fontFamily: "inherit",
+  },
+  reviewSubmitBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#667eea",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    padding: "0.55rem 0.9rem",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+  reviewError: {
+    backgroundColor: "#ffe6e6",
+    color: "#e74c3c",
+    padding: "0.6rem",
+    borderRadius: "6px",
+    fontSize: "0.9rem",
+  },
+  reviewList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.7rem",
+  },
+  reviewItem: {
+    border: "1px solid #eaeaea",
+    borderRadius: "8px",
+    padding: "0.8rem",
+  },
+  reviewHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "0.35rem",
+    color: "#2c3e50",
+  },
+  reviewStars: {
+    color: "#f39c12",
+    fontSize: "0.9rem",
+  },
+  reviewComment: {
+    margin: "0 0 0.45rem 0",
+    color: "#34495e",
+    fontSize: "0.9rem",
+    lineHeight: "1.5",
+  },
+  reviewDate: {
+    color: "#95a5a6",
+    fontSize: "0.8rem",
+  },
+  reviewHint: {
+    color: "#7f8c8d",
+    fontSize: "0.9rem",
+    margin: 0,
+  },
+  reviewPagination: {
+    marginTop: "0.5rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.75rem",
+  },
+  reviewPageButton: {
+    border: "1px solid #ddd",
+    backgroundColor: "#fff",
+    borderRadius: "6px",
+    padding: "0.4rem 0.7rem",
+    cursor: "pointer",
+    color: "#2c3e50",
+    fontWeight: 600,
+  },
+  reviewPageInfo: {
+    color: "#34495e",
+    fontSize: "0.85rem",
+    fontWeight: 600,
   },
   addToCart: {
     flex: 1,
