@@ -13,6 +13,8 @@ const OrdersManagement = () => {
     status: "all",
     paymentStatus: "all",
     search: "",
+    fromDate: "",
+    toDate: "",
   });
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
   const [page, setPage] = useState(1);
@@ -46,6 +48,8 @@ const OrdersManagement = () => {
         status: debouncedFilters.status,
         paymentStatus: debouncedFilters.paymentStatus,
         search: debouncedFilters.search,
+        fromDate: debouncedFilters.fromDate,
+        toDate: debouncedFilters.toDate,
       });
       setOrders(response.data.orders);
       setPagination(response.data.pagination);
@@ -179,6 +183,26 @@ const OrdersManagement = () => {
               </option>
             ))}
           </select>
+        </div>
+
+        <div style={styles.filterGroup}>
+          <label style={styles.label}>From Date</label>
+          <input
+            type="date"
+            value={filters.fromDate}
+            onChange={(e) => handleFilterChange("fromDate", e.target.value)}
+            style={styles.dateInput}
+          />
+        </div>
+
+        <div style={styles.filterGroup}>
+          <label style={styles.label}>To Date</label>
+          <input
+            type="date"
+            value={filters.toDate}
+            onChange={(e) => handleFilterChange("toDate", e.target.value)}
+            style={styles.dateInput}
+          />
         </div>
       </div>
 
@@ -375,7 +399,7 @@ const styles = {
   },
   filters: {
     display: "grid",
-    gridTemplateColumns: "2fr 1fr 1fr",
+    gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
     gap: "1rem",
     marginBottom: "1.5rem",
   },
@@ -390,6 +414,11 @@ const styles = {
     color: "#34495e",
   },
   searchInput: {
+    padding: "0.75rem",
+    border: "1px solid #ddd",
+    borderRadius: "6px",
+  },
+  dateInput: {
     padding: "0.75rem",
     border: "1px solid #ddd",
     borderRadius: "6px",
