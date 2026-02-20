@@ -48,6 +48,22 @@ class BookController {
       next(error);
     }
   }
+
+  async getBestSellingBooks(req, res, next) {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit) : 8;
+      const books = await bookService.getBestSellingBooks(limit);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        MESSAGES.BOOKS_FETCHED,
+        { books }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new BookController();
