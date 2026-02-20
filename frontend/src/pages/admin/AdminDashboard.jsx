@@ -66,6 +66,14 @@ const AdminDashboard = () => {
             View and manage customer orders
           </p>
         </Link>
+
+        <Link to="/admin/vouchers" style={styles.card}>
+          <div style={styles.icon}>🎟️</div>
+          <h3 style={styles.cardTitle}>Vouchers</h3>
+          <p style={styles.cardDesc}>
+            View, create and update voucher campaigns
+          </p>
+        </Link>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
 import Book from "../models/Book.js";
 import User from "../models/User.js";
+import Voucher from "../models/Voucher.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
@@ -104,12 +105,107 @@ class OrderService {
     };
   }
 
+  validateVoucherEligibility(voucher, orderAmount) {
+    if (!voucher) {
+      throw ApiError.badRequest("Voucher not found");
+    }
+
+    if (!voucher.isActive) {
+      throw ApiError.badRequest("Voucher is inactive");
+    }
+
+    const now = new Date();
+    if (new Date(voucher.expiryDate) < now) {
+      throw ApiError.badRequest("Voucher has expired");
+    }
+
+    if (orderAmount < Number(voucher.minOrderValue || 0)) {
+      throw ApiError.badRequest(
+        `Order does not meet minimum value of ${Number(voucher.minOrderValue || 0).toLocaleString("vi-VN")}₫`,
+      );
+    }
+  }
+
+  calculateVoucherDiscount(voucher, orderAmount) {
+    let discount = 0;
+
+    if (voucher.discountType === "PERCENT") {
+      discount = (orderAmount * Number(voucher.discountValue)) / 100;
+
+      if (voucher.maxDiscountValue !== null && voucher.maxDiscountValue !== undefined) {
+        discount = Math.min(discount, Number(voucher.maxDiscountValue));
+      }
+    } else {
+      discount = Number(voucher.discountValue);
+    }
+
+    discount = Math.min(discount, orderAmount);
+
+    return Math.round(discount * 100) / 100;
+  }
+
+  async resolveVoucher({ voucherId = null, voucherCode = null }, orderAmount) {
+    if (!voucherId && !voucherCode) {
+      return { voucher: null, voucherDiscount: 0 };
+    }
+
+    let voucher = null;
+
+    if (voucherId) {
+      voucher = await Voucher.findById(voucherId);
+    } else if (voucherCode) {
+      voucher = await Voucher.findOne({
+        code: String(voucherCode).trim().toUpperCase(),
+      });
+    }
+
+    this.validateVoucherEligibility(voucher, orderAmount);
+
+    const voucherDiscount = this.calculateVoucherDiscount(voucher, orderAmount);
+
+    return { voucher, voucherDiscount };
+  }
+
+  async validateVoucherForCheckout(userId, voucherCode) {
+    if (!voucherCode || !String(voucherCode).trim()) {
+      throw ApiError.badRequest("Voucher code is required");
+    }
+
+    const { validItems } = await this.validateCartForCheckout(userId);
+
+    const subtotal = validItems.reduce((sum, item) => {
+      return sum + item.book.price * item.quantity;
+    }, 0);
+
+    const shippingFee = this.calculateShippingFee(subtotal);
+    const orderAmount = subtotal + shippingFee;
+
+    const { voucher, voucherDiscount } = await this.resolveVoucher(
+      { voucherCode },
+      orderAmount,
+    );
+
+    const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee);
+
+    return {
+      voucher: {
+        _id: voucher._id,
+        code: voucher.code,
+        discountType: voucher.discountType,
+        discountValue: voucher.discountValue,
+        maxDiscountValue: voucher.maxDiscountValue,
+      },
+      totals,
+    };
+  }
+
   // Create order
   async createOrder(userId, orderData) {
     const {
       paymentMethod = "COD",
       shippingAddressId = "MOCK_ADDRESS_ID",
       voucherId = null,
+      voucherCode = null,
       notes = "",
       ipAddress = "127.0.0.1",
     } = orderData;
@@ -132,8 +228,13 @@ class OrderService {
     // Calculate shipping fee based on subtotal (free if > 200,000 VND)
     const shippingFee = this.calculateShippingFee(subtotal);
 
-    // Calculate totals (voucher support placeholder - will be 0 for now)
-    const voucherDiscount = 0; // TODO: Calculate from voucherId when voucher module is ready
+    const orderAmount = subtotal + shippingFee;
+
+    const { voucher, voucherDiscount } = await this.resolveVoucher(
+      { voucherId, voucherCode },
+      orderAmount,
+    );
+
     const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee);
 
     // Generate order number
@@ -189,7 +290,7 @@ class OrderService {
       paymentStatus: paymentResult.paymentStatus,
       orderStatus: "PENDING",
       shippingAddress: shippingAddressId,
-      voucher: voucherId,
+      voucher: voucher?._id || null,
       notes,
       transactionId: paymentResult.transactionId || null,
     });

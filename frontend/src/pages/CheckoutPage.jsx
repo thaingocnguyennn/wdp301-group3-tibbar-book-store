@@ -19,6 +19,11 @@ const CheckoutPage = () => {
   const [showVietQRPayment, setShowVietQRPayment] = useState(false);
   const [vietQRPaymentInfo, setVietQRPaymentInfo] = useState(null);
   const [orderNumber, setOrderNumber] = useState(null);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherTotals, setVoucherTotals] = useState(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherMessage, setVoucherMessage] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,29 +64,42 @@ const CheckoutPage = () => {
   }, []);
 
   // Calculate totals
-  const totals = useMemo(() => {
+  const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
       const price = item.book?.price || 0;
       return sum + price * item.quantity;
     }, 0);
-
-    const discount = 0; // Voucher module not implemented yet
     
     // Free shipping if subtotal > 200,000 VND
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
     const shippingFee = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
     
-    const total = subtotal + shippingFee - discount;
+    const total = subtotal + shippingFee;
 
     return {
       subtotal: Math.round(subtotal * 100) / 100,
-      discount: Math.round(discount * 100) / 100,
+      discount: 0,
       shippingFee: Math.round(shippingFee * 100) / 100,
       total: Math.round(total * 100) / 100,
       isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
     };
   }, [cart.items]);
+
+  const totals = useMemo(() => {
+    if (!voucherTotals) {
+      return baseTotals;
+    }
+
+    return {
+      ...baseTotals,
+      subtotal: Number(voucherTotals.subtotal || baseTotals.subtotal),
+      discount: Number(voucherTotals.discount || 0),
+      shippingFee: Number(voucherTotals.shippingFee || baseTotals.shippingFee),
+      total: Number(voucherTotals.total || baseTotals.total),
+      isFreeShipping: Number(voucherTotals.shippingFee || baseTotals.shippingFee) === 0,
+    };
+  }, [baseTotals, voucherTotals]);
 
   // Validate cart
   const cartIsValid = useMemo(() => {
@@ -90,6 +108,73 @@ const CheckoutPage = () => {
       (item) => item.book && item.quantity > 0 && item.book.price > 0
     );
   }, [cart.items]);
+
+  const clearVoucherState = (keepCode = false) => {
+    setAppliedVoucher(null);
+    setVoucherTotals(null);
+    setVoucherMessage("");
+
+    if (!keepCode) {
+      setVoucherCode("");
+    }
+  };
+
+  const applyVoucherByCode = async (code, { silent = false } = {}) => {
+    const normalizedVoucher = String(code || "").trim();
+
+    if (!normalizedVoucher) {
+      if (!silent) {
+        setError("Please enter voucher code");
+      }
+      clearVoucherState(true);
+      return;
+    }
+
+    try {
+      setVoucherLoading(true);
+      if (!silent) {
+        setError("");
+      }
+
+      const response = await orderApi.validateVoucher(normalizedVoucher);
+      const voucher = response.data.voucher;
+
+      setAppliedVoucher(voucher);
+      setVoucherTotals(response.data.totals);
+      setVoucherCode(voucher?.code || normalizedVoucher.toUpperCase());
+      setVoucherMessage(`Voucher ${voucher?.code || normalizedVoucher.toUpperCase()} applied.`);
+    } catch (err) {
+      setAppliedVoucher(null);
+      setVoucherTotals(null);
+      setVoucherMessage("");
+
+      if (!silent) {
+        setError(err.response?.data?.message || "Invalid voucher code");
+      }
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!cart.items || cart.items.length === 0) {
+      clearVoucherState(false);
+      return;
+    }
+
+    if (voucherCode.trim()) {
+      applyVoucherByCode(voucherCode, { silent: true });
+    }
+  }, [cart.items]);
+
+  const handleApplyVoucher = async () => {
+    await applyVoucherByCode(voucherCode);
+  };
+
+  const handleRemoveVoucher = () => {
+    clearVoucherState(false);
+    setError("");
+  };
 
   const handlePlaceOrder = async () => {
     if (!selectedPaymentMethod) {
@@ -109,7 +194,7 @@ const CheckoutPage = () => {
       const orderData = {
         paymentMethod: selectedPaymentMethod,
         shippingAddressId: "MOCK_ADDRESS_ID", // Placeholder
-        voucherId: null, // Placeholder
+        voucherCode: appliedVoucher?.code || null,
         notes: notes.trim(),
       };
 
@@ -234,13 +319,54 @@ const CheckoutPage = () => {
           {/* Voucher Placeholder */}
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>🎟️ Voucher / Discount Code</h2>
-            <div style={styles.placeholder}>
-              <p style={styles.placeholderText}>
-                🚧 <strong>Coming soon</strong> - Handled by another developer
-              </p>
-              <p style={styles.placeholderSubtext}>
-                No discounts applied at this time
-              </p>
+            <div style={styles.voucherBox}>
+              <div style={styles.voucherRow}>
+                <input
+                  type="text"
+                  value={voucherCode}
+                  onChange={(event) => {
+                    setVoucherCode(event.target.value);
+                    setVoucherMessage("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleApplyVoucher();
+                    }
+                  }}
+                  placeholder="Enter voucher code"
+                  style={styles.voucherInput}
+                  disabled={voucherLoading || !!appliedVoucher}
+                />
+                {!appliedVoucher ? (
+                  <button
+                    type="button"
+                    style={styles.voucherButton}
+                    onClick={handleApplyVoucher}
+                    disabled={voucherLoading}
+                  >
+                    {voucherLoading ? "Applying..." : "Apply"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    style={styles.voucherRemoveButton}
+                    onClick={handleRemoveVoucher}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {appliedVoucher ? (
+                <p style={styles.voucherAppliedText}>
+                  ✅ {voucherMessage || `Voucher ${appliedVoucher.code} applied successfully`}
+                </p>
+              ) : (
+                <p style={styles.voucherHintText}>
+                  Enter voucher code then click Apply
+                </p>
+              )}
             </div>
           </div>
 
@@ -454,6 +580,52 @@ const styles = {
   placeholderSubtext: {
     color: "#868e96",
     margin: 0,
+    fontSize: "0.85rem",
+  },
+  voucherBox: {
+    backgroundColor: "#f8f9fa",
+    padding: "1rem",
+    borderRadius: "8px",
+    border: "1px solid #e9ecef",
+  },
+  voucherRow: {
+    display: "flex",
+    gap: "0.75rem",
+    alignItems: "center",
+  },
+  voucherInput: {
+    flex: 1,
+    padding: "0.7rem",
+    borderRadius: "6px",
+    border: "1px solid #ddd",
+    fontSize: "0.95rem",
+  },
+  voucherButton: {
+    backgroundColor: "#667eea",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    padding: "0.7rem 1rem",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+  voucherRemoveButton: {
+    backgroundColor: "#e74c3c",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    padding: "0.7rem 1rem",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+  voucherAppliedText: {
+    margin: "0.65rem 0 0",
+    color: "#27ae60",
+    fontSize: "0.9rem",
+  },
+  voucherHintText: {
+    margin: "0.65rem 0 0",
+    color: "#6c757d",
     fontSize: "0.85rem",
   },
   paymentMethods: {
