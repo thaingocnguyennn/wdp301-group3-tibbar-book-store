@@ -137,6 +137,31 @@ class UserService {
     }));
   }
 
+  async changePassword(userId, currentPassword, newPassword) {
+    // Get user with password field
+    const user = await User.findById(userId).select('+password');
+
+    if (!user) {
+      throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    }
+
+    // Verify current password
+    const isPasswordCorrect = await user.comparePassword(currentPassword);
+    if (!isPasswordCorrect) {
+      throw ApiError.unauthorized('Current password is incorrect');
+    }
+
+    // Validate new password
+    if (!newPassword || newPassword.length < 6) {
+      throw ApiError.badRequest('New password must be at least 6 characters');
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    return { message: 'Password changed successfully' };
+  }
 
 }
 

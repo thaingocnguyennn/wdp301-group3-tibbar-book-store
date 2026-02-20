@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 const ProfilePage = () => {
   const { user: authUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -17,9 +18,17 @@ const ProfilePage = () => {
       country: ''
     }
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const [loading, setLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [profileUser, setProfileUser] = useState(null);
 
   useEffect(() => {
@@ -112,19 +121,143 @@ const ProfilePage = () => {
     setIsEditing(false);
   };
 
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData({
+      ...passwordData,
+      [name]: value
+    });
+  };
+
+  const handleChangePasswordClick = () => {
+    setPasswordMessage('');
+    setPasswordError('');
+    setIsChangingPassword(true);
+  };
+
+  const handlePasswordCancel = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setPasswordMessage('');
+    setPasswordError('');
+    setIsChangingPassword(false);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    setPasswordError('');
+
+    // Validation
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError('All password fields are required');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('New password and confirm password do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters');
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      await userApi.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setPasswordMessage('Password changed successfully');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setTimeout(() => {
+        setIsChangingPassword(false);
+        setPasswordMessage('');
+      }, 2000);
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>My Profile</h2>
+        <h2 style={styles.title}>{isChangingPassword ? 'Change Password' : 'My Profile'}</h2>
 
-        <div style={styles.infoSection}>
-          <p><strong>Email:</strong> {authUser?.email}</p>
-          <p><strong>Role:</strong> {authUser?.role}</p>
-        </div>
+        {!isChangingPassword && (
+          <div style={styles.infoSection}>
+            <p><strong>Email:</strong> {authUser?.email}</p>
+            <p><strong>Role:</strong> {authUser?.role}</p>
+          </div>
+        )}
 
-        {message && <div style={styles.success}>{message}</div>}
-        {error && <div style={styles.error}>{error}</div>}
-        {!isEditing ? (
+        {/* Profile Messages */}
+        {!isChangingPassword && message && <div style={styles.success}>{message}</div>}
+        {!isChangingPassword && error && <div style={styles.error}>{error}</div>}
+
+        {/* Password Messages */}
+        {isChangingPassword && passwordMessage && <div style={styles.success}>{passwordMessage}</div>}
+        {isChangingPassword && passwordError && <div style={styles.error}>{passwordError}</div>}
+
+        {/* Show Change Password Form */}
+        {isChangingPassword ? (
+          <form onSubmit={handlePasswordSubmit} style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Current Password</label>
+              <input
+                type="password"
+                name="currentPassword"
+                value={passwordData.currentPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>New Password</label>
+              <input
+                type="password"
+                name="newPassword"
+                value={passwordData.newPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Confirm New Password</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={passwordData.confirmPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.buttonRow}>
+              <button type="submit" disabled={passwordLoading} style={styles.button}>
+                {passwordLoading ? 'Changing...' : 'Change Password'}
+              </button>
+              <button type="button" disabled={passwordLoading} style={styles.secondaryButton} onClick={handlePasswordCancel}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : !isEditing ? (
+          /* Show Profile Details */
           <div style={styles.detailsSection}>
             <div style={styles.detailGroup}>
               <div style={styles.detailItem}><strong>First Name:</strong> {profileUser?.firstName || '-'}</div>
@@ -138,11 +271,17 @@ const ProfilePage = () => {
               <div style={styles.detailItem}><strong>Zip Code:</strong> {profileUser?.address?.zipCode || '-'}</div>
               <div style={styles.detailItem}><strong>Country:</strong> {profileUser?.address?.country || '-'}</div>
             </div>
-            <button type="button" style={styles.button} onClick={handleEditClick}>
-              Edit Profile
-            </button>
+            <div style={styles.buttonRow}>
+              <button type="button" style={styles.button} onClick={handleEditClick}>
+                Edit Profile
+              </button>
+              <button type="button" style={styles.secondaryButton} onClick={handleChangePasswordClick}>
+                Change Password
+              </button>
+            </div>
           </div>
         ) : (
+          /* Show Edit Profile Form */
           <form onSubmit={handleSubmit} style={styles.form}>
             <h3 style={styles.sectionTitle}>Personal Information</h3>
 

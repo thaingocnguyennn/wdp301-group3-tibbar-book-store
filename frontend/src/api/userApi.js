@@ -9,6 +9,14 @@ export const userApi = {
   updateProfile: async (userData) => {
     const response = await axiosInstance.put('/users/me', userData);
     return response.data;
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const response = await axiosInstance.put('/users/me/change-password', {
+      currentPassword,
+      newPassword
+    });
+    return response.data;
   }
 };
 
