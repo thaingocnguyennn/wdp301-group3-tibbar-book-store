@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
@@ -222,16 +223,24 @@ function AppContent() {
 }
 
 function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  if (!googleClientId) {
+    console.warn('Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file');
+  }
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <AppContent />
-          </WishlistProvider>
-        </CartProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <GoogleOAuthProvider clientId={googleClientId || ''}>
+      <BrowserRouter>
+        <AuthProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <AppContent />
+            </WishlistProvider>
+          </CartProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
   );
 }
 

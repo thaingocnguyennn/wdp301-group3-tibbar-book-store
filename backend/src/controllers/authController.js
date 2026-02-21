@@ -147,6 +147,29 @@ class AuthController {
       next(error);
     }
   }
+
+  async googleLogin(req, res, next) {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        throw ApiError.badRequest('Google ID token is required');
+      }
+
+      const { user, accessToken, refreshToken } = await authService.googleLogin(token);
+
+      setRefreshTokenCookie(res, refreshToken);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        MESSAGES.LOGIN_SUCCESS,
+        { user, accessToken }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new AuthController();

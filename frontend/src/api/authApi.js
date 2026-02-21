@@ -11,6 +11,11 @@ export const authApi = {
     return response.data;
   },
 
+  googleLogin: async (data) => {
+    const response = await axiosInstance.post('/auth/google-login', data);
+    return response.data;
+  },
+
   logout: async () => {
     const response = await axiosInstance.post('/auth/logout');
     return response.data;
