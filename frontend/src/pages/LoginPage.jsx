@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import authApi from '../api/authApi';
+import GoogleLoginButton from '../components/common/GoogleLoginButton';
 
 const LoginPage = () => {
   // Login form states
@@ -24,7 +25,7 @@ const LoginPage = () => {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [otpResendTimer, setOtpResendTimer] = useState(0);
 
-  const { login } = useAuth();
+  const { login, handleAuthResponse } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,6 +53,24 @@ const LoginPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLoginSuccess = async (response) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      handleAuthResponse(response);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = (errorMessage) => {
+    setError(errorMessage || 'Google login failed');
   };
 
   const handleForgotPasswordSubmit = async (e) => {
@@ -206,6 +225,18 @@ const LoginPage = () => {
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
+
+          <div style={styles.divider}>
+            <div style={styles.dividerLine}></div>
+            <span>OR</span>
+            <div style={styles.dividerLine}></div>
+          </div>
+
+          <GoogleLoginButton
+            onSuccess={handleGoogleLoginSuccess}
+            onError={handleGoogleLoginError}
+            loading={loading}
+          />
 
           <p style={styles.footer}>
             Don't have an account? <Link to="/register" style={styles.link}>Register here</Link>
@@ -511,6 +542,19 @@ const styles = {
     letterSpacing: '8px',
     textAlign: 'center',
     fontWeight: 'bold'
+  },
+  divider: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    margin: '1.5rem 0',
+    fontSize: '0.9rem',
+    color: '#7f8c8d'
+  },
+  dividerLine: {
+    flex: 1,
+    height: '1px',
+    backgroundColor: '#ddd'
   }
 };
 

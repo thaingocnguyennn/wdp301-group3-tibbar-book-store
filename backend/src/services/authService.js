@@ -3,6 +3,7 @@ import ApiError from '../utils/ApiError.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/tokenHelper.js';
 import { MESSAGES } from '../config/constants.js';
 import { sendOTPEmail, sendPasswordResetConfirmationEmail } from '../utils/emailHelper.js';
+import { OAuth2Client } from 'google-auth-library';
 
 class AuthService {
   async register(userData) {
@@ -163,6 +164,80 @@ class AuthService {
     } catch (error) {
       console.error('Failed to send OTP email:', error);
       throw ApiError.internalServerError('Failed to send OTP email. Please try again.');
+    }
+  }
+
+  async googleLogin(idToken) {
+    try {
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+      if (!googleClientId) {
+        throw ApiError.internalServerError('Google Client ID is not configured');
+      }
+
+      // Verify the ID token using google-auth-library
+      const client = new OAuth2Client(googleClientId);
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: googleClientId
+      });
+
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        throw ApiError.unauthorized('Invalid Google ID token');
+      }
+
+      const { email, given_name, family_name, picture, sub: googleId } = payload;
+
+      if (!email || !googleId) {
+        throw ApiError.badRequest('Invalid Google profile data');
+      }
+
+      // Check if user exists with this email
+      let user = await User.findOne({ email });
+
+      if (user) {
+        // User exists - link Google ID if not already linked
+        if (!user.googleId) {
+          user.googleId = googleId;
+          user.provider = 'google';
+          if (picture && !user.avatar) {
+            user.avatar = picture;
+          }
+          await user.save();
+        }
+      } else {
+        // Create new user from Google profile
+        user = await User.create({
+          email,
+          googleId,
+          firstName: given_name || '',
+          lastName: family_name || '',
+          avatar: picture || null,
+          provider: 'google',
+          password: null // Google users don't have passwords
+        });
+      }
+
+      // Check if account is active
+      if (!user.isActive) {
+        throw ApiError.forbidden('Your account has been locked. Please contact support.');
+      }
+
+      // Generate our own JWT tokens
+      const accessToken = generateAccessToken(user._id, user.role);
+      const refreshToken = generateRefreshToken(user._id);
+
+      user.refreshToken = refreshToken;
+      await user.save();
+
+      return { user, accessToken, refreshToken };
+    } catch (error) {
+      if (error.name === 'TokenPayloadError' || error.message.includes('Invalid token')) {
+        throw ApiError.unauthorized('Invalid or expired Google token');
+      }
+      throw error;
     }
   }
 }
