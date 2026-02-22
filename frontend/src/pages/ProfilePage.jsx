@@ -1,22 +1,17 @@
 import { useState, useEffect } from 'react';
 import { userApi } from '../api/userApi';
 import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 const ProfilePage = () => {
   const { user: authUser } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    phone: '',
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: ''
-    }
+    phone: ''
   });
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -43,14 +38,7 @@ const ProfilePage = () => {
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        phone: user.phone || '',
-        address: user.address || {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: ''
-        }
+        phone: user.phone || ''
       });
     } catch (err) {
       setError('Failed to load profile');
@@ -59,22 +47,10 @@ const ProfilePage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name.startsWith('address.')) {
-      const addressField = name.split('.')[1];
-      setFormData({
-        ...formData,
-        address: {
-          ...formData.address,
-          [addressField]: value
-        }
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
-    }
+    setFormData({
+      ...formData,
+      [name]: value
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -106,14 +82,7 @@ const ProfilePage = () => {
       setFormData({
         firstName: profileUser.firstName || '',
         lastName: profileUser.lastName || '',
-        phone: profileUser.phone || '',
-        address: profileUser.address || {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: ''
-        }
+        phone: profileUser.phone || ''
       });
     }
     setMessage('');
@@ -264,19 +233,15 @@ const ProfilePage = () => {
               <div style={styles.detailItem}><strong>Last Name:</strong> {profileUser?.lastName || '-'}</div>
               <div style={styles.detailItem}><strong>Phone:</strong> {profileUser?.phone || '-'}</div>
             </div>
-            <div style={styles.detailGroup}>
-              <div style={styles.detailItem}><strong>Street:</strong> {profileUser?.address?.street || '-'}</div>
-              <div style={styles.detailItem}><strong>City:</strong> {profileUser?.address?.city || '-'}</div>
-              <div style={styles.detailItem}><strong>State:</strong> {profileUser?.address?.state || '-'}</div>
-              <div style={styles.detailItem}><strong>Zip Code:</strong> {profileUser?.address?.zipCode || '-'}</div>
-              <div style={styles.detailItem}><strong>Country:</strong> {profileUser?.address?.country || '-'}</div>
-            </div>
             <div style={styles.buttonRow}>
               <button type="button" style={styles.button} onClick={handleEditClick}>
                 Edit Profile
               </button>
               <button type="button" style={styles.secondaryButton} onClick={handleChangePasswordClick}>
                 Change Password
+              </button>
+              <button type="button" style={styles.addressButton} onClick={() => navigate('/address')}>
+                Address
               </button>
             </div>
           </div>
@@ -318,67 +283,6 @@ const ProfilePage = () => {
                 onChange={handleChange}
                 style={styles.input}
               />
-            </div>
-
-            <h3 style={styles.sectionTitle}>Address</h3>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Street</label>
-              <input
-                type="text"
-                name="address.street"
-                value={formData.address.street}
-                onChange={handleChange}
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>City</label>
-                <input
-                  type="text"
-                  name="address.city"
-                  value={formData.address.city}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>State</label>
-                <input
-                  type="text"
-                  name="address.state"
-                  value={formData.address.state}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Zip Code</label>
-                <input
-                  type="text"
-                  name="address.zipCode"
-                  value={formData.address.zipCode}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Country</label>
-                <input
-                  type="text"
-                  name="address.country"
-                  value={formData.address.country}
-                  onChange={handleChange}
-                  style={styles.input}
-                />
-              </div>
             </div>
 
             <div style={styles.buttonRow}>
@@ -492,13 +396,25 @@ const styles = {
   buttonRow: {
     display: 'flex',
     gap: '0.75rem',
-    alignItems: 'center'
+    alignItems: 'center',
+    flexWrap: 'wrap'
   },
   secondaryButton: {
     backgroundColor: '#ecf0f1',
     color: '#2c3e50',
     padding: '0.75rem',
     border: '1px solid #dcdfe3',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    marginTop: '1rem'
+  },
+  addressButton: {
+    backgroundColor: '#9b59b6',
+    color: '#fff',
+    padding: '0.75rem',
+    border: 'none',
     borderRadius: '4px',
     fontSize: '1rem',
     fontWeight: '500',
