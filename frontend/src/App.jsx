@@ -13,6 +13,7 @@ import RegisterPage from "./pages/RegisterPage";
 import BookDetailPage from "./pages/BookDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddressPage from "./pages/AddressPage";
+import ShipperHomePage from "./pages/ShipperHomePage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import BooksManagement from "./pages/admin/BooksManagement";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
@@ -31,8 +32,8 @@ import AdminRevenue from "./pages/admin/AdminRevenue";
 import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
 // Protected Route Component - Only for authenticated routes
-const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
+  const { isAuthenticated, isAdmin, user, loading } = useAuth();
 
   if (loading) {
     return <div style={styles.loading}>Loading...</div>;
@@ -49,6 +50,10 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (shipperOnly && user?.role !== 'shipper') {
     return <Navigate to="/" replace />;
   }
 
@@ -70,13 +75,31 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Role-based home page component
+const RoleBasedHome = () => {
+  const { isAuthenticated, user } = useAuth();
+
+  // Redirect shippers to their dashboard
+  if (isAuthenticated && user?.role === 'shipper') {
+    return <Navigate to="/shipper/dashboard" replace />;
+  }
+
+  // Redirect admins to admin dashboard
+  if (isAuthenticated && (user?.role === 'admin' || user?.role === 'manager')) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  // Default to customer home page
+  return <HomePage />;
+};
+
 function AppContent() {
   return (
     <div style={styles.app}>
       <Navbar />
       <Routes>
         {/* Public Routes - No authentication required */}
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
 
@@ -162,6 +185,16 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Shipper Routes - Shipper role required */}
+        <Route
+          path="/shipper/dashboard"
+          element={
+            <ProtectedRoute shipperOnly>
+              <ShipperHomePage />
             </ProtectedRoute>
           }
         />
