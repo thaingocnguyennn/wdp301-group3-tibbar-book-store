@@ -20,6 +20,7 @@ import cartRoutes from "./routes/cartRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import vietqrPaymentRoutes from "./routes/vietqrPaymentRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import addressRoutes from "./routes/addressRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
@@ -72,6 +73,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments/vietqr", vietqrPaymentRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/addresses", addressRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

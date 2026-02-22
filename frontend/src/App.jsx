@@ -12,6 +12,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import BookDetailPage from "./pages/BookDetailPage";
 import ProfilePage from "./pages/ProfilePage";
+import AddressPage from "./pages/AddressPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import BooksManagement from "./pages/admin/BooksManagement";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
@@ -103,6 +104,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/address"
+          element={
+            <ProtectedRoute>
+              <AddressPage />
             </ProtectedRoute>
           }
         />
