@@ -23,13 +23,6 @@ const BooksManagement = () => {
     visibility: 'public'
   });
   const [message, setMessage] = useState('');
-  const [priceError, setPriceError] = useState('');
-
-  // Price constraints (VND)
-  const BOOK_PRICE = {
-    MIN: 50000,
-    MAX: 120000
-  };
 
   useEffect(() => {
     fetchBooks();
@@ -56,34 +49,9 @@ const BooksManagement = () => {
     }
   };
 
-  const validatePrice = (price) => {
-    const numPrice = Number(price);
-    if (!price || isNaN(numPrice)) {
-      return '';
-    }
-    if (numPrice < BOOK_PRICE.MIN || numPrice > BOOK_PRICE.MAX) {
-      return `Price must be between ${BOOK_PRICE.MIN.toLocaleString('vi-VN')}₫ and ${BOOK_PRICE.MAX.toLocaleString('vi-VN')}₫`;
-    }
-    return '';
-  };
-
-  const handlePriceChange = (e) => {
-    const newPrice = e.target.value;
-    setFormData({...formData, price: newPrice});
-    setPriceError(validatePrice(newPrice));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
-
-    // Validate price before submit
-    const priceValidation = validatePrice(formData.price);
-    if (priceValidation) {
-      setPriceError(priceValidation);
-      setMessage(priceValidation);
-      return;
-    }
 
     const payload = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
@@ -167,7 +135,6 @@ const BooksManagement = () => {
     });
     setEditingBook(null);
     setShowForm(false);
-    setPriceError('');
     setImageFile(null);
     setImageInputKey((prev) => prev + 1);
   };
@@ -241,28 +208,16 @@ const BooksManagement = () => {
           </div>
 
           <div style={styles.formRow}>
-            <div style={{flex: 1}}>
-              <input
-                type="number"
-                placeholder="Price (VND) *"
-                value={formData.price}
-                onChange={handlePriceChange}
-                required
-                min="50000"
-                max="120000"
-                step="1000"
-                style={{
-                  ...styles.input,
-                  ...(priceError ? {borderColor: '#e74c3c', borderWidth: '2px'} : {})
-                }}
-              />
-              {priceError && (
-                <div style={styles.errorText}>{priceError}</div>
-              )}
-              <div style={styles.helperText}>
-                Range: 50,000₫ - 120,000₫
-              </div>
-            </div>
+            <input
+              type="number"
+              placeholder="Price (VND) *"
+              value={formData.price}
+              onChange={(e) => setFormData({...formData, price: e.target.value})}
+              required
+              min="0"
+              step="1000"
+              style={styles.input}
+            />
             <input
               type="number"
               placeholder="Stock *"
@@ -380,9 +335,7 @@ const styles = {
   editBtn: { backgroundColor: '#3498db', color: '#fff', padding: '0.4rem 0.8rem', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '0.5rem', fontSize: '0.85rem' },
   deleteBtn: { backgroundColor: '#e74c3c', color: '#fff', padding: '0.4rem 0.8rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' },
   loading: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' },
-  empty: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' },
-  errorText: { color: '#e74c3c', fontSize: '0.85rem', marginTop: '0.25rem' },
-  helperText: { color: '#7f8c8d', fontSize: '0.8rem', marginTop: '0.25rem', fontStyle: 'italic' }
+  empty: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' }
 };
 
 export default BooksManagement;

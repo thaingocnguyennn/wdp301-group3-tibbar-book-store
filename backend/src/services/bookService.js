@@ -2,7 +2,7 @@ import Book from '../models/Book.js';
 import Category from '../models/Category.js';
 import Order from '../models/Order.js';
 import ApiError from '../utils/ApiError.js';
-import { MESSAGES, PAGINATION, BOOK_VISIBILITY, BOOK_PRICE } from '../config/constants.js';
+import { MESSAGES, PAGINATION, BOOK_VISIBILITY } from '../config/constants.js';
 
 class BookService {
   async getPublicBooks(filters = {}) {
@@ -204,16 +204,6 @@ class BookService {
       throw ApiError.badRequest('Invalid category');
     }
 
-    // Validate book price
-    if (bookData.price !== undefined && bookData.price !== null) {
-      const price = Number(bookData.price);
-      if (price < BOOK_PRICE.MIN || price > BOOK_PRICE.MAX) {
-        throw ApiError.badRequest(
-          `Book price must be between ${BOOK_PRICE.MIN.toLocaleString('vi-VN')} and ${BOOK_PRICE.MAX.toLocaleString('vi-VN')} VND.`
-        );
-      }
-    }
-
     const book = await Book.create(bookData);
     await book.populate('category', 'name');
 
@@ -225,16 +215,6 @@ class BookService {
       const categoryExists = await Category.findById(updateData.category);
       if (!categoryExists || categoryExists.isDeleted) {
         throw ApiError.badRequest('Invalid category');
-      }
-    }
-
-    // Validate book price if being updated
-    if (updateData.price !== undefined && updateData.price !== null) {
-      const price = Number(updateData.price);
-      if (price < BOOK_PRICE.MIN || price > BOOK_PRICE.MAX) {
-        throw ApiError.badRequest(
-          `Book price must be between ${BOOK_PRICE.MIN.toLocaleString('vi-VN')} and ${BOOK_PRICE.MAX.toLocaleString('vi-VN')} VND.`
-        );
       }
     }
 
