@@ -6,6 +6,22 @@ class VoucherService {
     return Voucher.find({}).sort({ createdAt: -1 }).lean();
   }
 
+  async getAvailableVouchers(subtotal = 0) {
+    const now = new Date();
+    return Voucher.find({
+      isActive: true,
+      // treat null / missing expiryDate as "never expires"
+      $or: [
+        { expiryDate: { $gt: now } },
+        { expiryDate: null },
+        { expiryDate: { $exists: false } },
+      ],
+      minOrderValue: { $lte: Number(subtotal) },
+    })
+      .sort({ minOrderValue: -1 })
+      .lean();
+  }
+
   async createVoucher(payload) {
     this.validateVoucherPayload(payload, true);
 

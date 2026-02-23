@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
 import { orderApi } from "../api/orderApi";
+import { voucherApi } from "../api/voucherApi";
 import VietQRPayment from "../components/payment/VietQRPayment";
+import AvailableVouchers from "../components/payment/AvailableVouchers";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -24,6 +26,9 @@ const CheckoutPage = () => {
   const [voucherTotals, setVoucherTotals] = useState(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [voucherMessage, setVoucherMessage] = useState("");
+  const [availableVouchers, setAvailableVouchers] = useState([]);
+  const [availableVouchersLoading, setAvailableVouchersLoading] = useState(false);
+  const [showAvailableVouchers, setShowAvailableVouchers] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -167,6 +172,30 @@ const CheckoutPage = () => {
     }
   }, [cart.items]);
 
+  // Fetch eligible vouchers whenever the cart subtotal changes
+  useEffect(() => {
+    if (!isAuthenticated || baseTotals.subtotal <= 0) {
+      setAvailableVouchers([]);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchAvailable = async () => {
+      setAvailableVouchersLoading(true);
+      try {
+        const res = await voucherApi.getAvailableVouchers(baseTotals.subtotal);
+        if (!cancelled) setAvailableVouchers(res.data?.vouchers || []);
+      } catch {
+        if (!cancelled) setAvailableVouchers([]);
+      } finally {
+        if (!cancelled) setAvailableVouchersLoading(false);
+      }
+    };
+
+    fetchAvailable();
+    return () => { cancelled = true; };
+  }, [baseTotals.subtotal, isAuthenticated]);
+
   const handleApplyVoucher = async () => {
     await applyVoucherByCode(voucherCode);
   };
@@ -174,6 +203,12 @@ const CheckoutPage = () => {
   const handleRemoveVoucher = () => {
     clearVoucherState(false);
     setError("");
+  };
+
+  const handleSelectAvailableVoucher = async (code) => {
+    setShowAvailableVouchers(false);
+    setVoucherCode(code);
+    await applyVoucherByCode(code);
   };
 
   const handlePlaceOrder = async () => {
@@ -366,6 +401,27 @@ const CheckoutPage = () => {
                 <p style={styles.voucherHintText}>
                   Enter voucher code then click Apply
                 </p>
+              )}
+
+              {/* Toggle available vouchers list */}
+              {!appliedVoucher && (
+                <button
+                  type="button"
+                  style={styles.toggleVouchersBtn}
+                  onClick={() => setShowAvailableVouchers((prev) => !prev)}
+                >
+                  {showAvailableVouchers
+                    ? "▲ Hide available vouchers"
+                    : `▼ View available vouchers${availableVouchers.length ? ` (${availableVouchers.length})` : ""}`}
+                </button>
+              )}
+
+              {!appliedVoucher && showAvailableVouchers && (
+                <AvailableVouchers
+                  vouchers={availableVouchers}
+                  loading={availableVouchersLoading}
+                  onSelect={handleSelectAvailableVoucher}
+                />
               )}
             </div>
           </div>
@@ -627,6 +683,18 @@ const styles = {
     margin: "0.65rem 0 0",
     color: "#6c757d",
     fontSize: "0.85rem",
+  },
+  toggleVouchersBtn: {
+    marginTop: "0.6rem",
+    background: "none",
+    border: "none",
+    color: "#667eea",
+    fontSize: "0.85rem",
+    cursor: "pointer",
+    padding: 0,
+    fontWeight: "600",
+    textDecoration: "underline",
+    textUnderlineOffset: "2px",
   },
   paymentMethods: {
     display: "flex",
