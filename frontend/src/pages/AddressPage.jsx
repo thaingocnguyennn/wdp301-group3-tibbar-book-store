@@ -14,7 +14,8 @@ const AddressPage = () => {
     province: '',
     district: '',
     commune: '',
-    description: ''
+    description: '',
+    isDefault: false
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -42,7 +43,8 @@ const AddressPage = () => {
       province: '',
       district: '',
       commune: '',
-      description: ''
+      description: '',
+      isDefault: false
     });
     setEditingAddress(null);
     setIsFormOpen(false);
@@ -63,7 +65,8 @@ const AddressPage = () => {
       province: address.province,
       district: address.district,
       commune: address.commune,
-      description: address.description
+      description: address.description,
+      isDefault: address.isDefault || false
     });
     setIsFormOpen(true);
     setMessage('');
@@ -116,6 +119,28 @@ const AddressPage = () => {
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete address');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetDefault = async (address) => {
+    if (address.isDefault) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+    setError('');
+
+    try {
+      await addressApi.setDefaultAddress(address._id);
+      setMessage('Default address updated successfully');
+      await fetchAddresses();
+      setTimeout(() => setMessage(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update default address');
       setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
@@ -227,6 +252,20 @@ const AddressPage = () => {
               />
             </div>
 
+            <div style={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                id="isDefault"
+                name="isDefault"
+                checked={formData.isDefault}
+                onChange={handleChange}
+                style={styles.checkbox}
+              />
+              <label htmlFor="isDefault" style={styles.checkboxLabel}>
+                Set as default address
+              </label>
+            </div>
+
             <div style={styles.buttonRow}>
               <button type="submit" disabled={loading} style={styles.saveButton}>
                 {loading ? 'Saving...' : editingAddress ? 'Update Address' : 'Add Address'}
@@ -257,7 +296,10 @@ const AddressPage = () => {
             addresses.map((address) => (
               <div
                 key={address._id}
-                style={styles.addressCard}
+                style={{
+                  ...styles.addressCard,
+                  ...(address.isDefault ? styles.defaultCard : {})
+                }}
               >
                 <div style={styles.addressContent}>
                   <div style={styles.addressHeader}>
@@ -268,6 +310,9 @@ const AddressPage = () => {
                     <p>{address.description}</p>
                     <p>{address.commune}, {address.district}</p>
                     <p>{address.province}</p>
+                    {address.isDefault && (
+                      <span style={styles.defaultBadge}>Default</span>
+                    )}
                   </div>
                 </div>
                 <div style={styles.addressActions}>
@@ -277,6 +322,13 @@ const AddressPage = () => {
                     disabled={loading}
                   >
                     Edit
+                  </button>
+                  <button
+                    style={styles.defaultButton}
+                    onClick={() => handleSetDefault(address)}
+                    disabled={loading || address.isDefault}
+                  >
+                    {address.isDefault ? 'Default' : 'Set Default'}
                   </button>
                   <button
                     style={styles.deleteButton}
@@ -396,6 +448,19 @@ const styles = {
     resize: 'vertical',
     fontFamily: 'inherit'
   },
+  checkboxRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px'
+  },
+  checkboxLabel: {
+    fontSize: '0.95rem',
+    color: '#34495e'
+  },
   buttonRow: {
     display: 'flex',
     gap: '0.75rem',
@@ -446,6 +511,9 @@ const styles = {
     border: '2px solid transparent',
     position: 'relative'
   },
+  defaultCard: {
+    borderColor: '#2ecc71'
+  },
 
   addressContent: {
     marginBottom: '1rem'
@@ -472,10 +540,29 @@ const styles = {
     fontSize: '0.95rem',
     lineHeight: '1.6'
   },
+  defaultBadge: {
+    display: 'inline-block',
+    marginTop: '0.5rem',
+    backgroundColor: '#e8f8f0',
+    color: '#1e8449',
+    padding: '0.2rem 0.6rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
+    fontWeight: '600'
+  },
   addressActions: {
     display: 'flex',
     gap: '0.75rem',
     flexWrap: 'wrap'
+  },
+  defaultButton: {
+    backgroundColor: '#2ecc71',
+    color: '#fff',
+    padding: '0.5rem 1rem',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '0.9rem',
+    cursor: 'pointer'
   },
   editButton: {
     backgroundColor: '#3498db',
