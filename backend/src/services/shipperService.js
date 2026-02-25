@@ -35,10 +35,10 @@ class ShipperService {
     };
   }
 
-  // Get order details with address (safe to expose address from user's addresses array)
+  // Get order details with address snapshot for assigned shipper only
   async getOrderDetails(orderId, shipperId) {
     const order = await Order.findById(orderId)
-      .populate('user', 'firstName lastName email phone addresses')
+      .populate('user', 'firstName lastName email phone')
       .populate({
         path: 'items.book',
         select: 'title author ISBN price'
@@ -49,7 +49,7 @@ class ShipperService {
     }
 
     // Verify the order belongs to this shipper
-    if (order.shipper?.toString() !== shipperId) {
+    if (order.shipper?.toString() !== shipperId?.toString()) {
       throw new ApiError(403, 'You do not have access to this order');
     }
 
@@ -58,7 +58,7 @@ class ShipperService {
 
   // Update order status
   async updateOrderStatus(orderId, shipperId, newStatus) {
-    const allowedStatuses = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+    const allowedStatuses = ['DELIVERED', 'CANCELLED'];
 
     if (!allowedStatuses.includes(newStatus)) {
       throw new ApiError(400, 'Invalid order status');
@@ -71,7 +71,7 @@ class ShipperService {
     }
 
     // Verify the order belongs to this shipper
-    if (order.shipper?.toString() !== shipperId) {
+    if (order.shipper?.toString() !== shipperId?.toString()) {
       throw new ApiError(403, 'You do not have access to this order');
     }
 

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import { shipperApi } from '../api/shipperApi';
-import { useNavigate } from 'react-router-dom';
+import { shipperApi } from '../../api/shipperApi';
 
 const ShipperHomePage = () => {
-  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +54,11 @@ const ShipperHomePage = () => {
       setNewStatus(response.data.orderStatus);
       setError('');
     } catch (err) {
-      setError('Failed to load order details');
+      if (err.response?.status === 403) {
+        setError('You do not have access to this order');
+      } else {
+        setError('Failed to load order details');
+      }
     } finally {
       setLoading(false);
     }
@@ -163,18 +165,13 @@ const ShipperHomePage = () => {
           {/* Delivery Address */}
           <div style={styles.card}>
             <h4 style={styles.cardTitle}>Delivery Address</h4>
-            {selectedOrder.user.addresses && selectedOrder.user.addresses.length > 0 ? (
-              <div>
-                {selectedOrder.user.addresses.map((address, index) => (
-                  <div key={index} style={{...styles.addressBox, ...(address.isDefault ? styles.defaultAddress : {})}}>
-                    {address.isDefault && <span style={styles.defaultTag}>Default</span>}
-                    <p><strong>{address.fullName}</strong></p>
-                    <p>Phone: {address.phone}</p>
-                    <p>{address.description}</p>
-                    <p>{address.commune}, {address.district}</p>
-                    <p>{address.province}</p>
-                  </div>
-                ))}
+            {selectedOrder.shippingAddress && selectedOrder.shippingAddress.fullName ? (
+              <div style={styles.addressBox}>
+                <p><strong>{selectedOrder.shippingAddress.fullName}</strong></p>
+                <p>Phone: {selectedOrder.shippingAddress.phone}</p>
+                <p>{selectedOrder.shippingAddress.description}</p>
+                <p>{selectedOrder.shippingAddress.commune}, {selectedOrder.shippingAddress.district}</p>
+                <p>{selectedOrder.shippingAddress.province}</p>
               </div>
             ) : (
               <p style={styles.noData}>No delivery address available</p>
@@ -224,9 +221,6 @@ const ShipperHomePage = () => {
                   style={styles.select}
                 >
                   <option value="">Select Status</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="PROCESSING">Processing</option>
-                  <option value="SHIPPED">Shipped</option>
                   <option value="DELIVERED">Delivered</option>
                   <option value="CANCELLED">Cancelled</option>
                 </select>
@@ -244,7 +238,7 @@ const ShipperHomePage = () => {
       ) : (
         <div style={styles.ordersSection}>
           <h2 style={styles.title}>Assigned Orders</h2>
-          
+
           {/* Filter */}
           <div style={styles.filterBar}>
             <select
@@ -295,6 +289,9 @@ const ShipperHomePage = () => {
                   <div style={styles.orderCardContent}>
                     <p><strong>Customer:</strong> {order.user.firstName} {order.user.lastName}</p>
                     <p><strong>Phone:</strong> {order.user.phone}</p>
+                    {order.shipper && (
+                      <p><strong>Shipper:</strong> {order.shipper.firstName} {order.shipper.lastName} ({order.shipper.phone || 'N/A'})</p>
+                    )}
                     <p><strong>Total:</strong> ₫{order.total.toLocaleString()}</p>
                     <p><strong>Items:</strong> {order.items.length} item(s)</p>
                   </div>
@@ -426,20 +423,6 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '0.75rem',
     border: '1px solid #ddd'
-  },
-  defaultAddress: {
-    backgroundColor: '#f0f8ff',
-    borderColor: '#3498db'
-  },
-  defaultTag: {
-    display: 'inline-block',
-    backgroundColor: '#3498db',
-    color: '#fff',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '4px',
-    fontSize: '0.75rem',
-    fontWeight: 'bold',
-    marginBottom: '0.5rem'
   },
   noData: {
     color: '#7f8c8d',

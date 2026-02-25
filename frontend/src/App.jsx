@@ -13,7 +13,7 @@ import RegisterPage from "./pages/RegisterPage";
 import BookDetailPage from "./pages/BookDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddressPage from "./pages/AddressPage";
-import ShipperHomePage from "./pages/ShipperHomePage";
+import ShipperHomePage from "./pages/shipper/ShipperHomePage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import BooksManagement from "./pages/admin/BooksManagement";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";

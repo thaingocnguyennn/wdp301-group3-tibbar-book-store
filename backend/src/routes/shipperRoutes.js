@@ -1,11 +1,14 @@
 import express from 'express';
 import { authenticate } from '../middlewares/authMiddleware.js';
+import { authorize } from '../middlewares/roleMiddleware.js';
+import { ROLES } from '../config/constants.js';
 import shipperController from '../controllers/shipperController.js';
 
 const router = express.Router();
 
-// All routes require authentication
+// All routes require authentication and shipper role
 router.use(authenticate);
+router.use(authorize(ROLES.SHIPPER));
 
 // Get shipper dashboard with statistics
 router.get('/dashboard', (req, res, next) => 
