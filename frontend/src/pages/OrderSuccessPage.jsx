@@ -129,6 +129,23 @@ const OrderSuccessPage = () => {
           </div>
         </div>
 
+        {/* Shipping Address */}
+        {order.shippingAddress && order.shippingAddress.fullName && (
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>📍 Shipping Address</h2>
+            <div style={styles.addressBox}>
+              <p style={styles.addressLine}>
+                <strong>{order.shippingAddress.fullName}</strong>
+                <span style={styles.addressPhone}>&nbsp;|&nbsp;{order.shippingAddress.phone}</span>
+              </p>
+              <p style={styles.addressLine}>
+                {order.shippingAddress.description}, {order.shippingAddress.commune},&nbsp;
+                {order.shippingAddress.district}, {order.shippingAddress.province}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Order Items */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>📦 Order Items</h2>
@@ -379,6 +396,22 @@ const styles = {
     color: "#856404",
     margin: 0,
     lineHeight: 1.6,
+  },
+  addressBox: {
+    backgroundColor: "#f8f9fa",
+    border: "1px solid #dee2e6",
+    borderRadius: "8px",
+    padding: "1rem 1.25rem",
+  },
+  addressLine: {
+    margin: "0 0 0.35rem 0",
+    color: "#2c3e50",
+    fontSize: "0.95rem",
+    lineHeight: 1.5,
+  },
+  addressPhone: {
+    color: "#6c757d",
+    fontSize: "0.9rem",
   },
   notes: {
     backgroundColor: "#f8f9fa",

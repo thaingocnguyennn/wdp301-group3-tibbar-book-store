@@ -14,8 +14,7 @@ const AddressPage = () => {
     province: '',
     district: '',
     commune: '',
-    description: '',
-    isDefault: false
+    description: ''
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -43,8 +42,7 @@ const AddressPage = () => {
       province: '',
       district: '',
       commune: '',
-      description: '',
-      isDefault: false
+      description: ''
     });
     setEditingAddress(null);
     setIsFormOpen(false);
@@ -65,8 +63,7 @@ const AddressPage = () => {
       province: address.province,
       district: address.district,
       commune: address.commune,
-      description: address.description,
-      isDefault: address.isDefault
+      description: address.description
     });
     setIsFormOpen(true);
     setMessage('');
@@ -106,34 +103,19 @@ const AddressPage = () => {
     }
   };
 
-  const handleDelete = async (addressId) => {
+  const handleDelete = async (address) => {
     if (!window.confirm('Are you sure you want to delete this address?')) {
       return;
     }
 
     setLoading(true);
     try {
-      await addressApi.deleteAddress(addressId);
+      await addressApi.deleteAddress(address._id);
       setMessage('Address deleted successfully');
       await fetchAddresses();
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete address');
-      setTimeout(() => setError(''), 3000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSetDefault = async (addressId) => {
-    setLoading(true);
-    try {
-      await addressApi.setDefaultAddress(addressId);
-      setMessage('Default address set successfully');
-      await fetchAddresses();
-      setTimeout(() => setMessage(''), 2000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to set default address');
       setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
@@ -245,19 +227,6 @@ const AddressPage = () => {
               />
             </div>
 
-            <div style={styles.checkboxGroup}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  name="isDefault"
-                  checked={formData.isDefault}
-                  onChange={handleChange}
-                  style={styles.checkbox}
-                />
-                <span>Set as default address</span>
-              </label>
-            </div>
-
             <div style={styles.buttonRow}>
               <button type="submit" disabled={loading} style={styles.saveButton}>
                 {loading ? 'Saving...' : editingAddress ? 'Update Address' : 'Add Address'}
@@ -288,14 +257,8 @@ const AddressPage = () => {
             addresses.map((address) => (
               <div
                 key={address._id}
-                style={{
-                  ...styles.addressCard,
-                  ...(address.isDefault ? styles.defaultCard : {})
-                }}
+                style={styles.addressCard}
               >
-                {address.isDefault && (
-                  <div style={styles.defaultBadge}>Default</div>
-                )}
                 <div style={styles.addressContent}>
                   <div style={styles.addressHeader}>
                     <h4 style={styles.addressName}>{address.fullName}</h4>
@@ -315,18 +278,9 @@ const AddressPage = () => {
                   >
                     Edit
                   </button>
-                  {!address.isDefault && (
-                    <button
-                      style={styles.defaultButton}
-                      onClick={() => handleSetDefault(address._id)}
-                      disabled={loading}
-                    >
-                      Set as Default
-                    </button>
-                  )}
                   <button
                     style={styles.deleteButton}
-                    onClick={() => handleDelete(address._id)}
+                    onClick={() => handleDelete(address)}
                     disabled={loading}
                   >
                     Delete
@@ -442,22 +396,6 @@ const styles = {
     resize: 'vertical',
     fontFamily: 'inherit'
   },
-  checkboxGroup: {
-    marginTop: '0.5rem'
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    fontSize: '0.95rem',
-    color: '#34495e',
-    cursor: 'pointer'
-  },
-  checkbox: {
-    width: '18px',
-    height: '18px',
-    cursor: 'pointer'
-  },
   buttonRow: {
     display: 'flex',
     gap: '0.75rem',
@@ -508,21 +446,7 @@ const styles = {
     border: '2px solid transparent',
     position: 'relative'
   },
-  defaultCard: {
-    borderColor: '#3498db',
-    backgroundColor: '#f0f8ff'
-  },
-  defaultBadge: {
-    position: 'absolute',
-    top: '1rem',
-    right: '1rem',
-    backgroundColor: '#3498db',
-    color: '#fff',
-    padding: '0.25rem 0.75rem',
-    borderRadius: '12px',
-    fontSize: '0.8rem',
-    fontWeight: '600'
-  },
+
   addressContent: {
     marginBottom: '1rem'
   },
@@ -555,15 +479,6 @@ const styles = {
   },
   editButton: {
     backgroundColor: '#3498db',
-    color: '#fff',
-    padding: '0.5rem 1rem',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '0.9rem',
-    cursor: 'pointer'
-  },
-  defaultButton: {
-    backgroundColor: '#2ecc71',
     color: '#fff',
     padding: '0.5rem 1rem',
     border: 'none',

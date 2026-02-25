@@ -79,9 +79,11 @@ class AddressService {
     }
 
     const wasDefault = address.isDefault;
-    address.deleteOne();
 
-    // If deleted address was default and there are other addresses, make the first one default
+    // Use pull() to remove subdocument immediately in memory before save()
+    user.addresses.pull({ _id: addressId });
+
+    // If deleted address was default, promote the first remaining address
     if (wasDefault && user.addresses.length > 0) {
       user.addresses[0].isDefault = true;
     }

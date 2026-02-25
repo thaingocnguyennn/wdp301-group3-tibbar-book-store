@@ -94,10 +94,15 @@ const orderSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
-    // Shipping address (placeholder for future module)
+    // Shipping address snapshot (stored at order time)
     shippingAddress: {
-      type: String,
-      default: "MOCK_ADDRESS_ID",
+      addressId: { type: String, default: null },
+      fullName: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      province: { type: String, default: "" },
+      district: { type: String, default: "" },
+      commune: { type: String, default: "" },
+      description: { type: String, default: "" },
     },
 
     // Voucher (placeholder for future module)
