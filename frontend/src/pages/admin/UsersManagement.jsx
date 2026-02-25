@@ -16,7 +16,15 @@ const UsersManagement = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState('');
 
-  const roles = ['customer', 'admin', 'manager'];
+  const roles = ['customer', 'shipper', 'admin', 'manager'];
+
+  const roleBadgeColor = {
+    customer: { backgroundColor: '#d1ecf1', color: '#0c5460' },
+    shipper:  { backgroundColor: '#d4edda', color: '#155724' },
+    admin:    { backgroundColor: '#f8d7da', color: '#721c24' },
+    manager:  { backgroundColor: '#fff3cd', color: '#856404' },
+    guest:    { backgroundColor: '#e2e3e5', color: '#383d41' },
+  };
 
   // Debounce search inputs
   useEffect(() => {
@@ -129,6 +137,7 @@ const UsersManagement = () => {
           >
             <option value="all">All Roles</option>
             <option value="customer">Customer</option>
+            <option value="shipper">Shipper</option>
             <option value="admin">Admin</option>
             <option value="manager">Manager</option>
           </select>
@@ -199,7 +208,12 @@ const UsersManagement = () => {
                       </div>
                     </div>
                   ) : (
-                    <span style={styles.roleDisplay}>
+                    <span
+                      style={{
+                        ...styles.roleBadge,
+                        ...(roleBadgeColor[user.role] || roleBadgeColor.guest),
+                      }}
+                    >
                       {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                     </span>
                   )}
@@ -342,8 +356,12 @@ const styles = {
     display: 'flex',
     gap: '0.25rem',
   },
-  roleDisplay: {
-    fontWeight: '500',
+  roleBadge: {
+    display: 'inline-block',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '12px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
   },
   statusBadge: {
     padding: '0.25rem 0.75rem',
