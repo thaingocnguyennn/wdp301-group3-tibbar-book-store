@@ -219,12 +219,39 @@ class OrderService {
   async createOrder(userId, orderData) {
     const {
       paymentMethod = "COD",
-      shippingAddressId = "MOCK_ADDRESS_ID",
+      shippingAddressId = null,
       voucherId = null,
       voucherCode = null,
       notes = "",
       ipAddress = "127.0.0.1",
     } = orderData;
+
+    // Resolve shipping address from user's saved addresses
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound("User not found");
+
+    let resolvedAddress = null;
+    if (shippingAddressId) {
+      resolvedAddress = user.addresses.id(shippingAddressId);
+      if (!resolvedAddress) throw ApiError.badRequest("Shipping address not found");
+    } else {
+      // Fall back to default address
+      resolvedAddress = user.addresses.find((a) => a.isDefault) || user.addresses[0];
+    }
+
+    if (!resolvedAddress) {
+      throw ApiError.badRequest("Please add a shipping address before placing an order");
+    }
+
+    const shippingAddressSnapshot = {
+      addressId: resolvedAddress._id.toString(),
+      fullName: resolvedAddress.fullName,
+      phone: resolvedAddress.phone,
+      province: resolvedAddress.province,
+      district: resolvedAddress.district,
+      commune: resolvedAddress.commune,
+      description: resolvedAddress.description,
+    };
 
     // Validate payment method
     const paymentProvider = paymentService.getProvider(paymentMethod);
@@ -305,7 +332,7 @@ class OrderService {
       paymentMethod,
       paymentStatus: paymentResult.paymentStatus,
       orderStatus: "PENDING",
-      shippingAddress: shippingAddressId,
+      shippingAddress: shippingAddressSnapshot,
       voucher: voucher?._id || null,
       notes,
       transactionId: paymentResult.transactionId || null,

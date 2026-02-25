@@ -107,6 +107,22 @@ const OrderDetailPage = () => {
           </div>
         </div>
 
+        {order.shippingAddress && order.shippingAddress.fullName && (
+          <>
+            <h3 style={styles.sectionTitle}>📍 Shipping Address</h3>
+            <div style={styles.addressBox}>
+              <p style={styles.addressLine}>
+                <strong>{order.shippingAddress.fullName}</strong>
+                <span style={styles.addressPhone}>&nbsp;|&nbsp;{order.shippingAddress.phone}</span>
+              </p>
+              <p style={styles.addressLine}>
+                {order.shippingAddress.description}, {order.shippingAddress.commune},&nbsp;
+                {order.shippingAddress.district}, {order.shippingAddress.province}
+              </p>
+            </div>
+          </>
+        )}
+
         <h3 style={styles.sectionTitle}>Items</h3>
         <div style={styles.itemsTable}>
           <div style={styles.itemsHead}>
@@ -273,6 +289,23 @@ const styles = {
     paddingTop: "0.7rem",
     borderTop: "1px solid #ecf0f1",
     fontSize: "1.05rem",
+  },
+  addressBox: {
+    backgroundColor: "#f8f9fa",
+    border: "1px solid #dee2e6",
+    borderRadius: "8px",
+    padding: "0.85rem 1rem",
+    marginBottom: "1.2rem",
+  },
+  addressLine: {
+    margin: "0 0 0.3rem 0",
+    color: "#2c3e50",
+    fontSize: "0.9rem",
+    lineHeight: 1.5,
+  },
+  addressPhone: {
+    color: "#6c757d",
+    fontSize: "0.88rem",
   },
   cancelSection: {
     marginTop: "1rem",

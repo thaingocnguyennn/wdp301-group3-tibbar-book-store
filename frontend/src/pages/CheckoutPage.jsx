@@ -4,6 +4,7 @@ import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
 import { orderApi } from "../api/orderApi";
 import { voucherApi } from "../api/voucherApi";
+import { addressApi } from "../api/addressApi";
 import VietQRPayment from "../components/payment/VietQRPayment";
 import AvailableVouchers from "../components/payment/AvailableVouchers";
 
@@ -30,6 +31,11 @@ const CheckoutPage = () => {
   const [availableVouchersLoading, setAvailableVouchersLoading] = useState(false);
   const [showAvailableVouchers, setShowAvailableVouchers] = useState(false);
 
+  // Address state
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [addressesLoading, setAddressesLoading] = useState(true);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,6 +50,27 @@ const CheckoutPage = () => {
       navigate("/cart");
     }
   }, [cart.items, loading, isAuthenticated, showVietQRPayment, navigate]);
+
+  // Fetch addresses
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchAddresses = async () => {
+      setAddressesLoading(true);
+      try {
+        const response = await addressApi.getAddresses();
+        const list = response.data || [];
+        setAddresses(list);
+        // Auto-select default address
+        const defaultAddr = list.find((a) => a.isDefault) || list[0];
+        if (defaultAddr) setSelectedAddressId(defaultAddr._id);
+      } catch (err) {
+        console.error("Failed to fetch addresses:", err);
+      } finally {
+        setAddressesLoading(false);
+      }
+    };
+    fetchAddresses();
+  }, [isAuthenticated]);
 
   // Fetch payment methods
   useEffect(() => {
@@ -217,6 +244,11 @@ const CheckoutPage = () => {
       return;
     }
 
+    if (!selectedAddressId) {
+      setError("Please select a shipping address");
+      return;
+    }
+
     if (!cartIsValid || !cart.items || cart.items.length === 0) {
       setError("Your cart is empty or invalid. Please add items to your cart.");
       return;
@@ -228,7 +260,7 @@ const CheckoutPage = () => {
     try {
       const orderData = {
         paymentMethod: selectedPaymentMethod,
-        shippingAddressId: "MOCK_ADDRESS_ID", // Placeholder
+        shippingAddressId: selectedAddressId,
         voucherCode: appliedVoucher?.code || null,
         notes: notes.trim(),
       };
@@ -338,17 +370,64 @@ const CheckoutPage = () => {
       <div style={styles.grid}>
         {/* Left Column - Checkout Details */}
         <div style={styles.leftColumn}>
-          {/* Shipping Address Placeholder */}
+          {/* Shipping Address */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>📍 Shipping Address</h2>
-            <div style={styles.placeholder}>
-              <p style={styles.placeholderText}>
-                🚧 <strong>Coming soon</strong> - Handled by another developer
-              </p>
-              <p style={styles.placeholderSubtext}>
-                Using default address for now
-              </p>
+            <div style={styles.addressHeader}>
+              <h2 style={styles.sectionTitle}>📍 Shipping Address</h2>
+              <button
+                type="button"
+                style={styles.addAddressBtn}
+                onClick={() => navigate("/address")}
+              >
+                + Manage Addresses
+              </button>
             </div>
+
+            {addressesLoading ? (
+              <p style={styles.addressLoadingText}>Loading addresses...</p>
+            ) : addresses.length === 0 ? (
+              <div style={styles.noAddressBox}>
+                <p style={styles.noAddressText}>You have no saved addresses.</p>
+                <button
+                  type="button"
+                  style={styles.addAddressBtn}
+                  onClick={() => navigate("/address")}
+                >
+                  + Add Address
+                </button>
+              </div>
+            ) : (
+              <div style={styles.addressList}>
+                {addresses.map((addr) => (
+                  <div
+                    key={addr._id}
+                    style={{
+                      ...styles.addressCard,
+                      ...(selectedAddressId === addr._id ? styles.addressCardSelected : {}),
+                    }}
+                    onClick={() => setSelectedAddressId(addr._id)}
+                  >
+                    <div style={styles.addressRadio}>
+                      {selectedAddressId === addr._id && (
+                        <div style={styles.addressRadioInner} />
+                      )}
+                    </div>
+                    <div style={styles.addressInfo}>
+                      <div style={styles.addressName}>
+                        <strong>{addr.fullName}</strong>
+                        <span style={styles.addressPhone}>{addr.phone}</span>
+                        {addr.isDefault && (
+                          <span style={styles.defaultBadge}>Default</span>
+                        )}
+                      </div>
+                      <p style={styles.addressDetail}>
+                        {addr.description}, {addr.commune}, {addr.district}, {addr.province}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Voucher Placeholder */}
@@ -539,12 +618,12 @@ const CheckoutPage = () => {
             <button
               style={{
                 ...styles.placeOrderButton,
-                ...(isSubmitting || !selectedPaymentMethod || !cartIsValid
+                ...(isSubmitting || !selectedPaymentMethod || !cartIsValid || !selectedAddressId
                   ? styles.placeOrderButtonDisabled
                   : {}),
               }}
               onClick={handlePlaceOrder}
-              disabled={isSubmitting || !selectedPaymentMethod || !cartIsValid}
+              disabled={isSubmitting || !selectedPaymentMethod || !cartIsValid || !selectedAddressId || addresses.length === 0}
             >
               {isSubmitting ? "Processing..." : "Place Order"}
             </button>
@@ -621,22 +700,101 @@ const styles = {
     marginBottom: "1rem",
     marginTop: 0,
   },
-  placeholder: {
+  addressHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "1rem",
+  },
+  addAddressBtn: {
+    backgroundColor: "transparent",
+    color: "#667eea",
+    border: "1px solid #667eea",
+    padding: "0.4rem 0.9rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+  },
+  addressLoadingText: {
+    color: "#7f8c8d",
+    fontSize: "0.9rem",
+  },
+  noAddressBox: {
     backgroundColor: "#f8f9fa",
     padding: "1.25rem",
     borderRadius: "8px",
     border: "2px dashed #ddd",
     textAlign: "center",
   },
-  placeholderText: {
+  noAddressText: {
     color: "#495057",
-    margin: "0 0 0.5rem 0",
+    marginBottom: "0.75rem",
     fontSize: "0.95rem",
   },
-  placeholderSubtext: {
-    color: "#868e96",
-    margin: 0,
+  addressList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.75rem",
+  },
+  addressCard: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "0.75rem",
+    padding: "0.9rem 1rem",
+    border: "2px solid #e9ecef",
+    borderRadius: "8px",
+    cursor: "pointer",
+    transition: "all 0.15s",
+  },
+  addressCardSelected: {
+    borderColor: "#667eea",
+    backgroundColor: "#f0f3ff",
+  },
+  addressRadio: {
+    width: "18px",
+    height: "18px",
+    borderRadius: "50%",
+    border: "2px solid #667eea",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  addressRadioInner: {
+    width: "9px",
+    height: "9px",
+    borderRadius: "50%",
+    backgroundColor: "#667eea",
+  },
+  addressInfo: {
+    flex: 1,
+  },
+  addressName: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+    marginBottom: "0.3rem",
+    flexWrap: "wrap",
+  },
+  addressPhone: {
+    color: "#6c757d",
+    fontSize: "0.9rem",
+  },
+  defaultBadge: {
+    backgroundColor: "#667eea",
+    color: "#fff",
+    fontSize: "0.7rem",
+    padding: "0.15rem 0.5rem",
+    borderRadius: "4px",
+    fontWeight: "600",
+  },
+  addressDetail: {
+    color: "#6c757d",
     fontSize: "0.85rem",
+    margin: 0,
+    lineHeight: "1.4",
   },
   voucherBox: {
     backgroundColor: "#f8f9fa",
