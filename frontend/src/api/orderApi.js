@@ -54,24 +54,6 @@ export const orderApi = {
     });
     return response.data;
   },
-
-  // Confirm VietQR payment manually (Admin only)
-  confirmVietQRPayment: async (orderNumber) => {
-    const response = await axiosInstance.post(`/orders/vietqr/confirm/${orderNumber}`);
-    return response.data;
-  },
-
-  // Generate VietQR payment QR code (secure - amount from server)
-  generateVietQRPayment: async (orderId) => {
-    const response = await axiosInstance.post("/payments/vietqr/create", { orderId });
-    return response.data;
-  },
-
-  // Get VietQR payment details (idempotent - for refresh)
-  getVietQRPayment: async (orderId) => {
-    const response = await axiosInstance.get(`/payments/vietqr/${orderId}`);
-    return response.data;
-  },
 };
 
 export const adminOrderApi = {

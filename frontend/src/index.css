@@ -90,3 +90,44 @@ select:focus {
     transform: translateY(-10px);
   }
 }
+
+/* ─── Order card hover effects ─── */
+.order-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+  border-color: #e0e7ff !important;
+}
+
+/* ─── Pagination button hover ─── */
+.pagination-btn {
+  transition: all 0.2s ease !important;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25) !important;
+}
+
+/* ─── Payment return page progress bar animation ─── */
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(250%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ─── Checkout / Order button hover overrides ─── */
+.checkout-primary-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.35) !important;
+}
+
+.checkout-secondary-btn:hover {
+  background-color: #f8fafc !important;
+  border-color: #667eea !important;
+}

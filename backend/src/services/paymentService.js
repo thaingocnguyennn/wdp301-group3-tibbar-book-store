@@ -1,4 +1,21 @@
-import crypto from "crypto";
+import { VNPay, ProductCode, VnpLocale, HashAlgorithm, ignoreLogger } from "vnpay";
+
+// VNPay response code to English message mapping
+const VNPAY_RESPONSE_MESSAGES = {
+  "00": "Transaction successful",
+  "07": "Transaction suspected of fraud",
+  "09": "Card/account not registered for internet banking",
+  "10": "Card/account authentication failed more than allowed times",
+  "11": "Payment session expired",
+  "12": "Card/account is locked",
+  "13": "Invalid transaction authentication password",
+  "24": "Transaction cancelled by customer",
+  "51": "Insufficient account balance",
+  "65": "Account has exceeded daily transaction limit",
+  "75": "Payment bank is under maintenance",
+  "79": "Invalid payment password entered too many times",
+  "99": "An unknown error occurred",
+};
 
 // Payment provider interface - all providers must implement these methods
 class PaymentProvider {
@@ -30,8 +47,6 @@ class CODPaymentProvider extends PaymentProvider {
   }
 
   async createPayment(orderData) {
-    // COD doesn't need external payment processing
-    // Just return the order data with payment status PENDING
     return {
       success: true,
       paymentMethod: "COD",
@@ -41,7 +56,6 @@ class CODPaymentProvider extends PaymentProvider {
   }
 
   async confirmPayment(callbackParams) {
-    // COD doesn't have confirmation callback
     return {
       success: true,
       paymentStatus: "PENDING",
@@ -49,76 +63,98 @@ class CODPaymentProvider extends PaymentProvider {
   }
 }
 
-// VietQR Payment Provider
-class VietQRPaymentProvider extends PaymentProvider {
+// VNPay Payment Provider - Online payment via VNPay gateway
+class VNPayPaymentProvider extends PaymentProvider {
   constructor() {
-    super("VIETQR");
-    // Bank account information
-    this.bankId = "mb"; // MBbank code
-    this.accountNo = process.env.VIETQR_ACCOUNT_NO || "0346288374";
-    this.accountName = process.env.VIETQR_ACCOUNT_NAME || "TRAN VAN MINH PHUNG";
-    this.template = "compact2"; // QR template type
-    this.branch = process.env.VIETQR_BRANCH || "MBBank";
+    super("VNPAY");
+
+    this.tmnCode = process.env.VNP_TMN_CODE || "PKE9F59W";
+    this.secureSecret = process.env.VNP_HASH_SECRET || "RHW3KOPLCCGKU512ECR16J18VAK38QUF";
+    this.returnUrl = process.env.VNP_RETURN_URL || "http://localhost:5173/checkout/payment-return";
+
+    this.vnpay = new VNPay({
+      tmnCode: this.tmnCode,
+      secureSecret: this.secureSecret,
+      vnpayHost: "https://sandbox.vnpayment.vn",
+      testMode: true,
+      hashAlgorithm: HashAlgorithm.SHA512,
+      enableLog: true,
+      loggerFn: ignoreLogger,
+    });
   }
 
   async canPay() {
-    // VietQR is always available if bank info is configured
-    return !!(this.accountNo && this.accountName);
+    return !!(this.tmnCode && this.secureSecret);
   }
 
   async createPayment(orderData) {
-    console.log("🐳 [VietQR] Creating payment...", orderData);
-    
-    if (!await this.canPay()) {
-      throw new Error("VietQR is not configured. Please set bank account information in .env file.");
-    }
+    const { orderNumber, total, ipAddress } = orderData;
 
-    const { orderNumber, total } = orderData;
-    
-    // SECURITY: Verify total is provided and valid
     if (!total || total <= 0) {
       throw new Error("Invalid payment amount");
     }
-    
-    // Generate transfer content with ORDER reference for reconciliation
-    const description = `ORDER ${orderNumber}`;
-    const amount = Math.round(total); // Amount in VND
 
-    console.log("💵 [VietQR] Payment info:", {
+    console.log("💳 [VNPay] Creating payment URL...", {
       orderNumber,
-      description,
-      amount,
-      bankId: this.bankId
+      total,
+      ipAddress,
     });
 
-    // Generate VietQR URL using api.vietqr.io
-    const qrContent = `https://img.vietqr.io/image/${this.bankId}-${this.accountNo}-${this.template}.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(this.accountName)}`;
+    const paymentUrl = this.vnpay.buildPaymentUrl({
+      vnp_Amount: total,
+      vnp_IpAddr: ipAddress || "127.0.0.1",
+      vnp_TxnRef: orderNumber,
+      vnp_OrderInfo: `Thanh toan don hang ${orderNumber}`,
+      vnp_ReturnUrl: this.returnUrl,
+      vnp_Locale: VnpLocale.VN,
+      vnp_OrderType: ProductCode.Books_Newspapers_Magazines,
+    });
+
+    console.log("✅ [VNPay] Payment URL generated successfully");
 
     return {
       success: true,
-      paymentMethod: "VIETQR",
+      paymentMethod: "VNPAY",
       paymentStatus: "PENDING",
-      qrCodeUrl: qrContent,
-      bankInfo: {
-        bankId: "MBBank",
-        bankName: "Ngân hàng Quân đội (MBBank)",
-        accountNo: this.accountNo,
-        accountName: this.accountName,
-        branch: this.branch,
-      },
-      amount: amount,
-      description: description,
+      paymentUrl,
+      transactionId: orderNumber,
       orderData,
     };
   }
 
   async confirmPayment(callbackParams) {
-    // VietQR doesn't have automatic confirmation callback
-    // Payment confirmation needs to be done manually by admin
+    console.log("🔍 [VNPay] Verifying return URL params...");
+
+    const result = this.vnpay.verifyReturnUrl(callbackParams);
+
+    console.log("📋 [VNPay] Verification result:", {
+      isVerified: result.isVerified,
+      isSuccess: result.isSuccess,
+      message: result.message,
+      vnp_ResponseCode: result.vnp_ResponseCode,
+      vnp_TxnRef: result.vnp_TxnRef,
+    });
+
+    const responseCode = String(result.vnp_ResponseCode || "99");
+    const englishMessage =
+      VNPAY_RESPONSE_MESSAGES[responseCode] ||
+      result.message ||
+      "Payment verification failed";
+
+    if (result.isVerified && result.isSuccess) {
+      return {
+        success: true,
+        paymentStatus: "PAID",
+        transactionId: String(result.vnp_TransactionNo || ""),
+        message: VNPAY_RESPONSE_MESSAGES["00"] || "Payment completed successfully",
+      };
+    }
+
     return {
-      success: true,
-      paymentStatus: "PENDING",
-      message: "VietQR payment is pending confirmation",
+      success: false,
+      paymentStatus: "FAILED",
+      transactionId: String(result.vnp_TransactionNo || ""),
+      message: englishMessage,
     };
   }
 }
@@ -128,7 +164,7 @@ class PaymentService {
   constructor() {
     this.providers = {
       COD: new CODPaymentProvider(),
-      VIETQR: new VietQRPaymentProvider(),
+      VNPAY: new VNPayPaymentProvider(),
     };
   }
 
@@ -157,7 +193,7 @@ class PaymentService {
   getPaymentMethodName(method) {
     const names = {
       COD: "Cash on Delivery",
-      VIETQR: "VietQR Online Payment",
+      VNPAY: "VNPay Online Payment",
     };
     return names[method] || method;
   }
@@ -165,7 +201,7 @@ class PaymentService {
   getPaymentMethodDescription(method) {
     const descriptions = {
       COD: "Pay with cash when you receive your order",
-      VIETQR: "Scan QR code to pay via banking app",
+      VNPAY: "Pay via VNPay gateway (ATM, Credit Card, QR Code)",
     };
     return descriptions[method] || "";
   }

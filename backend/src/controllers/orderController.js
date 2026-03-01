@@ -113,12 +113,12 @@ class OrderController {
     }
   }
 
-  // Confirm payment (for VNPAY callback)
+  // Confirm payment (for VNPay return URL callback)
   async confirmPayment(req, res, next) {
     try {
-      const { orderNumber, ...callbackParams } = req.query;
+      const callbackParams = req.query;
 
-      const result = await orderService.confirmPayment(orderNumber, callbackParams);
+      const result = await orderService.confirmPayment(callbackParams);
 
       return ApiResponse.success(
         res,
@@ -166,23 +166,7 @@ class OrderController {
     }
   }
 
-  // Confirm VietQR payment manually (Admin only)
-  async confirmVietQRPayment(req, res, next) {
-    try {
-      const { orderNumber } = req.params;
 
-      const result = await orderService.confirmVietQRPayment(orderNumber);
-
-      return ApiResponse.success(
-        res,
-        HTTP_STATUS.OK,
-        "VietQR payment confirmed successfully",
-        result
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
   getRevenue = async (req, res, next) => {
     try {
       const { range } = req.query;
