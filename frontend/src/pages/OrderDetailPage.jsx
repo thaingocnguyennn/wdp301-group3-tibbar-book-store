@@ -2,6 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
 
+const ORDER_STEPS = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"];
+const ORDER_STATUS_CONFIG = {
+  PENDING: { icon: "⏳", label: "Pending", color: "#f59e0b" },
+  PROCESSING: { icon: "📦", label: "Processing", color: "#0284c7" },
+  SHIPPED: { icon: "🚚", label: "Shipped", color: "#4f46e5" },
+  DELIVERED: { icon: "✅", label: "Delivered", color: "#16a34a" },
+  CANCELLED: { icon: "✕", label: "Cancelled", color: "#dc2626" },
+};
+const PAYMENT_STATUS_CONFIG = {
+  PENDING: { icon: "○", label: "Unpaid", bg: "#fff8e1", color: "#d97706", border: "#fcd34d" },
+  PAID: { icon: "●", label: "Paid", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
+  FAILED: { icon: "!", label: "Failed", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+  REFUNDED: { icon: "↩", label: "Refunded", bg: "#f3f4f6", color: "#6b7280", border: "#d1d5db" },
+};
+const PAYMENT_METHOD_LABELS = {
+  COD: "Cash on Delivery",
+  VNPAY: "VNPay Online Payment",
+};
+
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -43,10 +62,19 @@ const OrderDetailPage = () => {
     }
   };
 
+  const getCurrentStepIndex = () => {
+    if (!order) return 0;
+    if (order.orderStatus === "CANCELLED") return -1;
+    return ORDER_STEPS.indexOf(order.orderStatus);
+  };
+
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={styles.card}>Loading order detail...</div>
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner} />
+          <p style={styles.loadingText}>Loading order details...</p>
+        </div>
       </div>
     );
   }
@@ -54,288 +82,688 @@ const OrderDetailPage = () => {
   if (error || !order) {
     return (
       <div style={styles.container}>
-        <div style={styles.card}>
-          <div style={styles.error}>{error || "Order not found"}</div>
-          <button
-            style={styles.secondaryButton}
-            onClick={() => navigate("/orders")}
-          >
-            Back to Orders
+        <div style={styles.errorCard}>
+          <div style={styles.errorIcon}>⚠</div>
+          <h2 style={styles.errorTitle}>{error || "Order not found"}</h2>
+          <button style={styles.backButton} onClick={() => navigate("/orders")}>
+            ← Back to Orders
           </button>
         </div>
       </div>
     );
   }
 
+  const statusConfig = ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
+  const paymentConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
+  const currentStep = getCurrentStepIndex();
+
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <button
-            style={styles.secondaryButton}
-            onClick={() => navigate("/orders")}
-          >
-            ← Back to Orders
-          </button>
-          <h1 style={styles.title}>Order Detail</h1>
+      {/* Top Navigation */}
+      <div style={styles.topNav}>
+        <button style={styles.backButton} onClick={() => navigate("/orders")}>
+          ← Back to Orders
+        </button>
+        <div style={styles.orderIdHeader}>
+          <span style={styles.orderLabel}>Order</span>
+          <span style={styles.orderNumber}>{order.orderNumber}</span>
         </div>
+      </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+      {error && (
+        <div style={styles.errorBanner}>
+          <span>⚠ {error}</span>
+        </div>
+      )}
 
-        <div style={styles.infoGrid}>
-          <div>
-            <strong>Order Number:</strong> {order.orderNumber}
+      {/* Status Timeline */}
+      {order.orderStatus !== "CANCELLED" ? (
+        <div style={styles.timelineCard}>
+          <div style={styles.timeline}>
+            {ORDER_STEPS.map((step, i) => {
+              const stepConfig = ORDER_STATUS_CONFIG[step];
+              const isCompleted = i <= currentStep;
+              const isCurrent = i === currentStep;
+              return (
+                <div key={step} style={styles.timelineStep}>
+                  <div
+                    style={{
+                      ...styles.timelineDot,
+                      backgroundColor: isCompleted ? stepConfig.color : "#e2e8f0",
+                      boxShadow: isCurrent ? `0 0 0 4px ${stepConfig.color}33` : "none",
+                      transform: isCurrent ? "scale(1.2)" : "scale(1)",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.75rem" }}>
+                      {isCompleted ? stepConfig.icon : ""}
+                    </span>
+                  </div>
+                  {i < ORDER_STEPS.length - 1 && (
+                    <div
+                      style={{
+                        ...styles.timelineLine,
+                        backgroundColor: i < currentStep ? ORDER_STATUS_CONFIG[ORDER_STEPS[i + 1]].color : "#e2e8f0",
+                      }}
+                    />
+                  )}
+                  <span
+                    style={{
+                      ...styles.timelineLabel,
+                      color: isCompleted ? "#1e293b" : "#94a3b8",
+                      fontWeight: isCurrent ? 700 : 500,
+                    }}
+                  >
+                    {stepConfig.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          <div>
-            <strong>Created At:</strong>{" "}
-            {new Date(order.createdAt).toLocaleString()}
-          </div>
-          <div>
-            <strong>Payment Method:</strong> {order.paymentMethod}
-          </div>
-          <div>
-            <strong>Payment Status:</strong>{" "}
-            <span style={getPaymentStyle(order.paymentStatus)}>
-              {order.paymentStatus}
+        </div>
+      ) : (
+        <div style={styles.cancelledBanner}>
+          <span style={styles.cancelledIcon}>✕</span>
+          <span style={styles.cancelledText}>This order has been cancelled</span>
+        </div>
+      )}
+
+      {/* Info Cards Grid */}
+      <div style={styles.infoGrid}>
+        <div style={styles.infoCard}>
+          <div style={styles.infoCardIcon}>📅</div>
+          <div style={styles.infoCardContent}>
+            <span style={styles.infoCardLabel}>Order Date</span>
+            <span style={styles.infoCardValue}>
+              {new Date(order.createdAt).toLocaleDateString("vi-VN", {
+                day: "2-digit", month: "2-digit", year: "numeric",
+              })}
+              {" "}
+              {new Date(order.createdAt).toLocaleTimeString("vi-VN", {
+                hour: "2-digit", minute: "2-digit",
+              })}
             </span>
           </div>
-          <div>
-            <strong>Order Status:</strong>{" "}
-            <span style={getOrderStyle(order.orderStatus)}>
-              {order.orderStatus}
+        </div>
+
+        <div style={styles.infoCard}>
+          <div style={styles.infoCardIcon}>
+            {order.paymentMethod === "VNPAY" ? "🏦" : "💵"}
+          </div>
+          <div style={styles.infoCardContent}>
+            <span style={styles.infoCardLabel}>Payment Method</span>
+            <span style={styles.infoCardValue}>
+              {PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}
             </span>
           </div>
         </div>
 
-        {order.shippingAddress && order.shippingAddress.fullName && (
-          <>
-            <h3 style={styles.sectionTitle}>📍 Shipping Address</h3>
-            <div style={styles.addressBox}>
-              <p style={styles.addressLine}>
-                <strong>{order.shippingAddress.fullName}</strong>
-                <span style={styles.addressPhone}>&nbsp;|&nbsp;{order.shippingAddress.phone}</span>
-              </p>
-              <p style={styles.addressLine}>
-                {order.shippingAddress.description}, {order.shippingAddress.commune},&nbsp;
-                {order.shippingAddress.district}, {order.shippingAddress.province}
-              </p>
+        <div style={styles.infoCard}>
+          <div style={styles.infoCardIcon}>{paymentConfig.icon}</div>
+          <div style={styles.infoCardContent}>
+            <span style={styles.infoCardLabel}>Payment Status</span>
+            <span
+              style={{
+                ...styles.statusBadge,
+                backgroundColor: paymentConfig.bg,
+                color: paymentConfig.color,
+                borderColor: paymentConfig.border,
+              }}
+            >
+              {paymentConfig.label}
+            </span>
+          </div>
+        </div>
+
+        <div style={styles.infoCard}>
+          <div style={styles.infoCardIcon}>{statusConfig.icon}</div>
+          <div style={styles.infoCardContent}>
+            <span style={styles.infoCardLabel}>Order Status</span>
+            <span style={{ ...styles.infoCardValue, color: statusConfig.color, fontWeight: 700 }}>
+              {statusConfig.label}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Shipping Address */}
+      {order.shippingAddress && order.shippingAddress.fullName && (
+        <div style={styles.sectionCard}>
+          <h3 style={styles.sectionTitle}>
+            <span style={styles.sectionIcon}>📍</span>
+            Shipping Address
+          </h3>
+          <div style={styles.addressContent}>
+            <div style={styles.addressNameRow}>
+              <strong style={styles.addressName}>{order.shippingAddress.fullName}</strong>
+              <span style={styles.addressDivider}>|</span>
+              <span style={styles.addressPhone}>{order.shippingAddress.phone}</span>
             </div>
-          </>
-        )}
-
-        <h3 style={styles.sectionTitle}>Items</h3>
-        <div style={styles.itemsTable}>
-          <div style={styles.itemsHead}>
-            <span>Book</span>
-            <span>Qty</span>
-            <span>Price</span>
-            <span>Subtotal</span>
+            <p style={styles.addressDetail}>
+              {order.shippingAddress.description}, {order.shippingAddress.commune},&nbsp;
+              {order.shippingAddress.district}, {order.shippingAddress.province}
+            </p>
           </div>
+        </div>
+      )}
+
+      {/* Order Items */}
+      <div style={styles.sectionCard}>
+        <h3 style={styles.sectionTitle}>
+          <span style={styles.sectionIcon}>🛍</span>
+          Order Items
+          <span style={styles.itemCount}>{order.items.length} item{order.items.length > 1 ? "s" : ""}</span>
+        </h3>
+
+        <div style={styles.itemsContainer}>
+          {/* Table Header */}
+          <div style={styles.tableHead}>
+            <span style={styles.colProduct}>Product</span>
+            <span style={styles.colCenter}>Qty</span>
+            <span style={styles.colRight}>Price</span>
+            <span style={styles.colRight}>Subtotal</span>
+          </div>
+
+          {/* Table Rows */}
           {order.items.map((item) => (
             <div
               key={`${item.book?._id || item.title}-${item.quantity}`}
-              style={styles.itemsRow}
+              style={styles.tableRow}
             >
-              <span>{item.title}</span>
-              <span>{item.quantity}</span>
-              <span>{Number(item.price || 0).toLocaleString("vi-VN")}₫</span>
-              <span>{Number(item.subtotal || 0).toLocaleString("vi-VN")}₫</span>
+              <span style={styles.colProduct}>
+                <span style={styles.productTitle}>{item.title}</span>
+              </span>
+              <span style={styles.colCenter}>
+                <span style={styles.qtyBadge}>{item.quantity}</span>
+              </span>
+              <span style={styles.colRight}>
+                {Number(item.price || 0).toLocaleString("vi-VN")}₫
+              </span>
+              <span style={{ ...styles.colRight, fontWeight: 700, color: "#1e293b" }}>
+                {Number(item.subtotal || 0).toLocaleString("vi-VN")}₫
+              </span>
             </div>
           ))}
         </div>
+      </div>
 
-        <h3 style={styles.sectionTitle}>Summary</h3>
-        <div style={styles.summary}>
+      {/* Summary */}
+      <div style={styles.summaryCard}>
+        <h3 style={styles.sectionTitle}>
+          <span style={styles.sectionIcon}>💰</span>
+          Order Summary
+        </h3>
+        <div style={styles.summaryContent}>
           <div style={styles.summaryRow}>
-            <span>Subtotal</span>
-            <strong>
+            <span style={styles.summaryLabel}>Subtotal</span>
+            <span style={styles.summaryValue}>
               {Number(order.subtotal || 0).toLocaleString("vi-VN")}₫
-            </strong>
+            </span>
           </div>
           <div style={styles.summaryRow}>
-            <span>Discount</span>
-            <strong>
+            <span style={styles.summaryLabel}>Discount</span>
+            <span style={{ ...styles.summaryValue, color: "#ef4444" }}>
               -{Number(order.discount || 0).toLocaleString("vi-VN")}₫
-            </strong>
+            </span>
           </div>
           <div style={styles.summaryRow}>
-            <span>Shipping Fee</span>
-            <strong>
-              {Number(order.shippingFee || 0).toLocaleString("vi-VN")}₫
-            </strong>
+            <span style={styles.summaryLabel}>Shipping Fee</span>
+            <span style={styles.summaryValue}>
+              {Number(order.shippingFee || 0) === 0 ? (
+                <span style={{ color: "#16a34a", fontWeight: 600 }}>Free</span>
+              ) : (
+                `${Number(order.shippingFee || 0).toLocaleString("vi-VN")}₫`
+              )}
+            </span>
           </div>
-          <div style={styles.summaryTotal}>
-            <span>Total</span>
-            <strong>{Number(order.total || 0).toLocaleString("vi-VN")}₫</strong>
+          <div style={styles.summaryDivider} />
+          <div style={styles.summaryTotalRow}>
+            <span style={styles.summaryTotalLabel}>Total</span>
+            <span style={styles.summaryTotalValue}>
+              {Number(order.total || 0).toLocaleString("vi-VN")}₫
+            </span>
           </div>
         </div>
-
-        {order.orderStatus === "PENDING" && (
-          <div style={styles.cancelSection}>
-            <button
-              type="button"
-              style={styles.dangerButton}
-              onClick={handleCancelOrder}
-              disabled={isCancelling}
-            >
-              {isCancelling ? "Cancelling..." : "Cancel Order"}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Cancel Action */}
+      {order.orderStatus === "PENDING" && (
+        <div style={styles.cancelSection}>
+          <button
+            type="button"
+            style={styles.cancelOrderButton}
+            onClick={handleCancelOrder}
+            disabled={isCancelling}
+          >
+            {isCancelling ? "Cancelling..." : "Cancel Order"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
-const getOrderStyle = (status) => {
-  const map = {
-    PENDING: "#f39c12",
-    PROCESSING: "#3498db",
-    SHIPPED: "#2980b9",
-    DELIVERED: "#27ae60",
-    CANCELLED: "#e74c3c",
-  };
-  return { ...styles.badge, backgroundColor: map[status] || "#7f8c8d" };
-};
-
-const getPaymentStyle = (status) => {
-  const map = {
-    PENDING: "#f39c12",
-    PAID: "#27ae60",
-    FAILED: "#e74c3c",
-    REFUNDED: "#7f8c8d",
-  };
-  return { ...styles.badge, backgroundColor: map[status] || "#7f8c8d" };
-};
-
 const styles = {
+  /* ─── Layout ─── */
   container: {
-    maxWidth: "1000px",
+    maxWidth: "880px",
     margin: "0 auto",
-    padding: "2rem",
+    padding: "2rem 1.5rem",
+    minHeight: "80vh",
   },
-  card: {
+
+  /* ─── Loading ─── */
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "5rem 0",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e2e8f0",
+    borderTopColor: "#667eea",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+    marginBottom: "1rem",
+  },
+  loadingText: {
+    color: "#94a3b8",
+    fontSize: "0.95rem",
+  },
+
+  /* ─── Error ─── */
+  errorCard: {
+    textAlign: "center",
+    padding: "4rem 2rem",
     backgroundColor: "#fff",
-    borderRadius: "12px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    padding: "1.5rem",
+    borderRadius: "16px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 24px rgba(0,0,0,0.04)",
   },
-  header: {
+  errorIcon: {
+    fontSize: "3rem",
+    marginBottom: "1rem",
+  },
+  errorTitle: {
+    fontSize: "1.2rem",
+    color: "#64748b",
+    fontWeight: 600,
+    marginBottom: "1.5rem",
+  },
+  errorBanner: {
     display: "flex",
     alignItems: "center",
-    gap: "1rem",
-    marginBottom: "1rem",
+    gap: "0.6rem",
+    backgroundColor: "#fef2f2",
+    color: "#dc2626",
+    padding: "0.85rem 1.15rem",
+    borderRadius: "10px",
+    marginBottom: "1.25rem",
+    border: "1px solid #fecaca",
+    fontSize: "0.9rem",
+    fontWeight: 500,
   },
-  title: {
-    margin: 0,
-    color: "#2c3e50",
+
+  /* ─── Top Nav ─── */
+  topNav: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "1.5rem",
   },
-  error: {
-    backgroundColor: "#ffe6e6",
-    color: "#e74c3c",
-    padding: "0.75rem",
-    borderRadius: "8px",
-    marginBottom: "1rem",
+  backButton: {
+    backgroundColor: "#fff",
+    color: "#667eea",
+    border: "1.5px solid #e0e7ff",
+    borderRadius: "10px",
+    padding: "0.5rem 1rem",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.85rem",
+    transition: "all 0.2s",
   },
+  orderIdHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  },
+  orderLabel: {
+    fontSize: "0.78rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+  },
+  orderNumber: {
+    fontSize: "1rem",
+    fontWeight: 700,
+    color: "#1e293b",
+    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+  },
+
+  /* ─── Timeline ─── */
+  timelineCard: {
+    backgroundColor: "#fff",
+    borderRadius: "14px",
+    padding: "1.75rem 2rem",
+    marginBottom: "1.25rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
+  },
+  timeline: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    position: "relative",
+  },
+  timelineStep: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.6rem",
+    flex: 1,
+    position: "relative",
+  },
+  timelineDot: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+    transition: "all 0.3s",
+  },
+  timelineLine: {
+    position: "absolute",
+    top: "15px",
+    left: "calc(50% + 18px)",
+    width: "calc(100% - 36px)",
+    height: "3px",
+    borderRadius: "2px",
+    transition: "background-color 0.3s",
+  },
+  timelineLabel: {
+    fontSize: "0.78rem",
+    textAlign: "center",
+    whiteSpace: "nowrap",
+    transition: "all 0.3s",
+  },
+
+  /* ─── Cancelled Banner ─── */
+  cancelledBanner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.7rem",
+    backgroundColor: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "14px",
+    padding: "1.15rem",
+    marginBottom: "1.25rem",
+  },
+  cancelledIcon: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    backgroundColor: "#dc2626",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+    fontSize: "0.85rem",
+  },
+  cancelledText: {
+    color: "#dc2626",
+    fontWeight: 600,
+    fontSize: "0.95rem",
+  },
+
+  /* ─── Info Grid ─── */
   infoGrid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: "0.8rem",
-    backgroundColor: "#f8f9fa",
+    gap: "0.85rem",
+    marginBottom: "1.25rem",
+  },
+  infoCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.85rem",
+    backgroundColor: "#fff",
+    borderRadius: "12px",
+    padding: "1rem 1.15rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
+  },
+  infoCardIcon: {
+    fontSize: "1.4rem",
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
     borderRadius: "10px",
-    padding: "1rem",
-    marginBottom: "1.2rem",
+    flexShrink: 0,
+  },
+  infoCardContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.2rem",
+    minWidth: 0,
+  },
+  infoCardLabel: {
+    fontSize: "0.72rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+  infoCardValue: {
+    fontSize: "0.9rem",
+    color: "#1e293b",
+    fontWeight: 600,
+  },
+  statusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.3rem",
+    fontSize: "0.78rem",
+    fontWeight: 600,
+    padding: "0.25rem 0.6rem",
+    borderRadius: "6px",
+    border: "1px solid",
+    width: "fit-content",
+  },
+
+  /* ─── Section Card ─── */
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: "14px",
+    padding: "1.5rem",
+    marginBottom: "1.25rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
   },
   sectionTitle: {
-    color: "#34495e",
-    margin: "1rem 0 0.6rem",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "1rem",
+    fontWeight: 700,
+    color: "#1e293b",
+    margin: "0 0 1rem",
   },
-  itemsTable: {
-    border: "1px solid #ecf0f1",
+  sectionIcon: {
+    fontSize: "1.1rem",
+  },
+  itemCount: {
+    marginLeft: "auto",
+    fontSize: "0.78rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+  },
+
+  /* ─── Address ─── */
+  addressContent: {
+    backgroundColor: "#f8fafc",
     borderRadius: "10px",
+    padding: "1rem 1.15rem",
+    border: "1px solid #e2e8f0",
+  },
+  addressNameRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    marginBottom: "0.4rem",
+  },
+  addressName: {
+    color: "#1e293b",
+    fontSize: "0.95rem",
+  },
+  addressDivider: {
+    color: "#cbd5e1",
+    fontSize: "0.85rem",
+  },
+  addressPhone: {
+    color: "#64748b",
+    fontSize: "0.88rem",
+  },
+  addressDetail: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "0.88rem",
+    lineHeight: 1.5,
+  },
+
+  /* ─── Items Table ─── */
+  itemsContainer: {
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
     overflow: "hidden",
   },
-  itemsHead: {
+  tableHead: {
     display: "grid",
-    gridTemplateColumns: "2fr 0.7fr 1fr 1fr",
+    gridTemplateColumns: "2.2fr 0.6fr 1fr 1fr",
     gap: "0.75rem",
-    backgroundColor: "#f7f9fc",
-    padding: "0.75rem",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#f8fafc",
     fontWeight: 700,
-    color: "#34495e",
+    fontSize: "0.78rem",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    borderBottom: "1px solid #e2e8f0",
   },
-  itemsRow: {
+  tableRow: {
     display: "grid",
-    gridTemplateColumns: "2fr 0.7fr 1fr 1fr",
+    gridTemplateColumns: "2.2fr 0.6fr 1fr 1fr",
     gap: "0.75rem",
-    padding: "0.75rem",
-    borderTop: "1px solid #ecf0f1",
-    color: "#2c3e50",
+    padding: "0.85rem 1rem",
+    borderBottom: "1px solid #f1f5f9",
+    alignItems: "center",
+    fontSize: "0.9rem",
+    color: "#475569",
   },
-  summary: {
-    border: "1px solid #ecf0f1",
-    borderRadius: "10px",
-    padding: "0.8rem",
+  colProduct: {
+    minWidth: 0,
+  },
+  colCenter: {
+    textAlign: "center",
+  },
+  colRight: {
+    textAlign: "right",
+  },
+  productTitle: {
+    fontWeight: 600,
+    color: "#1e293b",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    display: "block",
+  },
+  qtyBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "28px",
+    height: "28px",
+    borderRadius: "8px",
+    backgroundColor: "#f1f5f9",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    color: "#475569",
+  },
+
+  /* ─── Summary ─── */
+  summaryCard: {
+    backgroundColor: "#fff",
+    borderRadius: "14px",
+    padding: "1.5rem",
+    marginBottom: "1.25rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
+  },
+  summaryContent: {
+    maxWidth: "400px",
+    marginLeft: "auto",
   },
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: "0.5rem",
+    alignItems: "center",
+    marginBottom: "0.65rem",
   },
-  summaryTotal: {
+  summaryLabel: {
+    fontSize: "0.9rem",
+    color: "#64748b",
+  },
+  summaryValue: {
+    fontSize: "0.95rem",
+    color: "#1e293b",
+    fontWeight: 500,
+  },
+  summaryDivider: {
+    height: "1px",
+    backgroundColor: "#e2e8f0",
+    margin: "0.75rem 0",
+  },
+  summaryTotalRow: {
     display: "flex",
     justifyContent: "space-between",
-    marginTop: "0.7rem",
-    paddingTop: "0.7rem",
-    borderTop: "1px solid #ecf0f1",
-    fontSize: "1.05rem",
+    alignItems: "center",
   },
-  addressBox: {
-    backgroundColor: "#f8f9fa",
-    border: "1px solid #dee2e6",
-    borderRadius: "8px",
-    padding: "0.85rem 1rem",
-    marginBottom: "1.2rem",
+  summaryTotalLabel: {
+    fontSize: "1.1rem",
+    color: "#1e293b",
+    fontWeight: 700,
   },
-  addressLine: {
-    margin: "0 0 0.3rem 0",
-    color: "#2c3e50",
-    fontSize: "0.9rem",
-    lineHeight: 1.5,
+  summaryTotalValue: {
+    fontSize: "1.35rem",
+    fontWeight: 800,
+    color: "#1e293b",
+    letterSpacing: "-0.01em",
   },
-  addressPhone: {
-    color: "#6c757d",
-    fontSize: "0.88rem",
-  },
+
+  /* ─── Cancel ─── */
   cancelSection: {
-    marginTop: "1rem",
     display: "flex",
     justifyContent: "flex-end",
+    marginTop: "0.5rem",
   },
-  badge: {
-    color: "#fff",
-    borderRadius: "999px",
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    padding: "0.25rem 0.6rem",
-  },
-  secondaryButton: {
-    border: "1px solid #667eea",
-    color: "#667eea",
+  cancelOrderButton: {
     backgroundColor: "#fff",
-    borderRadius: "8px",
-    padding: "0.45rem 0.8rem",
+    color: "#ef4444",
+    border: "1.5px solid #fca5a5",
+    borderRadius: "10px",
+    padding: "0.6rem 1.5rem",
     cursor: "pointer",
     fontWeight: 600,
-  },
-  dangerButton: {
-    border: "1px solid #e74c3c",
-    color: "#fff",
-    backgroundColor: "#e74c3c",
-    borderRadius: "8px",
-    padding: "0.55rem 1rem",
-    cursor: "pointer",
-    fontWeight: 600,
+    fontSize: "0.9rem",
+    transition: "all 0.2s",
   },
 };
 

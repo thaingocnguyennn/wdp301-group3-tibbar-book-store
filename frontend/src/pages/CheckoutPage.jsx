@@ -5,7 +5,6 @@ import { useAuth } from "../hooks/useAuth";
 import { orderApi } from "../api/orderApi";
 import { voucherApi } from "../api/voucherApi";
 import { addressApi } from "../api/addressApi";
-import VietQRPayment from "../components/payment/VietQRPayment";
 import AvailableVouchers from "../components/payment/AvailableVouchers";
 
 const CheckoutPage = () => {
@@ -19,8 +18,6 @@ const CheckoutPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showVietQRPayment, setShowVietQRPayment] = useState(false);
-  const [vietQRPaymentInfo, setVietQRPaymentInfo] = useState(null);
   const [orderNumber, setOrderNumber] = useState(null);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null);
@@ -45,11 +42,10 @@ const CheckoutPage = () => {
 
   // Redirect to cart if cart is empty
   useEffect(() => {
-    // Don't redirect if showing VietQR payment screen
-    if (!loading && isAuthenticated && !showVietQRPayment && (!cart.items || cart.items.length === 0)) {
+    if (!loading && isAuthenticated && (!cart.items || cart.items.length === 0)) {
       navigate("/cart");
     }
-  }, [cart.items, loading, isAuthenticated, showVietQRPayment, navigate]);
+  }, [cart.items, loading, isAuthenticated, navigate]);
 
   // Fetch addresses
   useEffect(() => {
@@ -277,23 +273,14 @@ const CheckoutPage = () => {
         navigate(`/order-success/${order.orderNumber}`, {
           state: { order },
         });
-      } else if (order.paymentMethod === "VIETQR") {
-        // Step 2: Generate VietQR payment (secure - amount from server)
-        try {
-          const vietqrResponse = await orderApi.generateVietQRPayment(order._id);
-          const paymentInfo = vietqrResponse.data;
-          
-          // Show VietQR payment screen
-          setVietQRPaymentInfo(paymentInfo);
-          setOrderNumber(order.orderNumber);
-          setShowVietQRPayment(true);
-          setIsSubmitting(false);
-        } catch (vietqrError) {
-          console.error("Failed to generate VietQR payment:", vietqrError);
-          setError(
-            vietqrError.response?.data?.message ||
-              "Failed to generate payment QR code. Please try again."
-          );
+      } else if (order.paymentMethod === "VNPAY") {
+        // VNPay: Redirect to VNPay payment gateway
+        const paymentUrl = response.data.payment?.paymentUrl;
+        if (paymentUrl) {
+          window.location.href = paymentUrl;
+          return; // Don't setIsSubmitting(false) — page is navigating away
+        } else {
+          setError("Failed to get VNPay payment URL. Please try again.");
           setIsSubmitting(false);
         }
       } else {
@@ -317,37 +304,24 @@ const CheckoutPage = () => {
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={styles.loading}>Loading checkout...</div>
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner} />
+          <p style={styles.loadingText}>Loading checkout...</p>
+        </div>
       </div>
-    );
-  }
-
-  // Show VietQR payment screen
-  if (showVietQRPayment && vietQRPaymentInfo) {
-    return (
-      <VietQRPayment
-        paymentInfo={vietQRPaymentInfo}
-        orderNumber={orderNumber}
-        onBack={async () => {
-          // Clear cart when going back
-          await fetchCart();
-          setShowVietQRPayment(false);
-          setVietQRPaymentInfo(null);
-          navigate("/");
-        }}
-      />
     );
   }
 
   if (!cart.items || cart.items.length === 0) {
     return (
       <div style={styles.emptyContainer}>
-        <h2 style={styles.emptyTitle}>🛒 Your cart is empty</h2>
+        <div style={styles.emptyIcon}>🛒</div>
+        <h2 style={styles.emptyTitle}>Your cart is empty</h2>
         <p style={styles.emptyText}>
           Add items to your cart before checking out.
         </p>
         <button style={styles.primaryButton} onClick={() => navigate("/")}>
-          Go Shopping
+          Start Shopping
         </button>
       </div>
     );
@@ -356,35 +330,49 @@ const CheckoutPage = () => {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>🛍️ Checkout</h1>
+        <div>
+          <h1 style={styles.title}>Checkout</h1>
+          <p style={styles.subtitle}>{cart.items.length} item{cart.items.length > 1 ? "s" : ""} in your order</p>
+        </div>
         <button
-          style={styles.secondaryButton}
+          style={styles.backButton}
           onClick={() => navigate("/cart")}
         >
           ← Back to Cart
         </button>
       </div>
 
-      {error && <div style={styles.errorBanner}>{error}</div>}
+      {error && (
+        <div style={styles.errorBanner}>
+          <span style={styles.errorIcon}>⚠</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       <div style={styles.grid}>
         {/* Left Column - Checkout Details */}
         <div style={styles.leftColumn}>
           {/* Shipping Address */}
           <div style={styles.section}>
-            <div style={styles.addressHeader}>
-              <h2 style={styles.sectionTitle}>📍 Shipping Address</h2>
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>
+                <span style={styles.sectionIcon}>📍</span>
+                Shipping Address
+              </h2>
               <button
                 type="button"
-                style={styles.addAddressBtn}
+                style={styles.manageBtn}
                 onClick={() => navigate("/address")}
               >
-                + Manage Addresses
+                Manage →
               </button>
             </div>
 
             {addressesLoading ? (
-              <p style={styles.addressLoadingText}>Loading addresses...</p>
+              <div style={styles.addressLoading}>
+                <div style={styles.spinnerSmall} />
+                <span>Loading addresses...</span>
+              </div>
             ) : addresses.length === 0 ? (
               <div style={styles.noAddressBox}>
                 <p style={styles.noAddressText}>You have no saved addresses.</p>
@@ -407,14 +395,17 @@ const CheckoutPage = () => {
                     }}
                     onClick={() => setSelectedAddressId(addr._id)}
                   >
-                    <div style={styles.addressRadio}>
+                    <div style={{
+                      ...styles.addressRadio,
+                      ...(selectedAddressId === addr._id ? styles.addressRadioSelected : {}),
+                    }}>
                       {selectedAddressId === addr._id && (
                         <div style={styles.addressRadioInner} />
                       )}
                     </div>
                     <div style={styles.addressInfo}>
-                      <div style={styles.addressName}>
-                        <strong>{addr.fullName}</strong>
+                      <div style={styles.addressNameRow}>
+                        <strong style={styles.addressFullName}>{addr.fullName}</strong>
                         <span style={styles.addressPhone}>{addr.phone}</span>
                         {addr.isDefault && (
                           <span style={styles.defaultBadge}>Default</span>
@@ -430,9 +421,12 @@ const CheckoutPage = () => {
             )}
           </div>
 
-          {/* Voucher Placeholder */}
+          {/* Voucher */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>🎟️ Voucher / Discount Code</h2>
+            <h2 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>🎟️</span>
+              Voucher / Discount Code
+            </h2>
             <div style={styles.voucherBox}>
               <div style={styles.voucherRow}>
                 <input
@@ -474,7 +468,7 @@ const CheckoutPage = () => {
 
               {appliedVoucher ? (
                 <p style={styles.voucherAppliedText}>
-                  ✅ {voucherMessage || `Voucher ${appliedVoucher.code} applied successfully`}
+                  ✓ {voucherMessage || `Voucher ${appliedVoucher.code} applied successfully`}
                 </p>
               ) : (
                 <p style={styles.voucherHintText}>
@@ -507,52 +501,66 @@ const CheckoutPage = () => {
 
           {/* Payment Method */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>💳 Payment Method</h2>
+            <h2 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>💳</span>
+              Payment Method
+            </h2>
             <div style={styles.paymentMethods}>
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.method}
-                  style={{
-                    ...styles.paymentOption,
-                    ...(selectedPaymentMethod === method.method
-                      ? styles.paymentOptionSelected
-                      : {}),
-                    ...(method.available ? {} : styles.paymentOptionDisabled),
-                  }}
-                  onClick={() =>
-                    method.available && setSelectedPaymentMethod(method.method)
-                  }
-                >
-                  <div style={styles.paymentRadio}>
-                    {selectedPaymentMethod === method.method && (
-                      <div style={styles.paymentRadioInner}></div>
-                    )}
-                  </div>
-                  <div style={styles.paymentInfo}>
-                    <div style={styles.paymentName}>
-                      {method.name}
-                      {!method.available && (
-                        <span style={styles.comingSoonBadge}>Coming Soon</span>
+              {paymentMethods.map((method) => {
+                const isSelected = selectedPaymentMethod === method.method;
+                return (
+                  <div
+                    key={method.method}
+                    style={{
+                      ...styles.paymentOption,
+                      ...(isSelected ? styles.paymentOptionSelected : {}),
+                      ...(method.available ? {} : styles.paymentOptionDisabled),
+                    }}
+                    onClick={() =>
+                      method.available && setSelectedPaymentMethod(method.method)
+                    }
+                  >
+                    <div style={{
+                      ...styles.paymentRadio,
+                      ...(isSelected ? styles.paymentRadioSelected : {}),
+                    }}>
+                      {isSelected && (
+                        <div style={styles.paymentRadioInner}></div>
                       )}
                     </div>
-                    <div style={styles.paymentDescription}>
-                      {method.description}
+                    <div style={styles.paymentIcon}>
+                      {method.method === "VNPAY" ? "🏦" : "💵"}
+                    </div>
+                    <div style={styles.paymentInfo}>
+                      <div style={styles.paymentName}>
+                        {method.name}
+                        {!method.available && (
+                          <span style={styles.comingSoonBadge}>Coming Soon</span>
+                        )}
+                      </div>
+                      <div style={styles.paymentDescription}>
+                        {method.description}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Notes */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>📝 Order Notes (Optional)</h2>
+            <h2 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>📝</span>
+              Order Notes
+              <span style={styles.optionalLabel}>(Optional)</span>
+            </h2>
             <textarea
               style={styles.textarea}
               placeholder="Add any special instructions for your order..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={4}
+              rows={3}
               disabled={isSubmitting}
             />
           </div>
@@ -571,7 +579,7 @@ const CheckoutPage = () => {
                     <span style={styles.orderItemTitle}>
                       {item.book?.title}
                     </span>
-                    <span style={styles.orderItemQty}>x {item.quantity}</span>
+                    <span style={styles.orderItemQty}>× {item.quantity}</span>
                   </div>
                   <span style={styles.orderItemPrice}>
                     {((item.book?.price || 0) * item.quantity).toLocaleString('vi-VN')}₫
@@ -584,34 +592,34 @@ const CheckoutPage = () => {
 
             {/* Price Breakdown */}
             <div style={styles.summaryRow}>
-              <span>Subtotal</span>
-              <strong>{totals.subtotal.toLocaleString('vi-VN')}₫</strong>
+              <span style={styles.summaryLabel}>Subtotal</span>
+              <span style={styles.summaryValue}>{totals.subtotal.toLocaleString('vi-VN')}₫</span>
             </div>
             <div style={styles.summaryRow}>
-              <span>Discount</span>
-              <strong>-{totals.discount.toLocaleString('vi-VN')}₫</strong>
+              <span style={styles.summaryLabel}>Discount</span>
+              <span style={{ ...styles.summaryValue, color: "#ef4444" }}>-{totals.discount.toLocaleString('vi-VN')}₫</span>
             </div>
             <div style={styles.summaryRow}>
-              <span>Shipping Fee</span>
-              <strong>
+              <span style={styles.summaryLabel}>Shipping Fee</span>
+              <span style={styles.summaryValue}>
                 {totals.isFreeShipping ? (
-                  <span style={{color: '#27ae60'}}>Free ✓</span>
+                  <span style={{ color: '#16a34a', fontWeight: 600 }}>Free ✓</span>
                 ) : (
                   `${totals.shippingFee.toLocaleString('vi-VN')}₫`
                 )}
-              </strong>
+              </span>
             </div>
             {!totals.isFreeShipping && totals.subtotal > 0 && (
               <div style={styles.freeShippingNotice}>
-                💡 Add {(200000 - totals.subtotal).toLocaleString('vi-VN')}₫ more for free shipping
+                Add {(200000 - totals.subtotal).toLocaleString('vi-VN')}₫ more for free shipping
               </div>
             )}
 
             <div style={styles.summaryDivider}></div>
 
-            <div style={styles.summaryTotal}>
-              <span>Total</span>
-              <strong>{totals.total.toLocaleString('vi-VN')}₫</strong>
+            <div style={styles.summaryTotalRow}>
+              <span style={styles.summaryTotalLabel}>Total</span>
+              <span style={styles.summaryTotalValue}>{totals.total.toLocaleString('vi-VN')}₫</span>
             </div>
 
             {/* Place Order Button */}
@@ -639,128 +647,202 @@ const CheckoutPage = () => {
 };
 
 const styles = {
+  /* ─── Layout ─── */
   container: {
-    maxWidth: "1200px",
+    maxWidth: "1140px",
     margin: "0 auto",
-    padding: "2rem",
+    padding: "2rem 1.5rem",
     minHeight: "80vh",
   },
+
+  /* ─── Header ─── */
   header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "2rem",
+    alignItems: "flex-start",
+    marginBottom: "1.75rem",
   },
   title: {
-    fontSize: "2.2rem",
-    color: "#2c3e50",
+    fontSize: "1.75rem",
+    fontWeight: 800,
+    color: "#1a1a2e",
     margin: 0,
+    letterSpacing: "-0.02em",
   },
-  secondaryButton: {
+  subtitle: {
+    margin: "0.3rem 0 0",
+    fontSize: "0.88rem",
+    color: "#94a3b8",
+    fontWeight: 400,
+  },
+  backButton: {
     backgroundColor: "#fff",
     color: "#667eea",
-    border: "1px solid #667eea",
-    padding: "0.7rem 1.4rem",
-    borderRadius: "8px",
+    border: "1.5px solid #e0e7ff",
+    padding: "0.55rem 1.15rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "0.95rem",
+    fontSize: "0.88rem",
+    fontWeight: 600,
+    transition: "all 0.2s",
   },
+
+  /* ─── Error ─── */
   errorBanner: {
-    backgroundColor: "#fee",
-    color: "#c33",
-    padding: "1rem",
-    borderRadius: "8px",
-    marginBottom: "1.5rem",
-    border: "1px solid #fcc",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+    backgroundColor: "#fef2f2",
+    color: "#dc2626",
+    padding: "0.85rem 1.15rem",
+    borderRadius: "10px",
+    marginBottom: "1.25rem",
+    border: "1px solid #fecaca",
+    fontSize: "0.9rem",
+    fontWeight: 500,
   },
+  errorIcon: {
+    fontSize: "1.1rem",
+    flexShrink: 0,
+  },
+
+  /* ─── Grid ─── */
   grid: {
     display: "grid",
-    gridTemplateColumns: "1.8fr 1fr",
-    gap: "2rem",
+    gridTemplateColumns: "1.65fr 1fr",
+    gap: "1.5rem",
+    alignItems: "start",
   },
   leftColumn: {
     display: "flex",
     flexDirection: "column",
-    gap: "1.5rem",
+    gap: "1.15rem",
   },
   rightColumn: {
     height: "fit-content",
     position: "sticky",
     top: "2rem",
   },
+
+  /* ─── Section Card ─── */
   section: {
     backgroundColor: "#fff",
     padding: "1.5rem",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    borderRadius: "14px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
   },
-  sectionTitle: {
-    fontSize: "1.2rem",
-    color: "#2c3e50",
-    marginBottom: "1rem",
-    marginTop: 0,
-  },
-  addressHeader: {
+  sectionHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "1rem",
   },
-  addAddressBtn: {
+  sectionTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "1rem",
+    fontWeight: 700,
+    color: "#1e293b",
+    marginBottom: "1rem",
+    marginTop: 0,
+  },
+  sectionIcon: {
+    fontSize: "1.1rem",
+  },
+  optionalLabel: {
+    fontSize: "0.78rem",
+    color: "#94a3b8",
+    fontWeight: 400,
+    marginLeft: "0.35rem",
+  },
+  manageBtn: {
     backgroundColor: "transparent",
     color: "#667eea",
-    border: "1px solid #667eea",
-    padding: "0.4rem 0.9rem",
-    borderRadius: "6px",
+    border: "1.5px solid #e0e7ff",
+    padding: "0.35rem 0.85rem",
+    borderRadius: "8px",
     cursor: "pointer",
-    fontSize: "0.85rem",
-    fontWeight: "600",
+    fontSize: "0.78rem",
+    fontWeight: 600,
+    transition: "all 0.2s",
   },
-  addressLoadingText: {
-    color: "#7f8c8d",
+
+  /* ─── Address ─── */
+  addressLoading: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+    color: "#94a3b8",
     fontSize: "0.9rem",
+    padding: "1rem 0",
+  },
+  spinnerSmall: {
+    width: "18px",
+    height: "18px",
+    border: "2.5px solid #e2e8f0",
+    borderTopColor: "#667eea",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
   },
   noAddressBox: {
-    backgroundColor: "#f8f9fa",
-    padding: "1.25rem",
-    borderRadius: "8px",
-    border: "2px dashed #ddd",
+    backgroundColor: "#f8fafc",
+    padding: "1.5rem",
+    borderRadius: "10px",
+    border: "2px dashed #e2e8f0",
     textAlign: "center",
   },
   noAddressText: {
-    color: "#495057",
-    marginBottom: "0.75rem",
-    fontSize: "0.95rem",
+    color: "#64748b",
+    marginBottom: "0.85rem",
+    fontSize: "0.9rem",
+  },
+  addAddressBtn: {
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
+    color: "#fff",
+    border: "none",
+    padding: "0.5rem 1.15rem",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: 600,
   },
   addressList: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
+    gap: "0.6rem",
   },
   addressCard: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "0.75rem",
+    gap: "0.85rem",
     padding: "0.9rem 1rem",
-    border: "2px solid #e9ecef",
-    borderRadius: "8px",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: "10px",
     cursor: "pointer",
-    transition: "all 0.15s",
+    transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
+    backgroundColor: "#fff",
   },
   addressCardSelected: {
     borderColor: "#667eea",
-    backgroundColor: "#f0f3ff",
+    backgroundColor: "#f8f9ff",
+    boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
   },
   addressRadio: {
     width: "18px",
     height: "18px",
     borderRadius: "50%",
-    border: "2px solid #667eea",
+    border: "2px solid #cbd5e1",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
     marginTop: "2px",
+    transition: "all 0.2s",
+  },
+  addressRadioSelected: {
+    borderColor: "#667eea",
   },
   addressRadioInner: {
     width: "9px",
@@ -770,179 +852,224 @@ const styles = {
   },
   addressInfo: {
     flex: 1,
+    minWidth: 0,
   },
-  addressName: {
+  addressNameRow: {
     display: "flex",
     alignItems: "center",
-    gap: "0.6rem",
+    gap: "0.5rem",
     marginBottom: "0.3rem",
     flexWrap: "wrap",
   },
-  addressPhone: {
-    color: "#6c757d",
+  addressFullName: {
+    color: "#1e293b",
     fontSize: "0.9rem",
   },
+  addressPhone: {
+    color: "#94a3b8",
+    fontSize: "0.82rem",
+  },
   defaultBadge: {
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
-    fontSize: "0.7rem",
-    padding: "0.15rem 0.5rem",
+    fontSize: "0.65rem",
+    padding: "0.12rem 0.5rem",
     borderRadius: "4px",
-    fontWeight: "600",
+    fontWeight: 600,
+    letterSpacing: "0.03em",
   },
   addressDetail: {
-    color: "#6c757d",
-    fontSize: "0.85rem",
+    color: "#64748b",
+    fontSize: "0.82rem",
     margin: 0,
-    lineHeight: "1.4",
+    lineHeight: "1.45",
   },
+
+  /* ─── Voucher ─── */
   voucherBox: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#f8fafc",
     padding: "1rem",
-    borderRadius: "8px",
-    border: "1px solid #e9ecef",
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
   },
   voucherRow: {
     display: "flex",
-    gap: "0.75rem",
+    gap: "0.6rem",
     alignItems: "center",
   },
   voucherInput: {
     flex: 1,
-    padding: "0.7rem",
-    borderRadius: "6px",
-    border: "1px solid #ddd",
-    fontSize: "0.95rem",
+    padding: "0.65rem 0.85rem",
+    borderRadius: "8px",
+    border: "1.5px solid #e2e8f0",
+    fontSize: "0.9rem",
+    backgroundColor: "#fff",
+    transition: "border-color 0.2s",
   },
   voucherButton: {
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
     border: "none",
-    borderRadius: "6px",
-    padding: "0.7rem 1rem",
+    borderRadius: "8px",
+    padding: "0.65rem 1.15rem",
     cursor: "pointer",
-    fontWeight: "600",
+    fontWeight: 600,
+    fontSize: "0.88rem",
+    whiteSpace: "nowrap",
   },
   voucherRemoveButton: {
-    backgroundColor: "#e74c3c",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "0.7rem 1rem",
+    backgroundColor: "#fff",
+    color: "#ef4444",
+    border: "1.5px solid #fca5a5",
+    borderRadius: "8px",
+    padding: "0.65rem 1.15rem",
     cursor: "pointer",
-    fontWeight: "600",
+    fontWeight: 600,
+    fontSize: "0.88rem",
+    whiteSpace: "nowrap",
   },
   voucherAppliedText: {
-    margin: "0.65rem 0 0",
-    color: "#27ae60",
-    fontSize: "0.9rem",
+    margin: "0.6rem 0 0",
+    color: "#16a34a",
+    fontSize: "0.85rem",
+    fontWeight: 500,
   },
   voucherHintText: {
-    margin: "0.65rem 0 0",
-    color: "#6c757d",
-    fontSize: "0.85rem",
+    margin: "0.6rem 0 0",
+    color: "#94a3b8",
+    fontSize: "0.8rem",
   },
   toggleVouchersBtn: {
     marginTop: "0.6rem",
     background: "none",
     border: "none",
     color: "#667eea",
-    fontSize: "0.85rem",
+    fontSize: "0.82rem",
     cursor: "pointer",
     padding: 0,
-    fontWeight: "600",
+    fontWeight: 600,
     textDecoration: "underline",
-    textUnderlineOffset: "2px",
+    textUnderlineOffset: "3px",
   },
+
+  /* ─── Payment Methods ─── */
   paymentMethods: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
+    gap: "0.6rem",
   },
   paymentOption: {
     display: "flex",
     alignItems: "center",
-    gap: "1rem",
-    padding: "1rem",
-    borderRadius: "8px",
-    border: "2px solid #e9ecef",
+    gap: "0.85rem",
+    padding: "1rem 1.15rem",
+    borderRadius: "10px",
+    border: "1.5px solid #e2e8f0",
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
+    backgroundColor: "#fff",
   },
   paymentOptionSelected: {
     borderColor: "#667eea",
-    backgroundColor: "#f0f3ff",
+    backgroundColor: "#f8f9ff",
+    boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
   },
   paymentOptionDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
     cursor: "not-allowed",
   },
   paymentRadio: {
-    width: "20px",
-    height: "20px",
+    width: "18px",
+    height: "18px",
     borderRadius: "50%",
-    border: "2px solid #667eea",
+    border: "2px solid #cbd5e1",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    transition: "all 0.2s",
+  },
+  paymentRadioSelected: {
+    borderColor: "#667eea",
   },
   paymentRadioInner: {
-    width: "10px",
-    height: "10px",
+    width: "9px",
+    height: "9px",
     borderRadius: "50%",
     backgroundColor: "#667eea",
+  },
+  paymentIcon: {
+    fontSize: "1.4rem",
+    width: "38px",
+    height: "38px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
+    borderRadius: "8px",
+    flexShrink: 0,
   },
   paymentInfo: {
     flex: 1,
   },
   paymentName: {
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: "0.25rem",
+    fontWeight: 600,
+    color: "#1e293b",
+    marginBottom: "0.2rem",
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
+    fontSize: "0.92rem",
   },
   comingSoonBadge: {
-    fontSize: "0.7rem",
-    backgroundColor: "#ffc107",
-    color: "#000",
-    padding: "0.2rem 0.5rem",
+    fontSize: "0.65rem",
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+    padding: "0.15rem 0.45rem",
     borderRadius: "4px",
-    fontWeight: "600",
+    fontWeight: 600,
+    border: "1px solid #fcd34d",
   },
   paymentDescription: {
-    fontSize: "0.85rem",
-    color: "#6c757d",
+    fontSize: "0.8rem",
+    color: "#94a3b8",
+    lineHeight: 1.4,
   },
+
+  /* ─── Textarea ─── */
   textarea: {
     width: "100%",
-    padding: "0.75rem",
-    borderRadius: "6px",
-    border: "1px solid #ddd",
-    fontSize: "0.95rem",
+    padding: "0.75rem 0.9rem",
+    borderRadius: "10px",
+    border: "1.5px solid #e2e8f0",
+    fontSize: "0.9rem",
     fontFamily: "inherit",
     resize: "vertical",
     boxSizing: "border-box",
+    backgroundColor: "#fff",
+    transition: "border-color 0.2s",
   },
+
+  /* ─── Order Summary (Right) ─── */
   summary: {
     backgroundColor: "#fff",
     padding: "1.5rem",
-    borderRadius: "12px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+    borderRadius: "14px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid #f1f5f9",
   },
   summaryTitle: {
-    fontSize: "1.4rem",
+    fontSize: "1.1rem",
+    fontWeight: 700,
     marginBottom: "1rem",
     marginTop: 0,
-    color: "#2c3e50",
+    color: "#1e293b",
   },
   orderItems: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
-    marginBottom: "1rem",
+    gap: "0.65rem",
+    marginBottom: "0.75rem",
   },
   orderItem: {
     display: "flex",
@@ -952,106 +1079,159 @@ const styles = {
   orderItemInfo: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.25rem",
+    gap: "0.15rem",
     flex: 1,
+    minWidth: 0,
   },
   orderItemTitle: {
-    fontSize: "0.9rem",
-    color: "#2c3e50",
+    fontSize: "0.85rem",
+    color: "#1e293b",
+    fontWeight: 500,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   orderItemQty: {
-    fontSize: "0.8rem",
-    color: "#6c757d",
+    fontSize: "0.75rem",
+    color: "#94a3b8",
   },
   orderItemPrice: {
-    fontWeight: "600",
-    color: "#2c3e50",
-    fontSize: "0.9rem",
+    fontWeight: 600,
+    color: "#1e293b",
+    fontSize: "0.88rem",
+    flexShrink: 0,
+    marginLeft: "0.75rem",
   },
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: "0.75rem",
-    color: "#2c3e50",
-    fontSize: "0.95rem",
+    marginBottom: "0.6rem",
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: "0.88rem",
+    color: "#64748b",
+  },
+  summaryValue: {
+    fontSize: "0.92rem",
+    color: "#1e293b",
+    fontWeight: 500,
   },
   summaryDivider: {
     height: "1px",
-    backgroundColor: "#ecf0f1",
-    margin: "1rem 0",
+    backgroundColor: "#e2e8f0",
+    margin: "0.85rem 0",
   },
   freeShippingNotice: {
-    fontSize: "0.85rem",
+    fontSize: "0.78rem",
     color: "#667eea",
     backgroundColor: "#f0f3ff",
-    padding: "0.75rem",
-    borderRadius: "6px",
-    marginTop: "0.5rem",
+    padding: "0.6rem 0.85rem",
+    borderRadius: "8px",
+    marginTop: "0.35rem",
     textAlign: "center",
+    border: "1px solid #e0e7ff",
+    fontWeight: 500,
   },
-  summaryTotal: {
+  summaryTotalRow: {
     display: "flex",
     justifyContent: "space-between",
-    fontSize: "1.2rem",
-    fontWeight: "700",
-    color: "#2c3e50",
-    marginBottom: "1.5rem",
+    alignItems: "center",
+    marginBottom: "1.25rem",
+  },
+  summaryTotalLabel: {
+    fontSize: "1.05rem",
+    fontWeight: 700,
+    color: "#1e293b",
+  },
+  summaryTotalValue: {
+    fontSize: "1.3rem",
+    fontWeight: 800,
+    color: "#1e293b",
+    letterSpacing: "-0.01em",
   },
   placeOrderButton: {
     width: "100%",
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
-    padding: "1rem",
+    padding: "0.9rem",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "600",
-    transition: "background-color 0.2s",
+    fontSize: "0.95rem",
+    fontWeight: 700,
+    letterSpacing: "0.01em",
+    transition: "all 0.25s",
   },
   placeOrderButtonDisabled: {
-    backgroundColor: "#95a5a6",
+    background: "#cbd5e1",
     cursor: "not-allowed",
+    boxShadow: "none",
   },
   secureNote: {
     textAlign: "center",
-    fontSize: "0.8rem",
-    color: "#6c757d",
-    marginTop: "1rem",
+    fontSize: "0.75rem",
+    color: "#94a3b8",
+    marginTop: "0.85rem",
     marginBottom: 0,
   },
+
+  /* ─── Empty / Loading ─── */
   emptyContainer: {
-    maxWidth: "600px",
+    maxWidth: "480px",
     margin: "4rem auto",
     textAlign: "center",
     backgroundColor: "#fff",
-    padding: "3rem",
-    borderRadius: "16px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    padding: "3rem 2rem",
+    borderRadius: "18px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)",
+    border: "1px solid #f1f5f9",
+  },
+  emptyIcon: {
+    fontSize: "3.5rem",
+    marginBottom: "1rem",
   },
   emptyTitle: {
-    fontSize: "2rem",
-    color: "#2c3e50",
-    margin: "0 0 1rem 0",
+    fontSize: "1.35rem",
+    color: "#1e293b",
+    fontWeight: 700,
+    margin: "0 0 0.5rem",
   },
   emptyText: {
-    color: "#7f8c8d",
+    color: "#94a3b8",
     marginBottom: "2rem",
+    fontSize: "0.92rem",
+    lineHeight: 1.5,
   },
   primaryButton: {
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
     border: "none",
-    padding: "0.9rem 1.8rem",
-    borderRadius: "8px",
+    padding: "0.75rem 2rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
+    fontSize: "0.95rem",
+    fontWeight: 600,
   },
-  loading: {
-    textAlign: "center",
-    padding: "4rem",
-    fontSize: "1.2rem",
-    color: "#7f8c8d",
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "5rem 0",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e2e8f0",
+    borderTopColor: "#667eea",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+    marginBottom: "1rem",
+  },
+  loadingText: {
+    color: "#94a3b8",
+    fontSize: "0.95rem",
   },
 };
 

@@ -22,20 +22,19 @@ const PaymentReturnPage = () => {
         params[key] = value;
       });
 
-      // Check if this is a VNPAY callback (has vnp_ parameters)
+      // Check if this is a VNPay callback (has vnp_ parameters)
       const isVNPayCallback = Object.keys(params).some((key) =>
         key.startsWith("vnp_"),
       );
 
       if (!isVNPayCallback) {
-        // Not a VNPAY callback - show coming soon message
-        setStatus("coming-soon");
-        setMessage("Online payment integration is coming soon!");
+        setStatus("error");
+        setMessage("Invalid payment callback. No payment parameters found.");
         return;
       }
 
       // Extract order number from params
-      const orderNumber = params.vnp_TxnRef || params.orderNumber;
+      const orderNumber = params.vnp_TxnRef;
 
       if (!orderNumber) {
         setStatus("error");
@@ -81,28 +80,42 @@ const PaymentReturnPage = () => {
       case "loading":
         return (
           <div style={styles.content}>
-            <div style={styles.spinner}></div>
-            <h2 style={styles.title}>Processing Payment...</h2>
-            <p style={styles.text}>
-              Please wait while we confirm your payment. Do not close this page.
+            <div style={styles.spinnerContainer}>
+              <div style={styles.spinner}></div>
+              <div style={styles.spinnerPulse}></div>
+            </div>
+            <h2 style={styles.loadingTitle}>Processing Payment</h2>
+            <p style={styles.loadingText}>
+              Please wait while we confirm your payment with VNPay.
+              <br />Do not close this page.
             </p>
+            <div style={styles.progressBar}>
+              <div style={styles.progressFill}></div>
+            </div>
           </div>
         );
 
       case "success":
         return (
           <div style={styles.content}>
-            <div style={styles.iconSuccess}>✅</div>
-            <h2 style={styles.titleSuccess}>Payment Successful!</h2>
-            <p style={styles.text}>{message}</p>
+            <div style={styles.successCircle}>
+              <span style={styles.successCheck}>✓</span>
+            </div>
+            <h2 style={styles.successTitle}>Payment Successful!</h2>
+            <p style={styles.resultText}>{message}</p>
             {order && (
-              <div style={styles.orderInfo}>
-                <p>
-                  <strong>Order Number:</strong> {order.orderNumber}
-                </p>
-                <p>
-                  <strong>Amount:</strong> ${order.total.toFixed(2)}
-                </p>
+              <div style={styles.orderInfoBox}>
+                <div style={styles.orderInfoRow}>
+                  <span style={styles.orderInfoLabel}>Order Number</span>
+                  <span style={styles.orderInfoValueMono}>{order.orderNumber}</span>
+                </div>
+                <div style={styles.orderInfoDivider} />
+                <div style={styles.orderInfoRow}>
+                  <span style={styles.orderInfoLabel}>Amount Paid</span>
+                  <span style={styles.orderInfoValueBold}>
+                    {order.total.toLocaleString('vi-VN')}₫
+                  </span>
+                </div>
               </div>
             )}
             <p style={styles.redirectText}>
@@ -116,7 +129,7 @@ const PaymentReturnPage = () => {
                 })
               }
             >
-              View Order Now
+              View Order Now →
             </button>
           </div>
         );
@@ -124,21 +137,24 @@ const PaymentReturnPage = () => {
       case "failed":
         return (
           <div style={styles.content}>
-            <div style={styles.iconFailed}>❌</div>
-            <h2 style={styles.titleFailed}>Payment Failed</h2>
-            <p style={styles.text}>{message}</p>
+            <div style={styles.failedCircle}>
+              <span style={styles.failedX}>✕</span>
+            </div>
+            <h2 style={styles.failedTitle}>Payment Failed</h2>
+            <p style={styles.resultText}>{message}</p>
             {order && (
-              <div style={styles.orderInfo}>
-                <p>
-                  <strong>Order Number:</strong> {order.orderNumber}
-                </p>
-                <p style={styles.noteText}>
-                  Your order has been created but payment was not completed. You
-                  can retry payment or choose a different payment method.
+              <div style={styles.orderInfoBox}>
+                <div style={styles.orderInfoRow}>
+                  <span style={styles.orderInfoLabel}>Order Number</span>
+                  <span style={styles.orderInfoValueMono}>{order.orderNumber}</span>
+                </div>
+                <div style={styles.orderInfoDivider} />
+                <p style={styles.failedNote}>
+                  Your order has been created but payment was not completed. You can retry payment or choose a different payment method.
                 </p>
               </div>
             )}
-            <div style={styles.actions}>
+            <div style={styles.actionGroup}>
               <button
                 style={styles.primaryButton}
                 onClick={() => navigate("/cart")}
@@ -158,49 +174,17 @@ const PaymentReturnPage = () => {
       case "error":
         return (
           <div style={styles.content}>
-            <div style={styles.iconError}>⚠️</div>
-            <h2 style={styles.titleError}>Error</h2>
-            <p style={styles.text}>{message}</p>
-            <div style={styles.actions}>
+            <div style={styles.errorCircle}>
+              <span style={styles.errorExclaim}>!</span>
+            </div>
+            <h2 style={styles.errorTitle}>Something went wrong</h2>
+            <p style={styles.resultText}>{message}</p>
+            <div style={styles.actionGroup}>
               <button
                 style={styles.primaryButton}
                 onClick={() => navigate("/orders")}
               >
                 View My Orders
-              </button>
-              <button
-                style={styles.secondaryButton}
-                onClick={() => navigate("/")}
-              >
-                Go to Homepage
-              </button>
-            </div>
-          </div>
-        );
-
-      case "coming-soon":
-        return (
-          <div style={styles.content}>
-            <div style={styles.iconComingSoon}>🚧</div>
-            <h2 style={styles.titleComingSoon}>Online Payment Coming Soon</h2>
-            <p style={styles.text}>
-              Online payment integration is currently being set up. Please use
-              Cash on Delivery (COD) for now.
-            </p>
-            <div style={styles.infoBox}>
-              <h3 style={styles.infoBoxTitle}>Payment Provider Setup</h3>
-              <p style={styles.infoBoxText}>
-                To enable VNPAY online payment, the system administrator needs
-                to configure the payment gateway credentials in the backend
-                environment settings.
-              </p>
-            </div>
-            <div style={styles.actions}>
-              <button
-                style={styles.primaryButton}
-                onClick={() => navigate("/checkout")}
-              >
-                Back to Checkout
               </button>
               <button
                 style={styles.secondaryButton}
@@ -225,152 +209,259 @@ const PaymentReturnPage = () => {
 };
 
 const styles = {
+  /* ─── Layout ─── */
   container: {
-    maxWidth: "700px",
+    maxWidth: "560px",
     margin: "4rem auto",
-    padding: "0 1rem",
+    padding: "0 1.5rem",
     minHeight: "60vh",
   },
   card: {
     backgroundColor: "#fff",
-    borderRadius: "16px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    padding: "3rem 2rem",
+    borderRadius: "18px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)",
+    padding: "3rem 2.5rem",
+    border: "1px solid #f1f5f9",
   },
   content: {
     textAlign: "center",
   },
+
+  /* ─── Loading ─── */
+  spinnerContainer: {
+    position: "relative",
+    width: "64px",
+    height: "64px",
+    margin: "0 auto 1.75rem",
+  },
   spinner: {
-    width: "60px",
-    height: "60px",
-    border: "6px solid #f3f3f3",
-    borderTop: "6px solid #667eea",
+    width: "64px",
+    height: "64px",
+    border: "4px solid #e2e8f0",
+    borderTop: "4px solid #667eea",
     borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    margin: "0 auto 2rem",
+    animation: "spin 0.8s linear infinite",
+    position: "absolute",
+    top: 0,
+    left: 0,
   },
-  iconSuccess: {
-    fontSize: "5rem",
-    marginBottom: "1rem",
+  spinnerPulse: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    backgroundColor: "rgba(102,126,234,0.08)",
+    animation: "pulse 2s ease-in-out infinite",
+    position: "absolute",
+    top: 0,
+    left: 0,
   },
-  iconFailed: {
-    fontSize: "5rem",
-    marginBottom: "1rem",
+  loadingTitle: {
+    fontSize: "1.4rem",
+    color: "#1e293b",
+    fontWeight: 700,
+    marginBottom: "0.6rem",
   },
-  iconError: {
-    fontSize: "5rem",
-    marginBottom: "1rem",
-  },
-  iconComingSoon: {
-    fontSize: "5rem",
-    marginBottom: "1rem",
-  },
-  title: {
-    fontSize: "2rem",
-    color: "#2c3e50",
-    marginBottom: "1rem",
-  },
-  titleSuccess: {
-    fontSize: "2rem",
-    color: "#28a745",
-    marginBottom: "1rem",
-  },
-  titleFailed: {
-    fontSize: "2rem",
-    color: "#dc3545",
-    marginBottom: "1rem",
-  },
-  titleError: {
-    fontSize: "2rem",
-    color: "#ff6b6b",
-    marginBottom: "1rem",
-  },
-  titleComingSoon: {
-    fontSize: "2rem",
-    color: "#ffc107",
-    marginBottom: "1rem",
-  },
-  text: {
-    color: "#6c757d",
-    fontSize: "1.1rem",
+  loadingText: {
+    color: "#94a3b8",
+    fontSize: "0.9rem",
     lineHeight: 1.6,
-    marginBottom: "2rem",
+    marginBottom: "1.75rem",
   },
-  orderInfo: {
-    backgroundColor: "#f8f9fa",
-    padding: "1.5rem",
-    borderRadius: "8px",
+  progressBar: {
+    width: "200px",
+    height: "4px",
+    backgroundColor: "#e2e8f0",
+    borderRadius: "2px",
+    margin: "0 auto",
+    overflow: "hidden",
+  },
+  progressFill: {
+    width: "40%",
+    height: "100%",
+    background: "linear-gradient(90deg, #667eea, #764ba2)",
+    borderRadius: "2px",
+    animation: "progressSlide 1.5s ease-in-out infinite",
+  },
+
+  /* ─── Success ─── */
+  successCircle: {
+    width: "72px",
+    height: "72px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #16a34a, #22c55e)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 1.5rem",
+    boxShadow: "0 6px 20px rgba(22,163,106,0.25)",
+    animation: "fadeInUp 0.5s ease-out",
+  },
+  successCheck: {
+    color: "#fff",
+    fontSize: "2rem",
+    fontWeight: 700,
+  },
+  successTitle: {
+    fontSize: "1.5rem",
+    color: "#16a34a",
+    fontWeight: 800,
+    marginBottom: "0.6rem",
+  },
+
+  /* ─── Failed ─── */
+  failedCircle: {
+    width: "72px",
+    height: "72px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #dc2626, #ef4444)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 1.5rem",
+    boxShadow: "0 6px 20px rgba(220,38,38,0.25)",
+    animation: "fadeInUp 0.5s ease-out",
+  },
+  failedX: {
+    color: "#fff",
+    fontSize: "2rem",
+    fontWeight: 700,
+  },
+  failedTitle: {
+    fontSize: "1.5rem",
+    color: "#dc2626",
+    fontWeight: 800,
+    marginBottom: "0.6rem",
+  },
+  failedNote: {
+    fontSize: "0.85rem",
+    color: "#92400e",
+    margin: 0,
+    lineHeight: 1.55,
+  },
+
+  /* ─── Error ─── */
+  errorCircle: {
+    width: "72px",
+    height: "72px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 1.5rem",
+    boxShadow: "0 6px 20px rgba(245,158,11,0.25)",
+    animation: "fadeInUp 0.5s ease-out",
+  },
+  errorExclaim: {
+    color: "#fff",
+    fontSize: "2rem",
+    fontWeight: 700,
+  },
+  errorTitle: {
+    fontSize: "1.5rem",
+    color: "#f59e0b",
+    fontWeight: 800,
+    marginBottom: "0.6rem",
+  },
+
+  /* ─── Shared ─── */
+  resultText: {
+    color: "#64748b",
+    fontSize: "0.95rem",
+    lineHeight: 1.6,
+    marginBottom: "1.75rem",
+  },
+  orderInfoBox: {
+    backgroundColor: "#f8fafc",
+    padding: "1.15rem 1.35rem",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
     marginBottom: "1.5rem",
     textAlign: "left",
   },
-  noteText: {
-    fontSize: "0.95rem",
-    color: "#856404",
-    marginTop: "1rem",
+  orderInfoRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "0.35rem 0",
+  },
+  orderInfoLabel: {
+    fontSize: "0.82rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+  },
+  orderInfoValueMono: {
+    fontSize: "0.9rem",
+    color: "#1e293b",
+    fontWeight: 700,
+    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+  },
+  orderInfoValueBold: {
+    fontSize: "1.1rem",
+    color: "#1e293b",
+    fontWeight: 800,
+  },
+  orderInfoDivider: {
+    height: "1px",
+    backgroundColor: "#e2e8f0",
+    margin: "0.5rem 0",
   },
   redirectText: {
-    color: "#495057",
-    fontSize: "0.9rem",
+    color: "#94a3b8",
+    fontSize: "0.82rem",
     marginBottom: "1rem",
+    fontWeight: 500,
   },
-  infoBox: {
-    backgroundColor: "#fff3cd",
-    border: "1px solid #ffc107",
-    borderRadius: "8px",
-    padding: "1.5rem",
-    marginBottom: "2rem",
-    textAlign: "left",
-  },
-  infoBoxTitle: {
-    fontSize: "1.1rem",
-    color: "#856404",
-    marginTop: 0,
-    marginBottom: "0.75rem",
-  },
-  infoBoxText: {
-    color: "#856404",
-    fontSize: "0.95rem",
-    margin: 0,
-    lineHeight: 1.6,
-  },
-  actions: {
+
+  /* ─── Actions ─── */
+  actionGroup: {
     display: "flex",
-    gap: "1rem",
+    gap: "0.75rem",
     justifyContent: "center",
     flexWrap: "wrap",
   },
   primaryButton: {
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
     border: "none",
-    padding: "0.9rem 1.8rem",
-    borderRadius: "8px",
+    padding: "0.8rem 1.75rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "600",
+    fontSize: "0.92rem",
+    fontWeight: 600,
+    letterSpacing: "0.01em",
   },
   secondaryButton: {
     backgroundColor: "#fff",
     color: "#667eea",
-    border: "2px solid #667eea",
-    padding: "0.9rem 1.8rem",
-    borderRadius: "8px",
+    border: "1.5px solid #e0e7ff",
+    padding: "0.8rem 1.75rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "600",
+    fontSize: "0.92rem",
+    fontWeight: 600,
   },
 };
 
-// Add keyframes animation for spinner
+// Add keyframes animations
 if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  `;
-  document.head.appendChild(style);
+  const existingStyle = document.getElementById("payment-return-animations");
+  if (!existingStyle) {
+    const style = document.createElement("style");
+    style.id = "payment-return-animations";
+    style.textContent = `
+      @keyframes progressSlide {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(150%); }
+        100% { transform: translateX(-100%); }
+      }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.3); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 export default PaymentReturnPage;

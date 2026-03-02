@@ -564,8 +564,15 @@ class OrderService {
     return order;
   }
 
-  // Confirm payment (for VNPAY callback)
-  async confirmPayment(orderNumber, callbackParams) {
+  // Confirm payment (for VNPay callback)
+  async confirmPayment(callbackParams) {
+    // Extract order number from VNPay's vnp_TxnRef
+    const orderNumber = callbackParams.vnp_TxnRef;
+
+    if (!orderNumber) {
+      throw ApiError.badRequest("Invalid payment callback: Order number not found");
+    }
+
     const order = await Order.findOne({ orderNumber });
 
     if (!order) {
@@ -573,10 +580,10 @@ class OrderService {
     }
 
     if (order.paymentStatus === "PAID") {
-      return order; // Already paid
+      return { order, payment: { success: true, paymentStatus: "PAID", message: "Payment already confirmed" } };
     }
 
-    // Get payment provider
+    // Get payment provider and verify the callback
     const paymentProvider = paymentService.getProvider(order.paymentMethod);
     const confirmResult = await paymentProvider.confirmPayment(callbackParams);
 
@@ -588,7 +595,7 @@ class OrderService {
       order.paidAt = new Date();
       order.orderStatus = "PROCESSING"; // Move to processing after payment
     } else {
-      order.orderStatus = "PENDING"; // Keep pending if payment failed
+      order.paymentStatus = "FAILED";
     }
 
     await order.save();
@@ -633,36 +640,7 @@ class OrderService {
     return await paymentService.getAvailablePaymentMethods();
   }
 
-  // Confirm VietQR payment manually (Admin function)
-  async confirmVietQRPayment(orderNumber) {
-    const order = await Order.findOne({ orderNumber });
 
-    if (!order) {
-      throw ApiError.notFound("Order not found");
-    }
-
-    if (order.paymentMethod !== "VIETQR") {
-      throw ApiError.badRequest("This order is not a VietQR payment");
-    }
-
-    if (order.paymentStatus === "PAID") {
-      return { order, message: "Payment already confirmed" };
-    }
-
-    // Update order payment status
-    order.paymentStatus = "PAID";
-    order.paidAt = new Date();
-    order.orderStatus = "PROCESSING";
-
-    await order.save();
-
-    console.log("✅ [OrderService] VietQR payment confirmed:", {
-      orderNumber,
-      orderId: order._id,
-    });
-
-    return { order, message: "Payment confirmed successfully" };
-  }
 
   async getRevenue(range) {
     const filter = { orderStatus: "DELIVERED" };

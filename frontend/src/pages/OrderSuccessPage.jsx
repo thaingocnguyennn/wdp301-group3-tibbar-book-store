@@ -2,6 +2,26 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
 
+const PAYMENT_STATUS_CONFIG = {
+  PENDING: { icon: "○", label: "Payment Pending", bg: "#fff8e1", color: "#d97706", border: "#fcd34d" },
+  PAID: { icon: "●", label: "Paid", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
+  FAILED: { icon: "!", label: "Payment Failed", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+  REFUNDED: { icon: "↩", label: "Refunded", bg: "#f3f4f6", color: "#6b7280", border: "#d1d5db" },
+};
+
+const ORDER_STATUS_CONFIG = {
+  PENDING: { icon: "⏳", label: "Pending", bg: "#fff8e1", color: "#f59e0b", border: "#fcd34d" },
+  PROCESSING: { icon: "📦", label: "Processing", bg: "#e0f2fe", color: "#0284c7", border: "#7dd3fc" },
+  SHIPPED: { icon: "🚚", label: "Shipped", bg: "#e0e7ff", color: "#4f46e5", border: "#a5b4fc" },
+  DELIVERED: { icon: "✅", label: "Delivered", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
+  CANCELLED: { icon: "✕", label: "Cancelled", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+};
+
+const PAYMENT_METHOD_LABELS = {
+  COD: "Cash on Delivery",
+  VNPAY: "VNPay Online Payment",
+};
+
 const OrderSuccessPage = () => {
   const { orderNumber } = useParams();
   const navigate = useNavigate();
@@ -33,7 +53,10 @@ const OrderSuccessPage = () => {
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={styles.loading}>Loading order details...</div>
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner} />
+          <p style={styles.loadingText}>Loading order details...</p>
+        </div>
       </div>
     );
   }
@@ -41,8 +64,9 @@ const OrderSuccessPage = () => {
   if (error || !order) {
     return (
       <div style={styles.container}>
-        <div style={styles.errorContainer}>
-          <h2 style={styles.errorTitle}>❌ Order Not Found</h2>
+        <div style={styles.errorCard}>
+          <div style={styles.errorIconBig}>⚠</div>
+          <h2 style={styles.errorTitle}>Order Not Found</h2>
           <p style={styles.errorText}>
             {error || "We couldn't find your order."}
           </p>
@@ -54,91 +78,91 @@ const OrderSuccessPage = () => {
     );
   }
 
-  const getPaymentStatusBadge = () => {
-    const status = order.paymentStatus;
-    const badges = {
-      PENDING: { text: "⏳ Payment Pending", color: "#ffc107" },
-      PAID: { text: "✅ Paid", color: "#28a745" },
-      FAILED: { text: "❌ Payment Failed", color: "#dc3545" },
-      REFUNDED: { text: "💰 Refunded", color: "#6c757d" },
-    };
-    const badge = badges[status] || badges.PENDING;
-    return (
-      <span style={{ ...styles.badge, backgroundColor: badge.color }}>
-        {badge.text}
-      </span>
-    );
-  };
-
-  const getOrderStatusBadge = () => {
-    const status = order.orderStatus;
-    const badges = {
-      PENDING: { text: "⏳ Pending", color: "#ffc107" },
-      PROCESSING: { text: "📦 Processing", color: "#17a2b8" },
-      SHIPPED: { text: "🚚 Shipped", color: "#007bff" },
-      DELIVERED: { text: "✅ Delivered", color: "#28a745" },
-      CANCELLED: { text: "❌ Cancelled", color: "#dc3545" },
-    };
-    const badge = badges[status] || badges.PENDING;
-    return (
-      <span style={{ ...styles.badge, backgroundColor: badge.color }}>
-        {badge.text}
-      </span>
-    );
-  };
+  const paymentConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
+  const statusConfig = ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
 
   return (
     <div style={styles.container}>
-      <div style={styles.successCard}>
-        {/* Success Header */}
-        <div style={styles.successHeader}>
-          <div style={styles.successIcon}>✅</div>
+      <div style={styles.card}>
+        {/* ─── Success Header ─── */}
+        <div style={styles.header}>
+          <div style={styles.successCircle}>
+            <span style={styles.successCheck}>✓</span>
+          </div>
           <h1 style={styles.successTitle}>Order Placed Successfully!</h1>
           <p style={styles.successSubtitle}>
-            Thank you for your purchase. Your order has been received.
+            Thank you for your purchase. Your order has been received and is being processed.
           </p>
         </div>
 
-        {/* Order Info */}
-        <div style={styles.orderInfo}>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Order Number:</span>
-            <strong style={styles.infoValue}>{order.orderNumber}</strong>
+        {/* ─── Order Info Grid ─── */}
+        <div style={styles.infoSection}>
+          <div style={styles.infoGrid}>
+            <div style={styles.infoItem}>
+              <span style={styles.infoItemLabel}>Order Number</span>
+              <span style={styles.infoItemValueMono}>{order.orderNumber}</span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.infoItemLabel}>Order Date</span>
+              <span style={styles.infoItemValue}>
+                {new Date(order.createdAt).toLocaleDateString("vi-VN", {
+                  day: "2-digit", month: "2-digit", year: "numeric",
+                })}
+              </span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.infoItemLabel}>Payment Method</span>
+              <span style={styles.infoItemValue}>
+                {PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}
+              </span>
+            </div>
+            <div style={styles.infoItem}>
+              <span style={styles.infoItemLabel}>Total Amount</span>
+              <span style={styles.infoItemValueTotal}>
+                {order.total.toLocaleString("vi-VN")}₫
+              </span>
+            </div>
           </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Payment Method:</span>
-            <strong style={styles.infoValue}>
-              {order.paymentMethod === "COD"
-                ? "Cash on Delivery"
-                : order.paymentMethod}
-            </strong>
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Payment Status:</span>
-            {getPaymentStatusBadge()}
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Order Status:</span>
-            {getOrderStatusBadge()}
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Order Date:</span>
-            <span style={styles.infoValue}>
-              {new Date(order.createdAt).toLocaleString()}
+
+          {/* Status Badges */}
+          <div style={styles.statusRow}>
+            <span
+              style={{
+                ...styles.statusBadge,
+                backgroundColor: statusConfig.bg,
+                color: statusConfig.color,
+                borderColor: statusConfig.border,
+              }}
+            >
+              <span>{statusConfig.icon}</span> {statusConfig.label}
+            </span>
+            <span
+              style={{
+                ...styles.statusBadge,
+                backgroundColor: paymentConfig.bg,
+                color: paymentConfig.color,
+                borderColor: paymentConfig.border,
+              }}
+            >
+              <span>{paymentConfig.icon}</span> {paymentConfig.label}
             </span>
           </div>
         </div>
 
-        {/* Shipping Address */}
+        {/* ─── Shipping Address ─── */}
         {order.shippingAddress && order.shippingAddress.fullName && (
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>📍 Shipping Address</h2>
+            <h3 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>📍</span>
+              Shipping Address
+            </h3>
             <div style={styles.addressBox}>
-              <p style={styles.addressLine}>
-                <strong>{order.shippingAddress.fullName}</strong>
-                <span style={styles.addressPhone}>&nbsp;|&nbsp;{order.shippingAddress.phone}</span>
-              </p>
-              <p style={styles.addressLine}>
+              <div style={styles.addressNameRow}>
+                <strong style={styles.addressName}>{order.shippingAddress.fullName}</strong>
+                <span style={styles.addressDivider}>|</span>
+                <span style={styles.addressPhone}>{order.shippingAddress.phone}</span>
+              </div>
+              <p style={styles.addressDetail}>
                 {order.shippingAddress.description}, {order.shippingAddress.commune},&nbsp;
                 {order.shippingAddress.district}, {order.shippingAddress.province}
               </p>
@@ -146,17 +170,21 @@ const OrderSuccessPage = () => {
           </div>
         )}
 
-        {/* Order Items */}
+        {/* ─── Order Items ─── */}
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>📦 Order Items</h2>
-          <div style={styles.items}>
+          <h3 style={styles.sectionTitle}>
+            <span style={styles.sectionIcon}>🛍</span>
+            Order Items
+            <span style={styles.itemCount}>{order.items.length} item{order.items.length > 1 ? "s" : ""}</span>
+          </h3>
+          <div style={styles.itemsList}>
             {order.items.map((item) => (
-              <div key={item.book?._id || item._id} style={styles.item}>
+              <div key={item.book?._id || item._id} style={styles.itemCard}>
                 <div style={styles.itemInfo}>
                   <span style={styles.itemTitle}>{item.title}</span>
                   <span style={styles.itemAuthor}>by {item.author}</span>
-                  <span style={styles.itemPrice}>
-                    {item.price.toLocaleString("vi-VN")}₫ x {item.quantity}
+                  <span style={styles.itemPriceQty}>
+                    {item.price.toLocaleString("vi-VN")}₫ × {item.quantity}
                   </span>
                 </div>
                 <div style={styles.itemSubtotal}>
@@ -167,60 +195,71 @@ const OrderSuccessPage = () => {
           </div>
         </div>
 
-        {/* Order Summary */}
+        {/* ─── Price Summary ─── */}
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>💰 Order Summary</h2>
-          <div style={styles.summary}>
+          <h3 style={styles.sectionTitle}>
+            <span style={styles.sectionIcon}>💰</span>
+            Price Summary
+          </h3>
+          <div style={styles.summaryBox}>
             <div style={styles.summaryRow}>
-              <span>Subtotal</span>
-              <span>{order.subtotal.toLocaleString("vi-VN")}₫</span>
+              <span style={styles.summaryLabel}>Subtotal</span>
+              <span style={styles.summaryValue}>{order.subtotal.toLocaleString("vi-VN")}₫</span>
             </div>
             <div style={styles.summaryRow}>
-              <span>Discount</span>
-              <span>-{order.discount.toLocaleString("vi-VN")}₫</span>
-            </div>
-            <div style={styles.summaryRow}>
-              <span>Shipping Fee</span>
-              <span>
-                {order.shippingFee === 0
-                  ? "Free"
-                  : `${order.shippingFee.toLocaleString("vi-VN")}₫`}
+              <span style={styles.summaryLabel}>Discount</span>
+              <span style={{ ...styles.summaryValue, color: "#ef4444" }}>
+                -{order.discount.toLocaleString("vi-VN")}₫
               </span>
             </div>
-            <div style={styles.summaryDivider}></div>
-            <div style={styles.summaryTotal}>
-              <strong>Total</strong>
-              <strong>{order.total.toLocaleString("vi-VN")}₫</strong>
+            <div style={styles.summaryRow}>
+              <span style={styles.summaryLabel}>Shipping Fee</span>
+              <span style={styles.summaryValue}>
+                {order.shippingFee === 0 ? (
+                  <span style={{ color: "#16a34a", fontWeight: 600 }}>Free</span>
+                ) : (
+                  `${order.shippingFee.toLocaleString("vi-VN")}₫`
+                )}
+              </span>
+            </div>
+            <div style={styles.summaryDivider} />
+            <div style={styles.summaryTotalRow}>
+              <span style={styles.summaryTotalLabel}>Total</span>
+              <span style={styles.summaryTotalValue}>
+                {order.total.toLocaleString("vi-VN")}₫
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Payment Instructions (for COD) */}
+        {/* ─── COD Payment Instructions ─── */}
         {order.paymentMethod === "COD" && order.paymentStatus === "PENDING" && (
-          <div style={styles.infoBox}>
-            <h3 style={styles.infoBoxTitle}>💵 Payment Instructions</h3>
-            <p style={styles.infoBoxText}>
-              You have selected Cash on Delivery. Please prepare the exact
-              amount of <strong>{order.total.toLocaleString("vi-VN")}₫</strong>{" "}
-              to pay when you receive your order.
-            </p>
+          <div style={styles.codInfoBox}>
+            <div style={styles.codInfoIcon}>💵</div>
+            <div>
+              <h4 style={styles.codInfoTitle}>Payment Instructions</h4>
+              <p style={styles.codInfoText}>
+                You selected Cash on Delivery. Please prepare the exact amount of{" "}
+                <strong>{order.total.toLocaleString("vi-VN")}₫</strong> when you receive your order.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Notes */}
+        {/* ─── Notes ─── */}
         {order.notes && (
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>📝 Order Notes</h2>
-            <p style={styles.notes}>{order.notes}</p>
+            <h3 style={styles.sectionTitle}>
+              <span style={styles.sectionIcon}>📝</span>
+              Order Notes
+            </h3>
+            <p style={styles.notesText}>{order.notes}</p>
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* ─── Actions ─── */}
         <div style={styles.actions}>
-          <button
-            style={styles.primaryButton}
-            onClick={() => navigate("/orders")}
-          >
+          <button style={styles.primaryButton} onClick={() => navigate("/orders")}>
             View My Orders
           </button>
           <button style={styles.secondaryButton} onClick={() => navigate("/")}>
@@ -233,219 +272,377 @@ const OrderSuccessPage = () => {
 };
 
 const styles = {
+  /* ─── Layout ─── */
   container: {
-    maxWidth: "800px",
+    maxWidth: "780px",
     margin: "2rem auto",
-    padding: "0 1rem",
+    padding: "0 1.5rem",
     minHeight: "80vh",
   },
-  loading: {
-    textAlign: "center",
-    padding: "4rem",
-    fontSize: "1.2rem",
-    color: "#7f8c8d",
-  },
-  errorContainer: {
-    backgroundColor: "#fff",
-    padding: "3rem",
-    borderRadius: "16px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    textAlign: "center",
-  },
-  errorTitle: {
-    fontSize: "2rem",
-    color: "#dc3545",
-    margin: "0 0 1rem 0",
-  },
-  errorText: {
-    color: "#6c757d",
-    marginBottom: "2rem",
-  },
-  successCard: {
-    backgroundColor: "#fff",
-    borderRadius: "16px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    overflow: "hidden",
-  },
-  successHeader: {
-    backgroundColor: "#f0f8ff",
-    padding: "3rem 2rem",
-    textAlign: "center",
-    borderBottom: "1px solid #e9ecef",
-  },
-  successIcon: {
-    fontSize: "4rem",
-    marginBottom: "1rem",
-  },
-  successTitle: {
-    fontSize: "2rem",
-    color: "#28a745",
-    margin: "0 0 0.5rem 0",
-  },
-  successSubtitle: {
-    color: "#6c757d",
-    fontSize: "1.1rem",
-    margin: 0,
-  },
-  orderInfo: {
-    padding: "2rem",
-    backgroundColor: "#f8f9fa",
-    borderBottom: "1px solid #e9ecef",
-  },
-  infoRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "0.75rem 0",
-    borderBottom: "1px solid #dee2e6",
-  },
-  infoLabel: {
-    color: "#6c757d",
-    fontSize: "0.95rem",
-  },
-  infoValue: {
-    color: "#2c3e50",
-    fontSize: "0.95rem",
-  },
-  badge: {
-    padding: "0.35rem 0.75rem",
-    borderRadius: "20px",
-    color: "#fff",
-    fontSize: "0.85rem",
-    fontWeight: "600",
-  },
-  section: {
-    padding: "2rem",
-    borderBottom: "1px solid #e9ecef",
-  },
-  sectionTitle: {
-    fontSize: "1.3rem",
-    color: "#2c3e50",
-    marginTop: 0,
-    marginBottom: "1.5rem",
-  },
-  items: {
+
+  /* ─── Loading ─── */
+  loadingContainer: {
     display: "flex",
     flexDirection: "column",
-    gap: "1rem",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "5rem 0",
   },
-  item: {
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e2e8f0",
+    borderTopColor: "#667eea",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+    marginBottom: "1rem",
+  },
+  loadingText: {
+    color: "#94a3b8",
+    fontSize: "0.95rem",
+  },
+
+  /* ─── Error ─── */
+  errorCard: {
+    textAlign: "center",
+    padding: "4rem 2rem",
+    backgroundColor: "#fff",
+    borderRadius: "16px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 24px rgba(0,0,0,0.04)",
+  },
+  errorIconBig: {
+    fontSize: "3.5rem",
+    marginBottom: "1rem",
+  },
+  errorTitle: {
+    fontSize: "1.35rem",
+    color: "#dc2626",
+    fontWeight: 700,
+    margin: "0 0 0.5rem",
+  },
+  errorText: {
+    color: "#94a3b8",
+    marginBottom: "2rem",
+    fontSize: "0.95rem",
+  },
+
+  /* ─── Card ─── */
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: "18px",
+    overflow: "hidden",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)",
+    border: "1px solid #f1f5f9",
+  },
+
+  /* ─── Success Header ─── */
+  header: {
+    background: "linear-gradient(135deg, #667eea15, #764ba215)",
+    padding: "2.5rem 2rem",
+    textAlign: "center",
+    borderBottom: "1px solid #f1f5f9",
+  },
+  successCircle: {
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #16a34a, #22c55e)",
     display: "flex",
-    justifyContent: "space-between",
-    padding: "1rem",
-    backgroundColor: "#f8f9fa",
-    borderRadius: "8px",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 1.25rem",
+    boxShadow: "0 4px 14px rgba(22,163,106,0.3)",
+    animation: "fadeInUp 0.6s ease-out",
   },
-  itemInfo: {
+  successCheck: {
+    color: "#fff",
+    fontSize: "1.8rem",
+    fontWeight: 700,
+  },
+  successTitle: {
+    fontSize: "1.6rem",
+    fontWeight: 800,
+    color: "#1e293b",
+    margin: "0 0 0.4rem",
+    letterSpacing: "-0.02em",
+  },
+  successSubtitle: {
+    color: "#64748b",
+    fontSize: "0.95rem",
+    margin: 0,
+    lineHeight: 1.5,
+    maxWidth: "420px",
+    marginLeft: "auto",
+    marginRight: "auto",
+  },
+
+  /* ─── Info Section ─── */
+  infoSection: {
+    padding: "1.75rem 2rem",
+    borderBottom: "1px solid #f1f5f9",
+    backgroundColor: "#f8fafc",
+  },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "1.15rem",
+    marginBottom: "1rem",
+  },
+  infoItem: {
     display: "flex",
     flexDirection: "column",
     gap: "0.25rem",
   },
-  itemTitle: {
-    fontWeight: "600",
-    color: "#2c3e50",
+  infoItemLabel: {
+    fontSize: "0.72rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
   },
-  itemAuthor: {
-    fontSize: "0.9rem",
-    color: "#6c757d",
+  infoItemValue: {
+    fontSize: "0.95rem",
+    color: "#1e293b",
+    fontWeight: 600,
   },
-  itemPrice: {
-    fontSize: "0.85rem",
-    color: "#495057",
+  infoItemValueMono: {
+    fontSize: "0.95rem",
+    color: "#1e293b",
+    fontWeight: 700,
+    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
   },
-  itemSubtotal: {
-    fontWeight: "700",
+  infoItemValueTotal: {
+    fontSize: "1.2rem",
+    color: "#1e293b",
+    fontWeight: 800,
+    letterSpacing: "-0.01em",
+  },
+  statusRow: {
+    display: "flex",
+    gap: "0.6rem",
+    flexWrap: "wrap",
+  },
+  statusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.35rem",
+    fontSize: "0.78rem",
+    fontWeight: 600,
+    padding: "0.3rem 0.75rem",
+    borderRadius: "8px",
+    border: "1px solid",
+  },
+
+  /* ─── Sections ─── */
+  section: {
+    padding: "1.75rem 2rem",
+    borderBottom: "1px solid #f1f5f9",
+  },
+  sectionTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "1rem",
+    fontWeight: 700,
+    color: "#1e293b",
+    margin: "0 0 1rem",
+  },
+  sectionIcon: {
     fontSize: "1.1rem",
-    color: "#2c3e50",
   },
-  summary: {
+  itemCount: {
+    marginLeft: "auto",
+    fontSize: "0.78rem",
+    color: "#94a3b8",
+    fontWeight: 500,
+  },
+
+  /* ─── Address ─── */
+  addressBox: {
+    backgroundColor: "#f8fafc",
+    borderRadius: "10px",
+    padding: "1rem 1.15rem",
+    border: "1px solid #e2e8f0",
+  },
+  addressNameRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    marginBottom: "0.35rem",
+  },
+  addressName: {
+    color: "#1e293b",
+    fontSize: "0.95rem",
+  },
+  addressDivider: {
+    color: "#cbd5e1",
+    fontSize: "0.85rem",
+  },
+  addressPhone: {
+    color: "#64748b",
+    fontSize: "0.88rem",
+  },
+  addressDetail: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "0.88rem",
+    lineHeight: 1.5,
+  },
+
+  /* ─── Items ─── */
+  itemsList: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
+    gap: "0.6rem",
+  },
+  itemCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "0.85rem 1rem",
+    backgroundColor: "#f8fafc",
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
+  },
+  itemInfo: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.2rem",
+    minWidth: 0,
+    flex: 1,
+  },
+  itemTitle: {
+    fontWeight: 600,
+    color: "#1e293b",
+    fontSize: "0.95rem",
+  },
+  itemAuthor: {
+    fontSize: "0.82rem",
+    color: "#94a3b8",
+  },
+  itemPriceQty: {
+    fontSize: "0.82rem",
+    color: "#64748b",
+  },
+  itemSubtotal: {
+    fontWeight: 700,
+    fontSize: "1.05rem",
+    color: "#1e293b",
+    flexShrink: 0,
+    marginLeft: "1rem",
+  },
+
+  /* ─── Summary ─── */
+  summaryBox: {
+    maxWidth: "380px",
+    marginLeft: "auto",
   },
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
-    color: "#495057",
+    alignItems: "center",
+    marginBottom: "0.6rem",
+  },
+  summaryLabel: {
+    fontSize: "0.9rem",
+    color: "#64748b",
+  },
+  summaryValue: {
+    fontSize: "0.95rem",
+    color: "#1e293b",
+    fontWeight: 500,
   },
   summaryDivider: {
     height: "1px",
-    backgroundColor: "#dee2e6",
-    margin: "0.5rem 0",
+    backgroundColor: "#e2e8f0",
+    margin: "0.65rem 0",
   },
-  summaryTotal: {
+  summaryTotalRow: {
     display: "flex",
     justifyContent: "space-between",
-    fontSize: "1.3rem",
-    color: "#2c3e50",
+    alignItems: "center",
   },
-  infoBox: {
-    margin: "2rem",
-    padding: "1.5rem",
-    backgroundColor: "#fff3cd",
-    border: "1px solid #ffc107",
-    borderRadius: "8px",
-  },
-  infoBoxTitle: {
+  summaryTotalLabel: {
     fontSize: "1.1rem",
-    color: "#856404",
-    marginTop: 0,
-    marginBottom: "0.75rem",
+    color: "#1e293b",
+    fontWeight: 700,
   },
-  infoBoxText: {
-    color: "#856404",
-    margin: 0,
-    lineHeight: 1.6,
+  summaryTotalValue: {
+    fontSize: "1.35rem",
+    fontWeight: 800,
+    color: "#1e293b",
+    letterSpacing: "-0.01em",
   },
-  addressBox: {
-    backgroundColor: "#f8f9fa",
-    border: "1px solid #dee2e6",
-    borderRadius: "8px",
-    padding: "1rem 1.25rem",
+
+  /* ─── COD Info ─── */
+  codInfoBox: {
+    display: "flex",
+    gap: "1rem",
+    alignItems: "flex-start",
+    margin: "0 2rem",
+    padding: "1.25rem",
+    backgroundColor: "#fffbeb",
+    border: "1px solid #fcd34d",
+    borderRadius: "12px",
+    marginTop: "1.5rem",
   },
-  addressLine: {
-    margin: "0 0 0.35rem 0",
-    color: "#2c3e50",
+  codInfoIcon: {
+    fontSize: "1.5rem",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  codInfoTitle: {
     fontSize: "0.95rem",
-    lineHeight: 1.5,
+    color: "#92400e",
+    fontWeight: 700,
+    margin: "0 0 0.35rem",
   },
-  addressPhone: {
-    color: "#6c757d",
-    fontSize: "0.9rem",
+  codInfoText: {
+    color: "#92400e",
+    fontSize: "0.88rem",
+    margin: 0,
+    lineHeight: 1.55,
   },
-  notes: {
-    backgroundColor: "#f8f9fa",
-    padding: "1rem",
-    borderRadius: "8px",
-    color: "#495057",
+
+  /* ─── Notes ─── */
+  notesText: {
+    backgroundColor: "#f8fafc",
+    padding: "1rem 1.15rem",
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
+    color: "#475569",
     margin: 0,
     lineHeight: 1.6,
+    fontSize: "0.92rem",
   },
+
+  /* ─── Actions ─── */
   actions: {
     padding: "2rem",
     display: "flex",
-    gap: "1rem",
+    gap: "0.85rem",
     justifyContent: "center",
   },
   primaryButton: {
-    backgroundColor: "#667eea",
+    background: "linear-gradient(135deg, #667eea, #764ba2)",
     color: "#fff",
     border: "none",
-    padding: "0.9rem 1.8rem",
-    borderRadius: "8px",
+    padding: "0.8rem 1.75rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "600",
+    fontSize: "0.95rem",
+    fontWeight: 600,
+    letterSpacing: "0.01em",
   },
   secondaryButton: {
     backgroundColor: "#fff",
     color: "#667eea",
-    border: "2px solid #667eea",
-    padding: "0.9rem 1.8rem",
-    borderRadius: "8px",
+    border: "1.5px solid #e0e7ff",
+    padding: "0.8rem 1.75rem",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "600",
+    fontSize: "0.95rem",
+    fontWeight: 600,
   },
 };
 
