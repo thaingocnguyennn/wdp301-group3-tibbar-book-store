@@ -7,6 +7,8 @@ import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
 import { ROLES } from "../config/constants.js";
+import mongoose from "mongoose";
+const MAX_ORDERS = 20;
 class OrderService {
   normalizeDateBoundary(dateString, isEndOfDay = false) {
     const parsedDate = new Date(dateString);
@@ -704,68 +706,168 @@ class OrderService {
 
     return order;
   }
-
+  // Lấy số lượng đơn hàng đang được giao (SHIPPED hoặc PROCESSING) của shipper để kiểm tra giới hạn 20 đơn hàng
+  async getActiveOrderCount(shipperId) {
+    return await Order.countDocuments({
+      shipper: shipperId,
+      orderStatus: { $in: ["SHIPPED", "PROCESSING"] }
+    });
+  }
   // Tự động gán shipper cho đơn hàng dựa trên địa chỉ giao hàng và khu vực phục vụ của shipper
 
   async autoAssignShipper(orderId) {
-    try {
-      const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId);
 
-      if (!order) throw ApiError.notFound("Order not found");
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
 
-      if (order.shipper) {
-        throw ApiError.badRequest("Order already assigned");
-      }
+    if (order.shipper) {
+      throw ApiError.badRequest("Order already assigned");
+    }
 
-      // ✅ LẤY ĐỊA CHỈ TỪ SNAPSHOT TRONG ORDER
-      const { province, district } = order.shippingAddress;
+    const { province, district } = order.shippingAddress || {};
 
-      if (!province || !district) {
-        throw ApiError.badRequest("Shipping address incomplete");
-      }
-      console.log("Looking for shipper with:");
-      console.log("Province:", province);
-      console.log("District:", district);
-      console.log("Role:", ROLES.SHIPPER);
-      // 🔎 1️⃣ Tìm shipper cùng district + chưa đủ 5 đơn
-      let shipper = await User.findOne({
-        role: ROLES.SHIPPER,
-        isActive: true,
-        currentOrders: { $lt: 5 },
-        addresses: {
-          $elemMatch: {
-            province: province.trim(),
-            district: district.trim(),
-          },
+    if (!province || !district) {
+      throw ApiError.badRequest("Shipping address incomplete");
+    }
+
+    console.log("🔍 Looking for shipper:", province, district);
+
+    const shipper = await User.findOne({
+      role: ROLES.SHIPPER,
+      isActive: true,
+      currentOrders: { $lt: MAX_ORDERS },
+      _id: { $nin: order.rejectedShippers || [] },
+      addresses: {
+        $elemMatch: {
+          province: province.trim(),
+          district: district.trim(),
         },
-      }).sort({ currentOrders: 1 });
+      },
+    }).sort({ currentOrders: 1 });
 
-      if (!shipper) {
-        console.log("❌ No shipper found for exact province + district match");
-        return order; // không assign
-      }
-      // ✅ Assign
-      order.shipper = shipper._id;
-      order.assignedAt = new Date();
-      order.orderStatus = "SHIPPED";
+    // ❌ Nếu không có shipper → KHÔNG throw
+    if (!shipper) {
+      console.log("❌ No available shipper found");
+
+      // giữ order ở trạng thái PROCESSING thay vì SHIPPED
+      order.orderStatus = "PROCESSING";
+      await order.save();
+
+      return order;
+    }
+
+    // ✅ Assign shipper
+    order.shipper = shipper._id;
+    order.assignedAt = new Date();
+    order.orderStatus = "SHIPPED";
+    order.assignmentStatus = "PENDING";
+
+    await order.save();
+
+    // tăng số đơn hiện tại
+    await User.findByIdAndUpdate(shipper._id, {
+      $inc: { currentOrders: 1 },
+    });
+
+    await order.populate("shipper", "email firstName lastName");
+
+    console.log("✅ Assigned to shipper:", shipper.email);
+
+    return order;
+  }
+
+  async respondAssignment(orderId, shipperId, action) {
+
+    const order = await Order.findById(orderId);
+
+    if (!order) throw ApiError.notFound("Order not found");
+
+    // ✅ Kiểm tra đúng shipper
+    if (!order.shipper || order.shipper.toString() !== shipperId.toString()) {
+      throw ApiError.forbidden("Not your assignment");
+    }
+
+    if (order.assignmentStatus !== "PENDING") {
+      throw ApiError.badRequest("Assignment already responded");
+    }
+
+    // ================= ACCEPT =================
+    if (action === "ACCEPT") {
+
+      order.assignmentStatus = "ACCEPTED";
+
+      // ❌ KHÔNG đổi orderStatus nữa
+      // order.orderStatus = "PROCESSING";
 
       await order.save();
 
-      // ✅ Tăng số đơn hiện tại của shipper
-      await User.findByIdAndUpdate(shipper._id, {
-        $inc: { currentOrders: 1 },
+      return { message: "Order accepted successfully" };
+    }
+    // ================= REJECT =================
+    if (action === "REJECT") {
+
+      // 1️⃣ Thêm shipper vào danh sách đã reject
+      if (!order.rejectedShippers) {
+        order.rejectedShippers = [];
+      }
+
+      order.rejectedShippers.push(shipperId);
+
+      // 2️⃣ Trừ currentOrders
+      await User.findByIdAndUpdate(shipperId, {
+        $inc: { currentOrders: -1 }
       });
 
-      await order.populate("shipper", "email firstName lastName");
+      const { province, district } = order.shippingAddress;
 
-      return order;
+      // 3️⃣ Tìm shipper KHÔNG nằm trong rejectedShippers
+      const newShipper = await User.find({
+        role: ROLES.SHIPPER,
+        isActive: true,
+        currentOrders: { $lt: MAX_ORDERS },
+        _id: { $nin: order.rejectedShippers }, // 🔥 CHỖ QUAN TRỌNG
+        addresses: {
+          $elemMatch: {
+            province: province.trim(),
+            district: district.trim()
+          }
+        }
+      }).sort({ currentOrders: 1 });
 
-    } catch (error) {
-      throw error;
+      if (!newShipper || newShipper.length === 0) {
+
+        console.log("⚠ All shippers rejected. Resetting order...");
+
+        order.shipper = null;
+        order.assignmentStatus = null;
+        order.orderStatus = "PENDING";
+        order.assignedAt = null;
+
+        await order.save();
+
+        return { message: "All shippers rejected. Order moved back to PENDING." };
+      }
+
+      const nextShipper = newShipper[0];
+
+      order.shipper = nextShipper._id;
+      order.assignmentStatus = "PENDING";
+      order.orderStatus = "SHIPPED";
+      order.assignedAt = new Date();
+
+      await order.save();
+
+      await User.findByIdAndUpdate(nextShipper._id, {
+        $inc: { currentOrders: 1 }
+      });
+
+      return { message: "Reassigned to new shipper" };
     }
+
+    throw ApiError.badRequest("Invalid action");
   }
-
-
 }
 
 export default new OrderService();

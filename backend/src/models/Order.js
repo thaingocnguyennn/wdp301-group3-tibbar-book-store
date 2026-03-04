@@ -93,7 +93,18 @@ const orderSchema = new mongoose.Schema(
       enum: ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"],
       default: "PENDING",
     },
-
+    // 🔥 THÊM ĐOẠN NÀY
+    assignmentStatus: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REJECTED"],
+      default: null,
+    },
+    rejectedShippers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+      }
+    ],
     // Shipping address snapshot (stored at order time)
     shippingAddress: {
       addressId: { type: String, default: null },
@@ -133,6 +144,38 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // ================= ASSIGNMENT FIELDS =================
+
+    assignmentStatus: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REJECTED"],
+      default: null,
+    },
+
+    assignmentExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    reassignCount: {
+      type: Number,
+      default: 0,
+    },
+
+    assignmentHistory: [
+      {
+        shipper: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        assignedAt: Date,
+        respondedAt: Date,
+        status: {
+          type: String,
+          enum: ["ACCEPTED", "REJECTED", "EXPIRED"],
+        },
+      },
+    ],
   },
   {
     timestamps: true,
@@ -141,7 +184,6 @@ const orderSchema = new mongoose.Schema(
 
 // Indexes for efficient querying
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ paymentStatus: 1 });
 
