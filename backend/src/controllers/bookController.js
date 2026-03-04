@@ -34,9 +34,31 @@ class BookController {
     }
   }
 
+  // Phương thức để lấy danh sách sách đã xem gần đây của người dùng
+  async getRecentlyViewed(req, res, next) {
+    try {
+      const books = await bookService.getRecentlyViewed(req.user._id);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Recently viewed fetched",
+        { books }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
   async getBookById(req, res, next) {
     try {
       const book = await bookService.getBookById(req.params.id);
+      // Lưu recently viewed khi user xem chi tiết
+      if (req.user) {
+        await bookService.addToRecentlyViewed(
+          req.user._id,
+          req.params.id
+        );
+      }
 
       return ApiResponse.success(
         res,

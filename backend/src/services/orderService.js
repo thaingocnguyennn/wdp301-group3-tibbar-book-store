@@ -77,8 +77,8 @@ class OrderService {
         });
         continue;
       }
-
-      if (item.book.stock < item.quantity) {
+      // validate stock before create order
+      if (item.book.stock < item.quantity) { 
         validationErrors.push({
           message: `Not enough stock. Available: ${item.book.stock}`,
           book: item.book.title,
@@ -338,21 +338,21 @@ class OrderService {
       transactionId: paymentResult.transactionId || null,
     });
 
-    // Update book stock safely (prevent overselling)
-    for (const item of validItems) {
-      const updatedBook = await Book.findOneAndUpdate(
+    // Update book stock safely + prevent overselling
+    for (const item of validItems) { //Chỉ cập nhật nếu còn đủ stock, tránh overselling
+      const updatedBook = await Book.findOneAndUpdate(  //Chỉ cập nhật nếu còn đủ stock, tránh overselling
         {
-          _id: item.book._id,
-          stock: { $gte: item.quantity }, // only update if enough stock
+          _id: item.book._id, // tìm đúng sách
+          stock: { $gte: item.quantity }, // chỉ cập nhật nếu còn đủ stock, tránh overselling
         },
         {
-          $inc: { stock: -item.quantity },
+          $inc: { stock: -item.quantity },// decrease stock by ordered quantity
         },
-        { new: true }
+        { new: true } //Trả về document sau khi cập nhật
       );
 
-      if (!updatedBook) {
-        throw ApiError.badRequest(
+      if (!updatedBook) { // Nếu không tìm thấy hoặc không đủ stock, throw error
+        throw ApiError.badRequest( 
           `Product "${item.book.title}" is out of stock or not enough quantity available.`
         );
       }
@@ -642,35 +642,35 @@ class OrderService {
 
 
 
-  async getRevenue(range) {
-    const filter = { orderStatus: "DELIVERED" };
+  async getRevenue(range) { // Thống kê doanh thu, nếu range = "month" thì thống kê doanh thu trong tháng hiện tại, ngược lại thống kê toàn bộ
+    const filter = { orderStatus: "DELIVERED" };// Chỉ tính doanh thu từ những đơn hàng đã được giao thành công
 
-    const now = new Date();
+    const now = new Date();// Lấy ngày hiện tại để xác định khoảng thời gian thống kê
 
-    if (range === "month") {
-      filter.deliveredAt = {
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
+    if (range === "month") { // Nếu range là "month", chỉ thống kê doanh thu từ đầu tháng đến hiện tại
+      filter.deliveredAt = { // Chỉ tính những đơn hàng được giao trong tháng hiện tại
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1),// Ngày đầu tiên của tháng hiện tại
       };
     }
 
-    const orders = await Order.find(filter);
+    const orders = await Order.find(filter);// Lấy tất cả đơn hàng đã được giao thành công (và nếu range là "month" thì chỉ lấy những đơn hàng được giao trong tháng hiện tại)
 
-    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);// Tính tổng doanh thu bằng cách cộng tổng tiền của tất cả đơn hàng đã được giao thành công (đã lọc theo khoảng thời gian nếu range là "month")
 
     // 👇 group theo ngày
-    const chartMap = {};
+    const chartMap = {};// Tạo một object để nhóm doanh thu theo ngày, key là ngày (yyyy-mm-dd) và value là tổng doanh thu của ngày đó
 
     orders.forEach(order => {
       const day = order.deliveredAt.toISOString().slice(0, 10); // yyyy-mm-dd
-      chartMap[day] = (chartMap[day] || 0) + order.total;
+      chartMap[day] = (chartMap[day] || 0) + order.total;// Cộng dồn doanh thu của đơn hàng vào ngày tương ứng trong chartMap
     });
 
-    const chartData = Object.keys(chartMap).map(day => ({
-      date: day,
-      revenue: chartMap[day],
+    const chartData = Object.keys(chartMap).map(day => ({// Chuyển đổi chartMap thành mảng để dễ sử dụng cho biểu đồ, mỗi phần tử có dạng { date: "yyyy-mm-dd", revenue: tổng doanh thu của ngày đó }
+      date: day,// Ngày (yyyy-mm-dd)
+      revenue: chartMap[day],// Tổng doanh thu của ngày đó
     }));
 
-    return {
+    return { // Trả về tổng doanh thu, số lượng đơn hàng đã giao thành công và dữ liệu để vẽ biểu đồ doanh thu theo ngày
       totalRevenue,
       totalOrders: orders.length,
       chartData,
@@ -679,15 +679,15 @@ class OrderService {
 
 
 
-  async assignShipper(orderId, shipperId) {
-    const shipper = await User.findById(shipperId);
-    if (!shipper || shipper.role?.toLowerCase() !== "shipper") {
-      throw ApiError.badRequest("Invalid shipper");
+  async assignShipper(orderId, shipperId) { // Lấy orderId và shipperId từ tham số hàm
+    const shipper = await User.findById(shipperId);// Tìm shipper trong database
+    if (!shipper || shipper.role?.toLowerCase() !== "shipper") { // Kiểm tra nếu không tìm thấy hoặc không phải là shipper
+      throw ApiError.badRequest("Invalid shipper"); // Trả về lỗi nếu shipper không hợp lệ
     }
 
-    const order = await Order.findById(orderId);
-    if (!order) {
-      throw ApiError.notFound("Order not found");
+    const order = await Order.findById(orderId); // Tìm order trong database
+    if (!order) { // Kiểm tra nếu không tìm thấy order
+      throw ApiError.notFound("Order not found");// Trả về lỗi nếu không tìm thấy order
     }
 
     // ❌ Không cho assign lại
@@ -701,8 +701,8 @@ class OrderService {
     // ⭐ CHUYỂN TRẠNG THÁI SANG SHIPPED
     order.orderStatus = "SHIPPED";
 
-    await order.save();
-    await order.populate("shipper", "email");
+    await order.save(); // Lưu order sau khi gán shipper
+    await order.populate("shipper", "email");// Populate thông tin shipper (chỉ lấy email)
 
     return order;
   }
