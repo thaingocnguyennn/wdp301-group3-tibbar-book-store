@@ -8,6 +8,14 @@ const BookCard = ({ book }) => {
 
   if (!book) return null;
 
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const serverBaseUrl = apiBase.replace(/\/api\/?$/, '');
+  const imageSrc = book.imageUrl
+    ? book.imageUrl.startsWith('http')
+      ? book.imageUrl
+      : `${serverBaseUrl}${book.imageUrl}`
+    : '';
+
   const isWishlisted = Array.isArray(wishlist)
   ? wishlist.some(b => b._id === book._id)
   : false;
@@ -32,8 +40,8 @@ const BookCard = ({ book }) => {
   return (
     <div style={styles.card}>
       <div style={styles.imageContainer}>
-        {book.imageUrl ? (
-          <img src={book.imageUrl} alt={book.title} style={styles.image} />
+        {imageSrc ? (
+          <img src={imageSrc} alt={book.title} style={styles.image} />
         ) : (
           <div style={styles.placeholder}>📖</div>
         )}
@@ -75,7 +83,7 @@ const BookCard = ({ book }) => {
 
         <div style={styles.footer}>
           <span style={styles.price}>
-            ${typeof book.price === 'number' ? book.price.toFixed(2) : '0.00'}
+            {typeof book.price === 'number' ? book.price.toLocaleString('vi-VN') : '0'}₫
           </span>
           <Link to={`/books/${book._id}`} style={styles.button}>
             View Details

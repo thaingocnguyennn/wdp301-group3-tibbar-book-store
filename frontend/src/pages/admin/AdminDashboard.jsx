@@ -37,14 +37,43 @@ const AdminDashboard = () => {
             Manage user accounts and roles
           </p>
         </Link>
+        <Link to="/admin/wishlist" style={styles.card}>
+          <div style={styles.icon}>❤️</div>
+          <h3 style={styles.cardTitle}>Wishlist Statistics</h3>
+          <p style={styles.cardDesc}>
+            View most wishlisted books
+          </p>
+        </Link>
+        <Link to="/admin/shippers" style={styles.card}>
+          <div style={styles.icon}>🚚</div>
+          <h3 style={styles.cardTitle}>Shippers</h3>
+          <p style={styles.cardDesc}>
+            View shipers in system
+          </p>
+        </Link>
+        <Link to="/admin/revenue" style={styles.card}>
+          <div style={styles.icon}>📊</div>
+          <h3 style={styles.cardTitle}>Revenue Statistics</h3>
+          <p style={styles.cardDesc}>
+            Analyze sales performance and revenue reports
+          </p>
+        </Link>
 
-        <div style={{ ...styles.card, ...styles.disabled }}>
+        <Link to="/admin/orders" style={styles.card}>
           <div style={styles.icon}>📦</div>
           <h3 style={styles.cardTitle}>Orders</h3>
           <p style={styles.cardDesc}>
-            View and manage customer orders (Coming Soon)
+            View and manage customer orders
           </p>
-        </div>
+        </Link>
+
+        <Link to="/admin/vouchers" style={styles.card}>
+          <div style={styles.icon}>🎟️</div>
+          <h3 style={styles.cardTitle}>Vouchers</h3>
+          <p style={styles.cardDesc}>
+            View, create and update voucher campaigns
+          </p>
+        </Link>
       </div>
     </div>
   );
@@ -79,10 +108,6 @@ const styles = {
       transform: "translateY(-4px)",
       boxShadow: "0 6px 12px rgba(0,0,0,0.15)",
     },
-  },
-  disabled: {
-    opacity: 0.6,
-    cursor: "not-allowed",
   },
   icon: {
     fontSize: "3rem",

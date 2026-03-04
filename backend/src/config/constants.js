@@ -1,6 +1,7 @@
 export const ROLES = {
   GUEST: 'guest',
   CUSTOMER: 'customer',
+  SHIPPER: 'shipper',
   ADMIN: 'admin',
   MANAGER: 'manager'
 };
@@ -60,4 +61,10 @@ export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 12,
   MAX_LIMIT: 100
+};
+
+// Shipping fee (VND)
+export const SHIPPING = {
+  FEE: 30000,
+  FREE_THRESHOLD: 200000
 };

@@ -28,6 +28,17 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
+  const handleAuthResponse = (authData) => {
+    // Handle authentication response from Google or other OAuth providers
+    const { user, accessToken } = authData.data || authData;
+
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('accessToken', accessToken);
+    setUser(user);
+
+    return authData;
+  };
+
   const register = async (userData) => {
     const response = await authApi.register(userData);
     const { user, accessToken } = response.data;
@@ -71,6 +82,7 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         login,
         register,
+        handleAuthResponse,
         logout,
         updateUserRole
       }}

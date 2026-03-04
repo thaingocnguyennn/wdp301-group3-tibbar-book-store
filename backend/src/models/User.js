@@ -3,12 +3,41 @@ import bcrypt from 'bcryptjs';
 import { ROLES } from '../config/constants.js';
 
 const addressSchema = new mongoose.Schema({
-  street: { type: String, trim: true },
-  city: { type: String, trim: true },
-  state: { type: String, trim: true },
-  zipCode: { type: String, trim: true },
-  country: { type: String, trim: true }
-}, { _id: false });
+  fullName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  phone: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  province: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  district: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  commune: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,   // ví dụ: "Số 12, hẻm 45, gần chợ..."
+    required: true,
+    trim: true
+  },
+  isDefault: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true });
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -21,9 +50,23 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters'],
-    select: false
+    select: false,
+    default: null
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  avatar: {
+    type: String,
+    default: null
+  },
+  provider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   firstName: {
     type: String,
@@ -44,13 +87,21 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  address: addressSchema,
+  addresses: [addressSchema],
   isActive: {
     type: Boolean,
     default: true
   },
   refreshToken: {
     type: String,
+    select: false
+  },
+  otp: {
+    type: String,
+    select: false
+  },
+  otpExpires: {
+    type: Date,
     select: false
   }
 }, {

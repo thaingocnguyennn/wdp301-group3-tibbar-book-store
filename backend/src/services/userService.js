@@ -1,11 +1,12 @@
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, ROLES } from '../config/constants.js';
+import Order from "../models/Order.js";
 
 class UserService {
   async getProfile(userId) {
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
@@ -90,16 +91,78 @@ class UserService {
     }
 
     user.isActive = !user.isActive;
-    
+
     // If locking the account, clear refresh token to invalidate session
     if (!user.isActive) {
       user.refreshToken = null;
     }
-    
+
     await user.save();
 
     return user;
   }
+  async getShippers() {
+    // 1️⃣ Lấy danh sách shipper
+    const shippers = await User.find({ role: "shipper" })
+      .select("email role createdAt")
+      .sort({ createdAt: -1 });
+
+    const shipperIds = shippers.map(s => s._id);
+
+    // 2️⃣ Đếm số order theo shipper
+    const orderCounts = await Order.aggregate([
+      {
+        $match: {
+          shipper: { $in: shipperIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$shipper",
+          total: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // 3️⃣ Map shipperId → total orders
+    const countMap = {};
+    orderCounts.forEach(item => {
+      countMap[item._id.toString()] = item.total;
+    });
+
+    // 4️⃣ Gộp dữ liệu
+    return shippers.map(shipper => ({
+      ...shipper.toObject(),
+      assignedOrders: countMap[shipper._id.toString()] || 0
+    }));
+  }
+
+  async changePassword(userId, currentPassword, newPassword) {
+    // Get user with password field
+    const user = await User.findById(userId).select('+password');
+
+    if (!user) {
+      throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    }
+
+    // Verify current password
+    const isPasswordCorrect = await user.comparePassword(currentPassword);
+    if (!isPasswordCorrect) {
+      throw ApiError.unauthorized('Current password is incorrect');
+    }
+
+    // Validate new password
+    if (!newPassword || newPassword.length < 6) {
+      throw ApiError.badRequest('New password must be at least 6 characters');
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    return { message: 'Password changed successfully' };
+  }
+
 }
 
 export default new UserService();

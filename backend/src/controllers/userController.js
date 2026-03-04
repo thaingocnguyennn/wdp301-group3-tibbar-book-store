@@ -32,6 +32,43 @@ class UserController {
       next(error);
     }
   }
+  getShippers = async (req, res, next) => {
+    try {
+      const shippers = await userService.getShippers();
+      res.json({ shippers });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  async changePassword(req, res, next) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return ApiResponse.error(
+          res,
+          HTTP_STATUS.BAD_REQUEST,
+          'Current password and new password are required'
+        );
+      }
+
+      const result = await userService.changePassword(
+        req.user.userId,
+        currentPassword,
+        newPassword
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        result.message
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export default new UserController();
