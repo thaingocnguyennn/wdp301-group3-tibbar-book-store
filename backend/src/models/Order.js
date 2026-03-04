@@ -105,6 +105,11 @@ const orderSchema = new mongoose.Schema(
         ref: "User"
       }
     ],
+    // Bằng chứng giao hàng (ảnh chụp bằng điện thoại của shipper khi giao hàng thành công)
+    deliveryProof: {
+      imageUrl: String,
+      uploadedAt: Date
+    },
     // Shipping address snapshot (stored at order time)
     shippingAddress: {
       addressId: { type: String, default: null },
@@ -146,11 +151,6 @@ const orderSchema = new mongoose.Schema(
     },
     // ================= ASSIGNMENT FIELDS =================
 
-    assignmentStatus: {
-      type: String,
-      enum: ["PENDING", "ACCEPTED", "REJECTED"],
-      default: null,
-    },
 
     assignmentExpiresAt: {
       type: Date,
@@ -162,20 +162,20 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
 
-    assignmentHistory: [
-      {
-        shipper: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        assignedAt: Date,
-        respondedAt: Date,
-        status: {
-          type: String,
-          enum: ["ACCEPTED", "REJECTED", "EXPIRED"],
-        },
-      },
-    ],
+    assignmentHistory: {
+      type: [
+        {
+          shipper: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          assignedAt: Date,
+          respondedAt: Date,
+          status: {
+            type: String,
+            enum: ["PENDING", "ACCEPTED", "REJECTED"]
+          }
+        }
+      ],
+      default: []
+    },
   },
   {
     timestamps: true,

@@ -1,7 +1,8 @@
 import shipperService from '../services/shipperService.js';
+import orderService from "../services/orderService.js";
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS } from '../config/constants.js';
-import orderService from "../services/orderService.js";
+
 class ShipperController {
   async getShipperOrders(req, res, next) {
     try {
@@ -87,7 +88,7 @@ class ShipperController {
 
   async getShipperDashboard(req, res, next) {
     try {
-      const dashboard = await shipperService.getShipperDashboard(req.user.userId);
+      const dashboard = await shipperService.getShipperDashboard(req.user._id);
 
       return ApiResponse.success(
         res,
@@ -114,6 +115,60 @@ class ShipperController {
         HTTP_STATUS.OK,
         "Respond assignment successfully",
         result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async uploadProof(req, res, next) {
+    try {
+      if (!req.file) {
+        return ApiResponse.error(
+          res,
+          HTTP_STATUS.BAD_REQUEST,
+          "No image uploaded"
+        );
+      }
+
+      const imageUrl = `/uploads/delivery-proofs/${req.file.filename}`;
+
+      const result = await shipperService.uploadDeliveryProof(
+        req.params.orderId,
+        req.user._id,
+        imageUrl
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Proof uploaded successfully",
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async getAssignmentHistory(req, res) {
+    const shipperId = req.user._id;
+
+    const data = await orderService.getAssignmentHistory(shipperId);
+
+    res.json({
+      success: true,
+      data
+    });
+  }
+  async getPerformance(req, res, next) {
+    try {
+      const performance = await orderService.getShipperPerformance(
+        req.user._id
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Shipper performance retrieved successfully",
+        performance
       );
     } catch (error) {
       next(error);
