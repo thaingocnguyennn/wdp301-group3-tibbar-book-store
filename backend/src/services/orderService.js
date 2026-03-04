@@ -700,8 +700,21 @@ class OrderService {
 
     // ⭐ CHUYỂN TRẠNG THÁI SANG SHIPPED
     order.orderStatus = "SHIPPED";
+    order.assignmentStatus = "PENDING";
+    // ===== ADD ASSIGNMENT HISTORY =====
+    if (!order.assignmentHistory) {
+      order.assignmentHistory = [];
+    }
 
+    order.assignmentHistory.push({
+      shipper: shipperId,
+      assignedAt: new Date(),
+      status: "PENDING"
+    });
     await order.save(); // Lưu order sau khi gán shipper
+    await User.findByIdAndUpdate(shipperId, {
+      $inc: { currentOrders: 1 }
+    });
     await order.populate("shipper", "email");// Populate thông tin shipper (chỉ lấy email)
 
     return order;
@@ -763,7 +776,15 @@ class OrderService {
     order.assignedAt = new Date();
     order.orderStatus = "SHIPPED";
     order.assignmentStatus = "PENDING";
+    if (!order.assignmentHistory) {
+      order.assignmentHistory = [];
+    }
 
+    order.assignmentHistory.push({
+      shipper: shipper._id,
+      assignedAt: new Date(),
+      status: "PENDING"
+    });
     await order.save();
 
     // tăng số đơn hiện tại
@@ -797,13 +818,19 @@ class OrderService {
     if (action === "ACCEPT") {
 
       order.assignmentStatus = "ACCEPTED";
+      const lastAssignment = order.assignmentHistory[order.assignmentHistory.length - 1];
 
+      if (lastAssignment) {
+        lastAssignment.status = "ACCEPTED";
+        lastAssignment.respondedAt = new Date();
+      }
       // ❌ KHÔNG đổi orderStatus nữa
       // order.orderStatus = "PROCESSING";
 
       await order.save();
 
       return { message: "Order accepted successfully" };
+
     }
     // ================= REJECT =================
     if (action === "REJECT") {
@@ -814,7 +841,23 @@ class OrderService {
       }
 
       order.rejectedShippers.push(shipperId);
+      // ===== UPDATE LAST HISTORY =====
+      if (!order.assignmentHistory) {
+        order.assignmentHistory = [];
+      }
 
+      const lastIndex = order.assignmentHistory.length - 1;
+
+      if (lastIndex >= 0) {
+        order.assignmentHistory[lastIndex].status = "REJECTED";
+        order.assignmentHistory[lastIndex].respondedAt = new Date();
+      }
+
+      // ⚡ BẮT BUỘC MARK MODIFIED
+      order.markModified("assignmentHistory");
+
+      // 💥 SAVE NGAY SAU KHI REJECT
+      await order.save();
       // 2️⃣ Trừ currentOrders
       await User.findByIdAndUpdate(shipperId, {
         $inc: { currentOrders: -1 }
@@ -847,7 +890,7 @@ class OrderService {
 
         await order.save();
 
-        return { message: "All shippers rejected. Order moved back to PENDING." };
+        return order;
       }
 
       const nextShipper = newShipper[0];
@@ -856,17 +899,105 @@ class OrderService {
       order.assignmentStatus = "PENDING";
       order.orderStatus = "SHIPPED";
       order.assignedAt = new Date();
+      // ===== PUSH NEW HISTORY =====
+      if (!order.assignmentHistory) {
+        order.assignmentHistory = [];
+      }
 
+      order.assignmentHistory.push({
+        shipper: nextShipper._id,
+        assignedAt: new Date(),
+        status: "PENDING"
+      });
+      if (order.assignmentHistory?.length > 0) {
+        const last = order.assignmentHistory[order.assignmentHistory.length - 1];
+        order.assignmentStatus = last.status;
+      }
       await order.save();
 
       await User.findByIdAndUpdate(nextShipper._id, {
         $inc: { currentOrders: 1 }
       });
 
-      return { message: "Reassigned to new shipper" };
+      return order;
+
     }
 
     throw ApiError.badRequest("Invalid action");
+  }
+  // Lấy lịch sử phân công của shipper (danh sách các đơn hàng đã từng được phân công, bao gồm cả thông tin đơn hàng và trạng thái phân công)
+  async getShipperPerformance(shipperId) {
+
+    const orders = await Order.find({
+      "assignmentHistory.shipper": shipperId
+    });
+
+    let totalAssigned = 0;
+    let accepted = 0;
+    let rejected = 0;
+    let delivered = 0;
+
+    for (const order of orders) {
+
+      // Lấy tất cả history của shipper này trong order
+      const histories = order.assignmentHistory.filter(
+        h => h.shipper.toString() === shipperId.toString()
+      );
+
+      // Nếu shipper từng được assign order này → chỉ +1 lần
+      if (histories.length > 0) {
+        totalAssigned++;
+      }
+
+      // Kiểm tra shipper đã từng ACCEPT order này chưa
+      const acceptedHistory = histories.find(
+        h => h.status === "ACCEPTED"
+      );
+
+      // Kiểm tra shipper đã từng REJECT order này chưa
+      const rejectedHistory = histories.find(
+        h => h.status === "REJECTED"
+      );
+
+      if (acceptedHistory) {
+        accepted++;
+
+        // 🔥 Chỉ tính delivered nếu:
+        // 1. Order đã DELIVERED
+        // 2. Shipper hiện tại chính là shipper này
+        if (
+          order.orderStatus === "DELIVERED" &&
+          order.shipper?.toString() === shipperId.toString()
+        ) {
+          delivered++;
+        }
+      }
+
+      if (rejectedHistory) {
+        rejected++;
+      }
+    }
+
+    // 📊 Acceptance Rate
+    const acceptanceRate =
+      (accepted + rejected) > 0
+        ? ((accepted / (accepted + rejected)) * 100).toFixed(1)
+        : 0;
+
+    // 📊 Success Rate (chuẩn thực tế)
+    const successRate =
+      accepted > 0
+        ? ((delivered / accepted) * 100).toFixed(1)
+        : 0;
+
+    return {
+      totalAssigned,
+      accepted,
+      rejected,
+      delivered,
+      acceptanceRate,
+      successRate
+    };
   }
 }
 

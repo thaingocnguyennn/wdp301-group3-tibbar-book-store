@@ -32,6 +32,7 @@ import AdminRevenue from "./pages/admin/AdminRevenue";
 import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
 import RecentlyViewedPage from "./pages/RecentlyViewedPage";
+import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
@@ -199,7 +200,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/assignment-history" element={<AssignmentHistoryPage />} />
         <Route
           path="/admin/books"
           element={

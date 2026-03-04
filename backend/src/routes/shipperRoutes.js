@@ -3,6 +3,7 @@ import { authenticate } from '../middlewares/authMiddleware.js';
 import { authorize } from '../middlewares/roleMiddleware.js';
 import { ROLES } from '../config/constants.js';
 import shipperController from '../controllers/shipperController.js';
+import { deliveryProofUpload } from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
@@ -37,5 +38,18 @@ router.put('/orders/:orderId/status', (req, res, next) =>
 router.post(
   "/orders/:orderId/respond",
   shipperController.respondAssignment
+);
+router.post(
+  "/orders/:orderId/upload-proof",
+  deliveryProofUpload.single("image"),
+  shipperController.uploadProof
+);
+
+router.get("/assignment-history", shipperController.getAssignmentHistory);
+
+router.get(
+  "/performance",
+  authorize("shipper"),
+  shipperController.getPerformance
 );
 export default router;

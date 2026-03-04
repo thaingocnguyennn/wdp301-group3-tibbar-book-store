@@ -1,6 +1,7 @@
 import Order from '../models/Order.js';
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
+import orderService from "./orderService.js";
 
 class ShipperService {
   // Get all orders assigned to a shipper with pagination
@@ -70,21 +71,24 @@ class ShipperService {
       throw new ApiError(404, 'Order not found');
     }
 
-    // Verify the order belongs to this shipper
     if (order.shipper?.toString() !== shipperId?.toString()) {
       throw new ApiError(403, 'You do not have access to this order');
     }
 
-    // ✅ Nếu chuyển sang DELIVERED hoặc CANCELLED
+    // 🚨 BẮT BUỘC có ảnh nếu muốn DELIVERED
+    if (newStatus === 'DELIVERED') {
+      if (!order.deliveryProof) {
+        throw new ApiError(400, 'Please upload delivery proof before marking as delivered');
+      }
+    }
+
+    // Nếu chuyển sang DELIVERED hoặc CANCELLED
     if (['DELIVERED', 'CANCELLED'].includes(newStatus)) {
 
-      // chỉ trừ nếu trước đó là đơn đang active
       if (['SHIPPED', 'PROCESSING'].includes(order.orderStatus)) {
-
         await User.findByIdAndUpdate(shipperId, {
           $inc: { currentOrders: -1 }
         });
-
       }
 
       if (newStatus === 'DELIVERED' && !order.deliveredAt) {
@@ -163,7 +167,7 @@ class ShipperService {
       .populate('user', 'firstName lastName email phone')
       .sort({ createdAt: -1 })
       .limit(5);
-
+    const performance = await orderService.getShipperPerformance(shipperId);
     return {
       statistics: {
         totalOrders,
@@ -171,9 +175,35 @@ class ShipperService {
         shippedOrders,
         cancelledOrders
       },
-      recentOrders
+      recentOrders,
+      performance 
     };
   }
+  async uploadDeliveryProof(orderId, shipperId, imageUrl) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    if (order.shipper?.toString() !== shipperId.toString()) {
+      throw new ApiError(403, "Not your order");
+    }
+
+    if (order.orderStatus !== "SHIPPED") {
+      throw new ApiError(400, "Only shipped orders can upload proof");
+    }
+
+    order.deliveryProof = {
+      imageUrl,
+      uploadedAt: new Date()
+    };
+
+    await order.save();
+
+    return order;
+  }
+
 }
 
 export default new ShipperService();

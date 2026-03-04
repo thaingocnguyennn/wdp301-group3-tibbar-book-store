@@ -11,7 +11,8 @@ const ShipperHomePage = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [newStatus, setNewStatus] = useState('');
-
+  const [proofFile, setProofFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
     fetchDashboard();
     fetchOrders();
@@ -38,7 +39,7 @@ const ShipperHomePage = () => {
         limit: 10,
         status: filterStatus || undefined
       });
-      console.log("ORDERS DATA:", response.data.orders); // 👈 THÊM DÒNG NÀY
+
       setOrders(response.data.orders || []);
     } catch (err) {
       setError('Failed to load orders');
@@ -52,7 +53,8 @@ const ShipperHomePage = () => {
     try {
       const response = await shipperApi.getOrderDetails(orderId);
       setSelectedOrder(response.data);
-      setNewStatus(response.data.orderStatus);
+      setProofFile(null); // 🔥 THÊM DÒNG NÀY
+      setNewStatus("");
       setError('');
     } catch (err) {
       if (err.response?.status === 403) {
@@ -103,6 +105,38 @@ const ShipperHomePage = () => {
       setLoading(false);
     }
   };
+  // Mới thêm hàm này để xử lý upload bằng chứng giao hàng
+  const handleUploadProof = async () => {
+    console.log("UPLOAD CLICKED");
+
+    if (!proofFile) {
+      setError("Please select an image");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", proofFile);
+
+    setUploading(true);
+
+    try {
+      const response = await shipperApi.uploadDeliveryProof(
+        selectedOrder._id,
+        formData
+      );
+
+      setSelectedOrder(response.data); // 🔥 quan trọng
+      setProofFile(null);
+      setMessage("Proof uploaded successfully");
+      setError("");
+
+    } catch (err) {
+      setError(err.response?.data?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const getStatusBadgeColor = (status) => {
     const colors = {
       'PENDING': '#f39c12',
@@ -121,6 +155,7 @@ const ShipperHomePage = () => {
     };
     return colors[status] || '#95a5a6';
   };
+
   return (
     <div style={styles.container}>
       {/* Dashboard Summary */}
@@ -143,6 +178,26 @@ const ShipperHomePage = () => {
             <div style={styles.statCard}>
               <div style={styles.statNumber}>{dashboard.statistics.cancelledOrders}</div>
               <div style={styles.statLabel}>Cancel</div>
+
+            </div>
+            <div style={styles.statCard}>
+              <div style={styles.statNumber}>{dashboard.performance.accepted}</div>
+              <div style={styles.statLabel}>Accepted</div>
+            </div>
+
+            <div style={styles.statCard}>
+              <div style={styles.statNumber}>{dashboard.performance.rejected}</div>
+              <div style={styles.statLabel}>Rejected</div>
+            </div>
+
+            <div style={styles.statCard}>
+              <div style={styles.statNumber}>{dashboard.performance.successRate}%</div>
+              <div style={styles.statLabel}>Success Rate</div>
+            </div>
+
+            <div style={styles.statCard}>
+              <div style={styles.statNumber}>{dashboard.performance.acceptanceRate}%</div>
+              <div style={styles.statLabel}>Acceptance Rate</div>
             </div>
           </div>
         </div>
@@ -227,46 +282,91 @@ const ShipperHomePage = () => {
               </div>
             </div>
           </div>
-          {/* Status Update */}
-          {selectedOrder.orderStatus === "SHIPPED" && (
-            <div style={styles.card}>
-              <h4 style={styles.cardTitle}>Assignment Response</h4>
 
-              <div style={{ display: "flex", gap: "1rem" }}>
-                <button
-                  onClick={() => handleRespondAssignment("ACCEPT")}
-                  disabled={loading}
-                  style={{
-                    backgroundColor: "#2ecc71",
-                    color: "#fff",
-                    padding: "0.75rem 1.5rem",
-                    border: "none",
-                    borderRadius: "4px",
-                    fontWeight: "bold",
-                    cursor: "pointer"
-                  }}
-                >
-                  ✅ Accept
-                </button>
+          {/* Delivery Proof Upload */}
+          {selectedOrder?.orderStatus === "SHIPPED" &&
+            selectedOrder?.assignmentStatus === "ACCEPTED" && (
+              <div style={styles.card}>
+                <h4 style={styles.cardTitle}>Delivery Proof</h4>
 
-                <button
-                  onClick={() => handleRespondAssignment("REJECT")}
-                  disabled={loading}
-                  style={{
-                    backgroundColor: "#e74c3c",
-                    color: "#fff",
-                    padding: "0.75rem 1.5rem",
-                    border: "none",
-                    borderRadius: "4px",
-                    fontWeight: "bold",
-                    cursor: "pointer"
-                  }}
-                >
-                  ❌ Reject
-                </button>
+                {selectedOrder.deliveryProof?.imageUrl ? (
+                  <div>
+                    <img
+                      src={`http://localhost:5000${selectedOrder.deliveryProof.imageUrl}`}
+                      alt="Proof"
+                      style={{ width: "200px", borderRadius: "8px" }}
+                    />
+                    <p style={{ color: "#2ecc71", marginTop: "0.5rem" }}>
+                      ✅ Proof uploaded
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setProofFile(e.target.files[0])}
+                    />
+                    <button
+                      onClick={handleUploadProof}
+                      disabled={uploading}
+                      style={{
+                        marginTop: "1rem",
+                        backgroundColor: "#3498db",
+                        color: "#fff",
+                        padding: "0.5rem 1rem",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {uploading ? "Uploading..." : "Upload Proof"}
+                    </button>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          {/* Status Update */}
+          {selectedOrder?.orderStatus === "SHIPPED" &&
+            selectedOrder?.assignmentStatus === "PENDING" && (
+              <div style={styles.card}>
+                <h4 style={styles.cardTitle}>Assignment Response</h4>
+
+                <div style={{ display: "flex", gap: "1rem" }}>
+                  <button
+                    onClick={() => handleRespondAssignment("ACCEPT")}
+                    disabled={loading}
+                    style={{
+                      backgroundColor: "#2ecc71",
+                      color: "#fff",
+                      padding: "0.75rem 1.5rem",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontWeight: "bold",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ✅ Accept
+                  </button>
+
+                  <button
+                    onClick={() => handleRespondAssignment("REJECT")}
+                    disabled={loading}
+                    style={{
+                      backgroundColor: "#e74c3c",
+                      color: "#fff",
+                      padding: "0.75rem 1.5rem",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontWeight: "bold",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ❌ Reject
+                  </button>
+                </div>
+              </div>
+            )}
           {/* Status Update */}
           <div style={styles.card}>
             <h4 style={styles.cardTitle}>Update Order Status</h4>
@@ -291,7 +391,10 @@ const ShipperHomePage = () => {
               </div>
               <button
                 onClick={handleUpdateStatus}
-                disabled={loading}
+                disabled={
+                  loading ||
+                  (newStatus === "DELIVERED" && !selectedOrder.deliveryProof?.imageUrl)
+                }
                 style={styles.updateButton}
               >
                 {loading ? 'Updating...' : 'Update Status'}
@@ -345,7 +448,7 @@ const ShipperHomePage = () => {
                     <div style={{
                       display: 'flex',
                       gap: '8px',
-                      flexWrap: 'wrap'  
+                      flexWrap: 'wrap'
                     }}>
                       <span
                         style={{

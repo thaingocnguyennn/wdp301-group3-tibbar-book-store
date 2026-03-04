@@ -285,7 +285,28 @@ const OrderDetailPage = () => {
           ))}
         </div>
       </div>
+      {/* Delivery Proof */}
+      {order.orderStatus === "DELIVERED" && order.deliveryProof?.imageUrl && (
+        <div style={styles.sectionCard}>
+          <h3 style={styles.sectionTitle}>
+            <span style={styles.sectionIcon}>📸</span>
+            Delivery Proof
+          </h3>
 
+          <div style={styles.deliveryProofContainer}>
+            <img
+              src={`http://localhost:5000${order.deliveryProof.imageUrl}`}
+              alt="Delivery Proof"
+              style={styles.deliveryProofImage}
+            />
+
+            <p style={styles.deliveryProofTime}>
+              Uploaded at:{" "}
+              {new Date(order.deliveryProof.uploadedAt).toLocaleString("vi-VN")}
+            </p>
+          </div>
+        </div>
+      )}
       {/* Summary */}
       <div style={styles.summaryCard}>
         <h3 style={styles.sectionTitle}>
@@ -764,6 +785,25 @@ const styles = {
     fontWeight: 600,
     fontSize: "0.9rem",
     transition: "all 0.2s",
+  },
+  deliveryProofContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.75rem",
+  },
+
+  deliveryProofImage: {
+    width: "100%",
+    maxWidth: "420px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+  },
+
+  deliveryProofTime: {
+    fontSize: "0.85rem",
+    color: "#64748b",
   },
 };
 

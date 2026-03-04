@@ -8,7 +8,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { wishlist } = useWishlist();
   const { cart } = useCart();
-
+  const isShipper = user?.role?.toLowerCase() === "shipper";
   const cartCount = Array.isArray(cart?.items) ? cart.items.length : 0;
 
   const handleLogout = async () => {
@@ -46,13 +46,16 @@ const Navbar = () => {
                 My Orders
               </Link>
 
+              {isShipper && (
+                <Link to="/assignment-history" style={styles.link}>
+                  Assignment History
+                </Link>
+              )}
+
               <Link to="/wishlist" style={styles.link}>
                 Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
               </Link>
-              
-              <Link to="/recently-viewed" style={styles.link}>
-                Recently Viewed
-              </Link>
+
               <Link to="/cart" style={styles.link}>
                 Cart {cartCount > 0 && `(${cartCount})`}
               </Link>
