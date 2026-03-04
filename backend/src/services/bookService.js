@@ -3,7 +3,7 @@ import Category from '../models/Category.js';
 import Order from '../models/Order.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, PAGINATION, BOOK_VISIBILITY } from '../config/constants.js';
-
+import User from '../models/User.js';
 class BookService {
   async getPublicBooks(filters = {}) {
     const {
@@ -254,6 +254,50 @@ class BookService {
 
     return book;
   }
+  /* =======================================================
+    RECENTLY VIEWED
+ ======================================================= */
+  // Phương thức để lấy danh sách sách đã xem gần đây của người dùng
+  async addToRecentlyViewed(userId, bookId) {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    // Nếu chưa có mảng thì khởi tạo
+    if (!user.recentlyViewed) {
+      user.recentlyViewed = [];
+    }
+
+    // Remove duplicate
+    user.recentlyViewed = user.recentlyViewed.filter(
+      id => id.toString() !== bookId.toString()
+    );
+
+    // Add to beginning
+    user.recentlyViewed.unshift(bookId);
+
+    // Keep max 5
+    user.recentlyViewed = user.recentlyViewed.slice(0, 5);
+
+    await user.save();
+  }
+  // Phương thức để lấy danh sách sách đã xem gần đây của người dùng
+  async getRecentlyViewed(userId) {
+    const user = await User.findById(userId)
+      .populate({
+        path: 'recentlyViewed',
+        populate: {
+          path: 'category',
+          select: 'name'
+        }
+      });
+
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    return user.recentlyViewed;
+  }
+
 }
 
 export default new BookService();

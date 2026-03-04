@@ -103,30 +103,30 @@ class UserService {
   }
   async getShippers() {
     // 1️⃣ Lấy danh sách shipper
-    const shippers = await User.find({ role: "shipper" })
-      .select("email role createdAt")
-      .sort({ createdAt: -1 });
+    const shippers = await User.find({ role: "shipper" }) // Chỉ lấy những user có role là "shipper"
+      .select("email role createdAt")// Chỉ lấy những trường cần thiết để trả về cho client, tránh trả về thông tin nhạy cảm như password, refreshToken, v.v.
+      .sort({ createdAt: -1 });// Sắp xếp theo ngày tạo mới nhất trước để shipper mới được tạo sẽ hiển thị ở đầu danh sách
 
-    const shipperIds = shippers.map(s => s._id);
+    const shipperIds = shippers.map(s => s._id);// Lấy danh sách shipperId để dùng cho bước tiếp theo
 
     // 2️⃣ Đếm số order theo shipper
-    const orderCounts = await Order.aggregate([
+    const orderCounts = await Order.aggregate([// Sử dụng aggregation để đếm số lượng đơn hàng đã được giao thành công (DELIVERED) cho mỗi shipper
       {
-        $match: {
-          shipper: { $in: shipperIds }
+        $match: {// Lọc các order có shipper thuộc danh sách shipper
+          shipper: { $in: shipperIds }// Chỉ tính những đơn hàng có shipper là một trong những shipper trong danh sách shipperIds
         }
       },
       {
-        $group: {
+        $group: { //Gom theo shipper và đếm tổng số đơn
           _id: "$shipper",
           total: { $sum: 1 }
         }
       }
     ]);
 
-    // 3️⃣ Map shipperId → total orders
-    const countMap = {};
-    orderCounts.forEach(item => {
+    // 3️⃣ Map shipperId → total orders convert thành map 
+    const countMap = {};// Tạo một object để map shipperId với tổng số đơn hàng đã giao thành công của shipper đó, key là shipperId và value là tổng số đơn hàng
+    orderCounts.forEach(item => {// Duyệt qua kết quả đếm số đơn hàng theo shipper và lưu vào countMap để dễ lookup khi gộp dữ liệu với danh sách shipper
       countMap[item._id.toString()] = item.total;
     });
 

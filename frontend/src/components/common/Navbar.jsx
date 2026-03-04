@@ -49,7 +49,10 @@ const Navbar = () => {
               <Link to="/wishlist" style={styles.link}>
                 Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
               </Link>
-
+              
+              <Link to="/recently-viewed" style={styles.link}>
+                Recently Viewed
+              </Link>
               <Link to="/cart" style={styles.link}>
                 Cart {cartCount > 0 && `(${cartCount})`}
               </Link>

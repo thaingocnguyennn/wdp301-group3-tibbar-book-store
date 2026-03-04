@@ -177,12 +177,13 @@ class OrderController {
       next(err);
     }
   };
+
   assignShipper = async (req, res, next) => {
     try {
-      const { shipperId } = req.body;
-      const orderId = req.params.id;
+      const { shipperId } = req.body; // Lấy shipperId từ body thay vì params
+      const orderId = req.params.id;// Lấy orderId từ params
 
-      const order = await orderService.assignShipper(orderId, shipperId);
+      const order = await orderService.assignShipper(orderId, shipperId); // Gọi service để gán shipper cho đơn hàng
 
       return ApiResponse.success(
         res,
