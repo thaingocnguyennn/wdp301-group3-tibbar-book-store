@@ -64,6 +64,22 @@ class AdminOrderController {
       next(error);
     }
   }
+  async autoAssignShipper(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const order = await orderService.autoAssignShipper(id);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Auto assigned shipper successfully",
+        { order }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new AdminOrderController();
