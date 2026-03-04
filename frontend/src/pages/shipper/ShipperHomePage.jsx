@@ -38,6 +38,7 @@ const ShipperHomePage = () => {
         limit: 10,
         status: filterStatus || undefined
       });
+      console.log("ORDERS DATA:", response.data.orders); // 👈 THÊM DÒNG NÀY
       setOrders(response.data.orders || []);
     } catch (err) {
       setError('Failed to load orders');
@@ -84,7 +85,24 @@ const ShipperHomePage = () => {
       setLoading(false);
     }
   };
+  const handleRespondAssignment = async (action) => {
+    setLoading(true);
+    try {
+      await shipperApi.respondAssignment(selectedOrder._id, action);
 
+      setMessage(`Assignment ${action} successfully`);
+      setSelectedOrder(null);
+
+      await fetchOrders();
+      await fetchDashboard();
+
+      setTimeout(() => setMessage(''), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to respond assignment');
+    } finally {
+      setLoading(false);
+    }
+  };
   const getStatusBadgeColor = (status) => {
     const colors = {
       'PENDING': '#f39c12',
@@ -95,7 +113,14 @@ const ShipperHomePage = () => {
     };
     return colors[status] || '#95a5a6';
   };
-
+  const getAssignmentBadgeColor = (status) => {
+    const colors = {
+      'PENDING': '#f39c12',
+      'ACCEPTED': '#2ecc71',
+      'REJECTED': '#e74c3c'
+    };
+    return colors[status] || '#95a5a6';
+  };
   return (
     <div style={styles.container}>
       {/* Dashboard Summary */}
@@ -116,8 +141,8 @@ const ShipperHomePage = () => {
               <div style={styles.statLabel}>Shipped</div>
             </div>
             <div style={styles.statCard}>
-              <div style={styles.statNumber}>{dashboard.statistics.pendingOrders}</div>
-              <div style={styles.statLabel}>Pending</div>
+              <div style={styles.statNumber}>{dashboard.statistics.cancelledOrders}</div>
+              <div style={styles.statLabel}>Cancel</div>
             </div>
           </div>
         </div>
@@ -196,20 +221,59 @@ const ShipperHomePage = () => {
                 <span>Shipping Fee:</span>
                 <span>₫{selectedOrder.shippingFee.toLocaleString()}</span>
               </div>
-              <div style={{...styles.summaryRow, ...styles.totalRow}}>
+              <div style={{ ...styles.summaryRow, ...styles.totalRow }}>
                 <span><strong>Total:</strong></span>
                 <span><strong>₫{selectedOrder.total.toLocaleString()}</strong></span>
               </div>
             </div>
           </div>
+          {/* Status Update */}
+          {selectedOrder.orderStatus === "SHIPPED" && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Assignment Response</h4>
 
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button
+                  onClick={() => handleRespondAssignment("ACCEPT")}
+                  disabled={loading}
+                  style={{
+                    backgroundColor: "#2ecc71",
+                    color: "#fff",
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontWeight: "bold",
+                    cursor: "pointer"
+                  }}
+                >
+                  ✅ Accept
+                </button>
+
+                <button
+                  onClick={() => handleRespondAssignment("REJECT")}
+                  disabled={loading}
+                  style={{
+                    backgroundColor: "#e74c3c",
+                    color: "#fff",
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontWeight: "bold",
+                    cursor: "pointer"
+                  }}
+                >
+                  ❌ Reject
+                </button>
+              </div>
+            </div>
+          )}
           {/* Status Update */}
           <div style={styles.card}>
             <h4 style={styles.cardTitle}>Update Order Status</h4>
             <div style={styles.statusUpdateForm}>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Current Status:</label>
-                <span style={{...styles.statusBadge, backgroundColor: getStatusBadgeColor(selectedOrder.orderStatus)}}>
+                <span style={{ ...styles.statusBadge, backgroundColor: getStatusBadgeColor(selectedOrder.orderStatus) }}>
                   {selectedOrder.orderStatus}
                 </span>
               </div>
@@ -276,14 +340,34 @@ const ShipperHomePage = () => {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <span
-                      style={{
-                        ...styles.statusBadge,
-                        backgroundColor: getStatusBadgeColor(order.orderStatus)
-                      }}
-                    >
-                      {order.orderStatus}
-                    </span>
+
+                    {/* === STATUS BADGES (ORDER + ASSIGNMENT) === */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '8px',
+                      flexWrap: 'wrap'  
+                    }}>
+                      <span
+                        style={{
+                          ...styles.statusBadge,
+                          backgroundColor: getStatusBadgeColor(order.orderStatus)
+                        }}
+                      >
+                        {order.orderStatus}
+                      </span>
+
+                      {/* Assignment Status (THÊM MỚI) */}
+                      {order.assignmentStatus && (
+                        <span
+                          style={{
+                            ...styles.statusBadge,
+                            backgroundColor: getAssignmentBadgeColor(order.assignmentStatus)
+                          }}
+                        >
+                          {order.assignmentStatus}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div style={styles.orderCardContent}>
@@ -527,6 +611,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    flexWrap: 'wrap', // 👈 THÊM DÒNG NÀY
+    gap: '8px',       // 👈 thêm cho đẹp
     marginBottom: '1rem',
     paddingBottom: '1rem',
     borderBottom: '1px solid #ecf0f1'

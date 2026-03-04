@@ -1,12 +1,12 @@
 import shipperService from '../services/shipperService.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS } from '../config/constants.js';
-
+import orderService from "../services/orderService.js";
 class ShipperController {
   async getShipperOrders(req, res, next) {
     try {
       const { page, limit, status } = req.query;
-      const result = await shipperService.getShipperOrders(req.user.userId, {
+      const result = await shipperService.getShipperOrders(req.user._id, {
         page,
         limit,
         status
@@ -27,7 +27,7 @@ class ShipperController {
     try {
       const order = await shipperService.getOrderDetails(
         req.params.orderId,
-        req.user.userId
+        req.user._id
       );
 
       return ApiResponse.success(
@@ -55,7 +55,7 @@ class ShipperController {
 
       const order = await shipperService.updateOrderStatus(
         req.params.orderId,
-        req.user.userId,
+        req.user._id,
         status
       );
 
@@ -72,7 +72,7 @@ class ShipperController {
 
   async getShipperProfile(req, res, next) {
     try {
-      const result = await shipperService.getShipperProfile(req.user.userId);
+      const result = await shipperService.getShipperProfile(req.user._id);
 
       return ApiResponse.success(
         res,
@@ -94,6 +94,26 @@ class ShipperController {
         HTTP_STATUS.OK,
         'Shipper dashboard retrieved successfully',
         dashboard
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async respondAssignment(req, res, next) {
+    try {
+      const { action } = req.body;
+
+      const result = await orderService.respondAssignment(
+        req.params.orderId,
+        req.user._id,
+        action
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Respond assignment successfully",
+        result
       );
     } catch (error) {
       next(error);

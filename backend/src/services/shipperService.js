@@ -75,9 +75,21 @@ class ShipperService {
       throw new ApiError(403, 'You do not have access to this order');
     }
 
-    // Update delivery timestamp if delivered
-    if (newStatus === 'DELIVERED' && !order.deliveredAt) {
-      order.deliveredAt = new Date();
+    // ✅ Nếu chuyển sang DELIVERED hoặc CANCELLED
+    if (['DELIVERED', 'CANCELLED'].includes(newStatus)) {
+
+      // chỉ trừ nếu trước đó là đơn đang active
+      if (['SHIPPED', 'PROCESSING'].includes(order.orderStatus)) {
+
+        await User.findByIdAndUpdate(shipperId, {
+          $inc: { currentOrders: -1 }
+        });
+
+      }
+
+      if (newStatus === 'DELIVERED' && !order.deliveredAt) {
+        order.deliveredAt = new Date();
+      }
     }
 
     order.orderStatus = newStatus;
@@ -141,9 +153,9 @@ class ShipperService {
       shipper: shipperId,
       orderStatus: 'SHIPPED'
     });
-    const pendingOrders = await Order.countDocuments({
+    const cancelledOrders = await Order.countDocuments({
       shipper: shipperId,
-      orderStatus: { $in: ['PENDING', 'PROCESSING'] }
+      orderStatus: 'CANCELLED'
     });
 
     // Get recent orders
@@ -157,7 +169,7 @@ class ShipperService {
         totalOrders,
         deliveredOrders,
         shippedOrders,
-        pendingOrders
+        cancelledOrders
       },
       recentOrders
     };
