@@ -87,8 +87,26 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  addresses: [addressSchema],
+  addresses: {
+    type: [addressSchema],
+    default: [],
+  },
 
+
+
+  // 🔹 Chỉ dùng cho SHIPPER
+  currentOrders: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+
+  //Thư viện sách đã xem gần đây...
   //Thư viện sách đã xem gần đây, lưu trữ ID của sách để dễ dàng truy xuất thông tin khi cần thiết
   recentlyViewed: {
     type: [{
@@ -97,10 +115,7 @@ const userSchema = new mongoose.Schema({
     }],
     default: []
   },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
+
   refreshToken: {
     type: String,
     select: false

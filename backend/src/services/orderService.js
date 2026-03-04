@@ -6,7 +6,7 @@ import Voucher from "../models/Voucher.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
-
+import { ROLES } from "../config/constants.js";
 class OrderService {
   normalizeDateBoundary(dateString, isEndOfDay = false) {
     const parsedDate = new Date(dateString);
@@ -78,7 +78,7 @@ class OrderService {
         continue;
       }
       // validate stock before create order
-      if (item.book.stock < item.quantity) { 
+      if (item.book.stock < item.quantity) {
         validationErrors.push({
           message: `Not enough stock. Available: ${item.book.stock}`,
           book: item.book.title,
@@ -337,7 +337,8 @@ class OrderService {
       notes,
       transactionId: paymentResult.transactionId || null,
     });
-
+    // 🚀 AUTO ASSIGN NGAY
+    await this.autoAssignShipper(order._id);
     // Update book stock safely + prevent overselling
     for (const item of validItems) { //Chỉ cập nhật nếu còn đủ stock, tránh overselling
       const updatedBook = await Book.findOneAndUpdate(  //Chỉ cập nhật nếu còn đủ stock, tránh overselling
@@ -352,7 +353,7 @@ class OrderService {
       );
 
       if (!updatedBook) { // Nếu không tìm thấy hoặc không đủ stock, throw error
-        throw ApiError.badRequest( 
+        throw ApiError.badRequest(
           `Product "${item.book.title}" is out of stock or not enough quantity available.`
         );
       }
@@ -508,39 +509,25 @@ class OrderService {
     }
 
     const order = await Order.findById(orderId);
+    if (!order) throw ApiError.notFound("Order not found");
 
-    if (!order) {
-      throw ApiError.notFound("Order not found");
-    }
+    const oldStatus = order.orderStatus;
 
     order.orderStatus = status;
 
     if (status === "DELIVERED" && !order.deliveredAt) {
       order.deliveredAt = new Date();
+
+      // 🚀 TRỪ currentOrders
+      if (order.shipper) {
+        await User.findByIdAndUpdate(order.shipper, {
+          $inc: { currentOrders: -1 }
+        });
+      }
     }
 
     await order.save();
-
     await order.populate("items.book user");
-
-    return order;
-  }
-
-  // Get order by ID
-  async getOrderById(orderId, userId) {
-    const order = await Order.findById(orderId)
-      .populate("items.book")
-      .populate("user", "name email")
-      .lean();
-
-    if (!order) {
-      throw ApiError.notFound("Order not found");
-    }
-
-    // Verify order belongs to user (unless admin - will add admin check later)
-    if (order.user._id.toString() !== userId.toString()) {
-      throw ApiError.forbidden("You are not authorized to view this order");
-    }
 
     return order;
   }
@@ -677,7 +664,18 @@ class OrderService {
     };
   }
 
+  async getOrderById(orderId) {
+    const order = await Order.findById(orderId)
+      .populate("user", "email firstName lastName")
+      .populate("shipper", "email firstName lastName")
+      .populate("items.book");
 
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    return order;
+  }
 
   async assignShipper(orderId, shipperId) { // Lấy orderId và shipperId từ tham số hàm
     const shipper = await User.findById(shipperId);// Tìm shipper trong database
@@ -707,7 +705,65 @@ class OrderService {
     return order;
   }
 
+  // Tự động gán shipper cho đơn hàng dựa trên địa chỉ giao hàng và khu vực phục vụ của shipper
 
+  async autoAssignShipper(orderId) {
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) throw ApiError.notFound("Order not found");
+
+      if (order.shipper) {
+        throw ApiError.badRequest("Order already assigned");
+      }
+
+      // ✅ LẤY ĐỊA CHỈ TỪ SNAPSHOT TRONG ORDER
+      const { province, district } = order.shippingAddress;
+
+      if (!province || !district) {
+        throw ApiError.badRequest("Shipping address incomplete");
+      }
+      console.log("Looking for shipper with:");
+      console.log("Province:", province);
+      console.log("District:", district);
+      console.log("Role:", ROLES.SHIPPER);
+      // 🔎 1️⃣ Tìm shipper cùng district + chưa đủ 5 đơn
+      let shipper = await User.findOne({
+        role: ROLES.SHIPPER,
+        isActive: true,
+        currentOrders: { $lt: 5 },
+        addresses: {
+          $elemMatch: {
+            province: province.trim(),
+            district: district.trim(),
+          },
+        },
+      }).sort({ currentOrders: 1 });
+
+      if (!shipper) {
+        console.log("❌ No shipper found for exact province + district match");
+        return order; // không assign
+      }
+      // ✅ Assign
+      order.shipper = shipper._id;
+      order.assignedAt = new Date();
+      order.orderStatus = "SHIPPED";
+
+      await order.save();
+
+      // ✅ Tăng số đơn hiện tại của shipper
+      await User.findByIdAndUpdate(shipper._id, {
+        $inc: { currentOrders: 1 },
+      });
+
+      await order.populate("shipper", "email firstName lastName");
+
+      return order;
+
+    } catch (error) {
+      throw error;
+    }
+  }
 
 
 }
