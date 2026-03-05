@@ -2,7 +2,7 @@ import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, ROLES } from '../config/constants.js';
 import Order from "../models/Order.js";
-
+import orderService from "./orderService.js";
 class UserService {
   async getProfile(userId) {
     const user = await User.findById(userId);
@@ -103,38 +103,48 @@ class UserService {
   }
   async getShippers() {
     // 1️⃣ Lấy danh sách shipper
-    const shippers = await User.find({ role: "shipper" }) // Chỉ lấy những user có role là "shipper"
-      .select("email role createdAt")// Chỉ lấy những trường cần thiết để trả về cho client, tránh trả về thông tin nhạy cảm như password, refreshToken, v.v.
-      .sort({ createdAt: -1 });// Sắp xếp theo ngày tạo mới nhất trước để shipper mới được tạo sẽ hiển thị ở đầu danh sách
+    const shippers = await User.find({ role: "shipper" })
+      .select("email role createdAt")
+      .sort({ createdAt: -1 });
 
-    const shipperIds = shippers.map(s => s._id);// Lấy danh sách shipperId để dùng cho bước tiếp theo
+    const shipperIds = shippers.map(s => s._id);
 
-    // 2️⃣ Đếm số order theo shipper
-    const orderCounts = await Order.aggregate([// Sử dụng aggregation để đếm số lượng đơn hàng đã được giao thành công (DELIVERED) cho mỗi shipper
+    // 2️⃣ Đếm tổng số order đã được assign cho shipper
+    const orderCounts = await Order.aggregate([
       {
-        $match: {// Lọc các order có shipper thuộc danh sách shipper
-          shipper: { $in: shipperIds }// Chỉ tính những đơn hàng có shipper là một trong những shipper trong danh sách shipperIds
+        $match: {
+          shipper: { $in: shipperIds }
         }
       },
       {
-        $group: { //Gom theo shipper và đếm tổng số đơn
+        $group: {
           _id: "$shipper",
           total: { $sum: 1 }
         }
       }
     ]);
 
-    // 3️⃣ Map shipperId → total orders convert thành map 
-    const countMap = {};// Tạo một object để map shipperId với tổng số đơn hàng đã giao thành công của shipper đó, key là shipperId và value là tổng số đơn hàng
-    orderCounts.forEach(item => {// Duyệt qua kết quả đếm số đơn hàng theo shipper và lưu vào countMap để dễ lookup khi gộp dữ liệu với danh sách shipper
+    const countMap = {};
+    orderCounts.forEach(item => {
       countMap[item._id.toString()] = item.total;
     });
 
-    // 4️⃣ Gộp dữ liệu
-    return shippers.map(shipper => ({
-      ...shipper.toObject(),
-      assignedOrders: countMap[shipper._id.toString()] || 0
-    }));
+    // 🔥 3️⃣ TÍNH PERFORMANCE CHO TỪNG SHIPPER
+    const result = [];
+
+    for (const shipper of shippers) {
+
+      const performance = await orderService.getShipperPerformance(shipper._id);
+
+      result.push({
+        ...shipper.toObject(),
+        assignedOrders: countMap[shipper._id.toString()] || 0,
+        acceptanceRate: performance.acceptanceRate,
+        successRate: performance.successRate
+      });
+    }
+
+    return result;
   }
 
   async changePassword(userId, currentPassword, newPassword) {
