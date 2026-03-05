@@ -13,7 +13,7 @@ const AssignmentHistoryPage = () => {
 
   const fetchOrders = async () => {
     try {
-      const res = await axiosInstance.get("/shipper/orders");
+      const res = await axiosInstance.get("/shipper/assignment-history");
       setOrders(res.data.data.orders || []);
     } catch (err) {
       console.error("Error fetching assignment history:", err);
@@ -31,7 +31,9 @@ const AssignmentHistoryPage = () => {
       {orders.length === 0 && <p>No assignments yet.</p>}
 
       {orders.map((order) => {
-        const history = order.assignmentHistory || [];
+        const history = (order.assignmentHistory || []).filter(
+          (item) => item.shipper?.toString() === user._id
+        );
 
         return (
           <div
@@ -57,8 +59,8 @@ const AssignmentHistoryPage = () => {
                     item.status === "ACCEPTED"
                       ? "#e6ffed"
                       : item.status === "REJECTED"
-                      ? "#ffe6e6"
-                      : "#f4f4f4",
+                        ? "#ffe6e6"
+                        : "#f4f4f4",
                   borderRadius: 6,
                 }}
               >

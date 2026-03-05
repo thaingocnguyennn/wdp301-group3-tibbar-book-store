@@ -841,18 +841,19 @@ class OrderService {
       }
 
       order.rejectedShippers.push(shipperId);
-      // ===== UPDATE LAST HISTORY =====
-      if (!order.assignmentHistory) {
-        order.assignmentHistory = [];
+      
+      // ===== UPDATE LAST HISTORY CỦA ĐÚNG SHIPPER =====
+      const lastAssignment = [...order.assignmentHistory]
+        .reverse()
+        .find(a =>
+          a.shipper.toString() === shipperId.toString() &&
+          a.status === "PENDING"
+        );
+
+      if (lastAssignment) {
+        lastAssignment.status = "REJECTED";
+        lastAssignment.respondedAt = new Date();
       }
-
-      const lastIndex = order.assignmentHistory.length - 1;
-
-      if (lastIndex >= 0) {
-        order.assignmentHistory[lastIndex].status = "REJECTED";
-        order.assignmentHistory[lastIndex].respondedAt = new Date();
-      }
-
       // ⚡ BẮT BUỘC MARK MODIFIED
       order.markModified("assignmentHistory");
 
@@ -925,7 +926,7 @@ class OrderService {
 
     throw ApiError.badRequest("Invalid action");
   }
-  // Lấy lịch sử phân công của shipper (danh sách các đơn hàng đã từng được phân công, bao gồm cả thông tin đơn hàng và trạng thái phân công)
+  // Lấy hiệu suất làm việc của shipper dựa trên lịch sử phân công (tỷ lệ chấp nhận, từ chối, giao thành công)
   async getShipperPerformance(shipperId) {
 
     const orders = await Order.find({
@@ -997,6 +998,20 @@ class OrderService {
       delivered,
       acceptanceRate,
       successRate
+    };
+  }
+  // Lấy lịch sử phân công của shipper, bao gồm tất cả đơn hàng từng được phân công (dù đã accept hay reject), trạng thái phân công và thông tin đơn hàng
+  async getAssignmentHistory(shipperId) {
+    const orders = await Order.find({
+      "assignmentHistory.shipper": shipperId
+    })
+      .populate("items.book")
+      .populate("user", "email firstName lastName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      orders
     };
   }
 }
