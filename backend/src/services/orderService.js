@@ -7,7 +7,7 @@ import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
 import { ROLES } from "../config/constants.js";
-import mongoose from "mongoose";
+
 const MAX_ORDERS = 20;
 class OrderService {
   normalizeDateBoundary(dateString, isEndOfDay = false) {
@@ -689,8 +689,16 @@ class OrderService {
     if (!order) { // Kiểm tra nếu không tìm thấy order
       throw ApiError.notFound("Order not found");// Trả về lỗi nếu không tìm thấy order
     }
+    // ⭐ THÊM ĐOẠN NÀY
+    const { province, district } = order.shippingAddress || {};
 
-    // ❌ Không cho assign lại
+    const matchAddress = shipper.addresses?.some(addr =>
+      addr.province?.trim() === province?.trim() &&
+      addr.district?.trim() === district?.trim()
+    );
+    if (!matchAddress) {
+      throw ApiError.badRequest("Shipper does not serve this area");
+    }
     if (order.shipper) {
       throw ApiError.badRequest("Order already assigned to a shipper");
     }
@@ -712,7 +720,7 @@ class OrderService {
       status: "PENDING"
     });
     await order.save(); // Lưu order sau khi gán shipper
-    await User.findByIdAndUpdate(shipperId, {
+    await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 }
     });
     await order.populate("shipper", "email");// Populate thông tin shipper (chỉ lấy email)
@@ -789,9 +797,8 @@ class OrderService {
 
     // tăng số đơn hiện tại
     await User.findByIdAndUpdate(shipper._id, {
-      $inc: { currentOrders: 1 },
+      $inc: { currentOrders: 1 }
     });
-
     await order.populate("shipper", "email firstName lastName");
 
     console.log("✅ Assigned to shipper:", shipper.email);
@@ -840,8 +847,10 @@ class OrderService {
         order.rejectedShippers = [];
       }
 
-      order.rejectedShippers.push(shipperId);
-      
+      if (!order.rejectedShippers.includes(shipperId)) {
+        order.rejectedShippers.push(shipperId);
+      }
+
       // ===== UPDATE LAST HISTORY CỦA ĐÚNG SHIPPER =====
       const lastAssignment = [...order.assignmentHistory]
         .reverse()
@@ -867,11 +876,11 @@ class OrderService {
       const { province, district } = order.shippingAddress;
 
       // 3️⃣ Tìm shipper KHÔNG nằm trong rejectedShippers
-      const newShipper = await User.find({
+      const newShipper = await User.findOne({
         role: ROLES.SHIPPER,
         isActive: true,
         currentOrders: { $lt: MAX_ORDERS },
-        _id: { $nin: order.rejectedShippers }, // 🔥 CHỖ QUAN TRỌNG
+        _id: { $nin: order.rejectedShippers || [] }, // 🔥 CHỖ QUAN TRỌNG
         addresses: {
           $elemMatch: {
             province: province.trim(),
@@ -880,13 +889,14 @@ class OrderService {
         }
       }).sort({ currentOrders: 1 });
 
-      if (!newShipper || newShipper.length === 0) {
+      if (!newShipper) {
 
         console.log("⚠ All shippers rejected. Resetting order...");
 
         order.shipper = null;
-        order.assignmentStatus = null;
+
         order.orderStatus = "PENDING";
+        order.assignmentStatus = null;
         order.assignedAt = null;
 
         await order.save();
@@ -894,7 +904,7 @@ class OrderService {
         return order;
       }
 
-      const nextShipper = newShipper[0];
+      const nextShipper = newShipper;
 
       order.shipper = nextShipper._id;
       order.assignmentStatus = "PENDING";
@@ -937,7 +947,7 @@ class OrderService {
     let accepted = 0;
     let rejected = 0;
     let delivered = 0;
-
+    let cancelled = 0;
     for (const order of orders) {
 
       // Lấy tất cả history của shipper này trong order
@@ -972,6 +982,12 @@ class OrderService {
         ) {
           delivered++;
         }
+        if (
+          order.orderStatus === "CANCELLED" &&
+          order.shipper?.toString() === shipperId.toString()
+        ) {
+          cancelled++;
+        }
       }
 
       if (rejectedHistory) {
@@ -987,8 +1003,8 @@ class OrderService {
 
     // 📊 Success Rate (chuẩn thực tế)
     const successRate =
-      accepted > 0
-        ? ((delivered / accepted) * 100).toFixed(1)
+      (delivered + cancelled) > 0
+        ? ((delivered / (delivered + cancelled)) * 100).toFixed(1)
         : 0;
 
     return {
@@ -996,6 +1012,7 @@ class OrderService {
       accepted,
       rejected,
       delivered,
+      cancelled,
       acceptanceRate,
       successRate
     };
