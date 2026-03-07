@@ -30,7 +30,9 @@ const Navbar = () => {
           <Link to="/newest" style={styles.link}>
             ✨ Newest
           </Link>
-
+          <Link to="/recently-viewed" style={styles.link}>
+            🕒 Recently Viewed
+          </Link>
           {isAdmin && (
             <Link to="/admin/dashboard" style={styles.link}>
               Admin Dashboard
