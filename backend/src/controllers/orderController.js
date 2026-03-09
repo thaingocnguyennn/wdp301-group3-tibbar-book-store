@@ -7,13 +7,14 @@ class OrderController {
   async createOrder(req, res, next) {
     try {
       const userId = req.user._id;
-      const { paymentMethod, shippingAddressId, voucherId, voucherCode, notes } = req.body;
+      const { paymentMethod, shippingAddressId, voucherId, voucherCode, useCoin, notes } = req.body;
       const ipAddress = req.headers["x-forwarded-for"] || req.connection.remoteAddress || "127.0.0.1";
 
       console.log("🛒 [OrderController] Create order request:", {
         userId,
         userEmail: req.user.email,
         paymentMethod,
+        useCoin,
         timestamp: new Date().toISOString()
       });
 
@@ -22,6 +23,7 @@ class OrderController {
         shippingAddressId,
         voucherId,
         voucherCode,
+        useCoin,
         notes,
         ipAddress,
       });

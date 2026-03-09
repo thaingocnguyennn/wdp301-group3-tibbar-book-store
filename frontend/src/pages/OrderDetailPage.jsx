@@ -326,6 +326,17 @@ const OrderDetailPage = () => {
               -{Number(order.discount || 0).toLocaleString("vi-VN")}₫
             </span>
           </div>
+          {order.coinsUsed > 0 && (
+            <div style={styles.summaryRow}>
+              <span style={styles.summaryLabel}>
+                <span style={styles.coinIcon}>💰</span>
+                Coins Used
+              </span>
+              <span style={{ ...styles.summaryValue, color: "#f39c12" }}>
+                -{Number(order.coinsUsed || 0).toLocaleString("vi-VN")}₫
+              </span>
+            </div>
+          )}
           <div style={styles.summaryRow}>
             <span style={styles.summaryLabel}>Shipping Fee</span>
             <span style={styles.summaryValue}>
@@ -746,6 +757,10 @@ const styles = {
     fontSize: "0.95rem",
     color: "#1e293b",
     fontWeight: 500,
+  },
+  coinIcon: {
+    marginRight: "0.3rem",
+    fontSize: "0.85rem",
   },
   summaryDivider: {
     height: "1px",

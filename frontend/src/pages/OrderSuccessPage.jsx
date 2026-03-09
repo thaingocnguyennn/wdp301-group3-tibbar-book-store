@@ -212,6 +212,14 @@ const OrderSuccessPage = () => {
                 -{order.discount.toLocaleString("vi-VN")}₫
               </span>
             </div>
+            {order.coinsUsed > 0 && (
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>💰 Coin Discount</span>
+                <span style={{ ...styles.summaryValue, color: "#f39c12" }}>
+                  -{order.coinsUsed.toLocaleString("vi-VN")}₫
+                </span>
+              </div>
+            )}
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Shipping Fee</span>
               <span style={styles.summaryValue}>
@@ -241,6 +249,19 @@ const OrderSuccessPage = () => {
               <p style={styles.codInfoText}>
                 You selected Cash on Delivery. Please prepare the exact amount of{" "}
                 <strong>{order.total.toLocaleString("vi-VN")}₫</strong> when you receive your order.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Coin Savings Info ─── */}
+        {order.coinsUsed > 0 && (
+          <div style={styles.coinSavingsBox}>
+            <div style={styles.coinSavingsIcon}>🎉</div>
+            <div>
+              <h4 style={styles.coinSavingsTitle}>Coins Applied!</h4>
+              <p style={styles.coinSavingsText}>
+                You saved <strong>{order.coinsUsed.toLocaleString("vi-VN")}₫</strong> using your coin balance on this order.
               </p>
             </div>
           </div>
@@ -598,6 +619,36 @@ const styles = {
     margin: "0 0 0.35rem",
   },
   codInfoText: {
+    color: "#92400e",
+    fontSize: "0.88rem",
+    margin: 0,
+    lineHeight: 1.55,
+  },
+
+  /* ─── Coin Savings Info ─── */
+  coinSavingsBox: {
+    display: "flex",
+    gap: "1rem",
+    alignItems: "flex-start",
+    margin: "0 2rem",
+    padding: "1.25rem",
+    backgroundColor: "#fff9e6",
+    border: "1px solid #f39c12",
+    borderRadius: "12px",
+    marginTop: "1.5rem",
+  },
+  coinSavingsIcon: {
+    fontSize: "1.5rem",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  coinSavingsTitle: {
+    fontSize: "0.95rem",
+    color: "#92400e",
+    fontWeight: 700,
+    margin: "0 0 0.35rem",
+  },
+  coinSavingsText: {
     color: "#92400e",
     fontSize: "0.88rem",
     margin: 0,

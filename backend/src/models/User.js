@@ -116,6 +116,22 @@ const userSchema = new mongoose.Schema({
     default: []
   },
 
+  // Coin system fields
+  coinBalance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  lastCheckIn: {
+    type: Date,
+    default: null
+  },
+  checkInStreak: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
   refreshToken: {
     type: String,
     select: false

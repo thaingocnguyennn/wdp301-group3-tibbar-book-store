@@ -57,7 +57,40 @@ class UserService {
     }
 
     const users = await User.find(filter).sort({ createdAt: -1 });
-    return users;
+
+    if (!users.length) {
+      return users;
+    }
+
+    const userIds = users.map((user) => user._id);
+
+    const coinUsage = await Order.aggregate([
+      {
+        $match: {
+          user: { $in: userIds },
+          coinsUsed: { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: "$user",
+          totalCoinsUsed: { $sum: "$coinsUsed" },
+        },
+      },
+    ]);
+
+    const coinUsageMap = {};
+    coinUsage.forEach((item) => {
+      coinUsageMap[item._id.toString()] = item.totalCoinsUsed;
+    });
+
+    return users.map((user) => {
+      const plainUser = user.toObject();
+      return {
+        ...plainUser,
+        totalCoinsUsed: coinUsageMap[user._id.toString()] || 0,
+      };
+    });
   }
 
   async updateUserRole(userId, newRole) {
