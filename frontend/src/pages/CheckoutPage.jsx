@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { orderApi } from "../api/orderApi";
 import { voucherApi } from "../api/voucherApi";
 import { addressApi } from "../api/addressApi";
+import { coinApi } from "../api/coinApi";
 import AvailableVouchers from "../components/payment/AvailableVouchers";
 
 const CheckoutPage = () => {
@@ -32,6 +33,11 @@ const CheckoutPage = () => {
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressesLoading, setAddressesLoading] = useState(true);
+
+  // Coin state
+  const [useCoin, setUseCoin] = useState(false);
+  const [coinStatus, setCoinStatus] = useState(null);
+  const [coinDiscount, setCoinDiscount] = useState(0);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -91,6 +97,20 @@ const CheckoutPage = () => {
     fetchPaymentMethods();
   }, []);
 
+  // Fetch coin status
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchCoinStatus = async () => {
+      try {
+        const response = await coinApi.getCoinStatus();
+        setCoinStatus(response.data);
+      } catch (err) {
+        console.error("Failed to fetch coin status:", err);
+      }
+    };
+    fetchCoinStatus();
+  }, [isAuthenticated]);
+
   // Calculate totals
   const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
@@ -115,19 +135,41 @@ const CheckoutPage = () => {
   }, [cart.items]);
 
   const totals = useMemo(() => {
-    if (!voucherTotals) {
-      return baseTotals;
+    let currentTotals = baseTotals;
+    
+    if (voucherTotals) {
+      currentTotals = {
+        ...baseTotals,
+        subtotal: Number(voucherTotals.subtotal || baseTotals.subtotal),
+        discount: Number(voucherTotals.discount || 0),
+        shippingFee: Number(voucherTotals.shippingFee || baseTotals.shippingFee),
+        total: Number(voucherTotals.total || baseTotals.total),
+        isFreeShipping: Number(voucherTotals.shippingFee || baseTotals.shippingFee) === 0,
+      };
     }
 
-    return {
-      ...baseTotals,
-      subtotal: Number(voucherTotals.subtotal || baseTotals.subtotal),
-      discount: Number(voucherTotals.discount || 0),
-      shippingFee: Number(voucherTotals.shippingFee || baseTotals.shippingFee),
-      total: Number(voucherTotals.total || baseTotals.total),
-      isFreeShipping: Number(voucherTotals.shippingFee || baseTotals.shippingFee) === 0,
-    };
-  }, [baseTotals, voucherTotals]);
+    // Apply coin discount
+    if (useCoin && coinDiscount > 0) {
+      currentTotals = {
+        ...currentTotals,
+        coinDiscount,
+        total: Math.max(0, currentTotals.total - coinDiscount),
+      };
+    }
+
+    return currentTotals;
+  }, [baseTotals, voucherTotals, useCoin, coinDiscount]);
+
+  // Calculate coin discount when useCoin changes
+  useEffect(() => {
+    if (useCoin && coinStatus) {
+      const orderTotal = voucherTotals?.total || baseTotals.total;
+      const maxCoinsUsable = Math.min(coinStatus.coinBalance, orderTotal);
+      setCoinDiscount(maxCoinsUsable);
+    } else {
+      setCoinDiscount(0);
+    }
+  }, [useCoin, coinStatus, baseTotals.total, voucherTotals]);
 
   // Validate cart
   const cartIsValid = useMemo(() => {
@@ -258,6 +300,7 @@ const CheckoutPage = () => {
         paymentMethod: selectedPaymentMethod,
         shippingAddressId: selectedAddressId,
         voucherCode: appliedVoucher?.code || null,
+        useCoin: useCoin,
         notes: notes.trim(),
       };
 
@@ -599,6 +642,28 @@ const CheckoutPage = () => {
               <span style={styles.summaryLabel}>Discount</span>
               <span style={{ ...styles.summaryValue, color: "#ef4444" }}>-{totals.discount.toLocaleString('vi-VN')}₫</span>
             </div>
+            
+            {/* Coin Usage Section */}
+            {coinStatus && coinStatus.coinBalance > 0 && (
+              <div style={styles.coinSection}>
+                <label style={styles.coinLabel}>
+                  <input
+                    type="checkbox"
+                    checked={useCoin}
+                    onChange={(e) => setUseCoin(e.target.checked)}
+                    style={styles.coinCheckbox}
+                  />
+                  <span>Use Coins (Balance: {coinStatus.coinBalance.toLocaleString('vi-VN')} coins)</span>
+                </label>
+                {useCoin && coinDiscount > 0 && (
+                  <div style={styles.summaryRow}>
+                    <span style={styles.summaryLabel}>Coin Discount</span>
+                    <span style={{ ...styles.summaryValue, color: "#f39c12" }}>-{coinDiscount.toLocaleString('vi-VN')}₫</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Shipping Fee</span>
               <span style={styles.summaryValue}>
@@ -1174,6 +1239,29 @@ const styles = {
     color: "#94a3b8",
     marginTop: "0.85rem",
     marginBottom: 0,
+  },
+
+  /* ─── Coin Section ─── */
+  coinSection: {
+    backgroundColor: "#fff9e6",
+    border: "1.5px solid #f39c12",
+    borderRadius: "8px",
+    padding: "0.75rem",
+    marginBottom: "0.75rem",
+  },
+  coinLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "0.88rem",
+    color: "#1e293b",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  coinCheckbox: {
+    width: "16px",
+    height: "16px",
+    cursor: "pointer",
   },
 
   /* ─── Empty / Loading ─── */

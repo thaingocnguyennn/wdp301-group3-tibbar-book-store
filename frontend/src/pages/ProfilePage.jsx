@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { userApi } from '../api/userApi';
+import { coinApi } from '../api/coinApi';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,8 +27,16 @@ const ProfilePage = () => {
   const [passwordError, setPasswordError] = useState('');
   const [profileUser, setProfileUser] = useState(null);
 
+  // Coin system states
+  const [coinStatus, setCoinStatus] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInMessage, setCheckInMessage] = useState('');
+  const [showTransactions, setShowTransactions] = useState(false);
+
   useEffect(() => {
     fetchProfile();
+    fetchCoinStatus();
   }, []);
 
   const fetchProfile = async () => {
@@ -43,6 +52,47 @@ const ProfilePage = () => {
     } catch (err) {
       setError('Failed to load profile');
     }
+  };
+
+  const fetchCoinStatus = async () => {
+    try {
+      const response = await coinApi.getCoinStatus();
+      setCoinStatus(response.data);
+    } catch (err) {
+      console.error('Failed to load coin status:', err);
+    }
+  };
+
+  const fetchTransactionHistory = async () => {
+    try {
+      const response = await coinApi.getTransactionHistory(1, 10);
+      setTransactions(response.data.transactions);
+    } catch (err) {
+      console.error('Failed to load transaction history:', err);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    setCheckInLoading(true);
+    setCheckInMessage('');
+    try {
+      const response = await coinApi.checkIn();
+      setCheckInMessage(`🎉 ${response.message} You received ${response.data.reward} coins!`);
+      await fetchCoinStatus();
+      await fetchTransactionHistory();
+      setTimeout(() => setCheckInMessage(''), 3000);
+    } catch (err) {
+      setCheckInMessage(err.response?.data?.message || 'Check-in failed');
+    } finally {
+      setCheckInLoading(false);
+    }
+  };
+
+  const toggleTransactions = async () => {
+    if (!showTransactions) {
+      await fetchTransactionHistory();
+    }
+    setShowTransactions(!showTransactions);
   };
 
   const handleChange = (e) => {
@@ -166,6 +216,60 @@ const ProfilePage = () => {
           <div style={styles.infoSection}>
             <p><strong>Email:</strong> {authUser?.email}</p>
             <p><strong>Role:</strong> {authUser?.role}</p>
+          </div>
+        )}
+
+        {/* Coin Reward Section */}
+        {!isChangingPassword && coinStatus && (
+          <div style={styles.coinSection}>
+            <div style={styles.coinHeader}>
+              <div>
+                <h3 style={styles.coinTitle}>💰 My Coins</h3>
+                <p style={styles.coinBalance}>{coinStatus.coinBalance.toLocaleString()} coins</p>
+                <p style={styles.coinStreak}>Current Streak: {coinStatus.currentStreak} day(s)</p>
+              </div>
+              <button 
+                onClick={handleCheckIn} 
+                disabled={!coinStatus.canCheckInToday || checkInLoading}
+                style={{
+                  ...styles.checkInButton,
+                  ...((!coinStatus.canCheckInToday || checkInLoading) && styles.checkInButtonDisabled)
+                }}
+              >
+                {checkInLoading ? 'Checking in...' : coinStatus.canCheckInToday ? '✓ Check In' : '✓ Checked In'}
+              </button>
+            </div>
+            {checkInMessage && (
+              <div style={styles.checkInMessage}>{checkInMessage}</div>
+            )}
+            <button 
+              onClick={toggleTransactions}
+              style={styles.transactionToggle}
+            >
+              {showTransactions ? 'Hide Transaction History' : 'View Transaction History'}
+            </button>
+            {showTransactions && (
+              <div style={styles.transactionList}>
+                {transactions.length === 0 ? (
+                  <p style={styles.noTransactions}>No transactions yet</p>
+                ) : (
+                  transactions.map((tx, index) => (
+                    <div key={index} style={styles.transactionItem}>
+                      <div>
+                        <p style={styles.transactionDesc}>{tx.description}</p>
+                        <p style={styles.transactionDate}>{new Date(tx.createdAt).toLocaleString()}</p>
+                      </div>
+                      <p style={{
+                        ...styles.transactionAmount,
+                        color: tx.amount > 0 ? '#27ae60' : '#e74c3c'
+                      }}>
+                        {tx.amount > 0 ? '+' : ''}{tx.amount}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -420,6 +524,107 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     marginTop: '1rem'
+  },
+  coinSection: {
+    backgroundColor: '#fff9e6',
+    border: '2px solid #f39c12',
+    padding: '1.5rem',
+    borderRadius: '8px',
+    marginBottom: '1.5rem'
+  },
+  coinHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem'
+  },
+  coinTitle: {
+    fontSize: '1.3rem',
+    color: '#f39c12',
+    margin: '0 0 0.5rem 0'
+  },
+  coinBalance: {
+    fontSize: '1.8rem',
+    fontWeight: 'bold',
+    color: '#e67e22',
+    margin: '0.25rem 0'
+  },
+  coinStreak: {
+    fontSize: '0.9rem',
+    color: '#7f8c8d',
+    margin: '0.25rem 0'
+  },
+  checkInButton: {
+    backgroundColor: '#27ae60',
+    color: '#fff',
+    padding: '0.75rem 1.5rem',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s'
+  },
+  checkInButtonDisabled: {
+    backgroundColor: '#95a5a6',
+    cursor: 'not-allowed',
+    opacity: 0.6
+  },
+  checkInMessage: {
+    backgroundColor: '#d4edda',
+    color: '#155724',
+    padding: '0.75rem',
+    borderRadius: '4px',
+    marginTop: '1rem',
+    fontWeight: '500'
+  },
+  transactionToggle: {
+    backgroundColor: '#3498db',
+    color: '#fff',
+    padding: '0.5rem 1rem',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    marginTop: '1rem'
+  },
+  transactionList: {
+    marginTop: '1rem',
+    maxHeight: '300px',
+    overflowY: 'auto',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    padding: '0.5rem'
+  },
+  transactionItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.75rem',
+    borderBottom: '1px solid #ecf0f1',
+    backgroundColor: '#fff'
+  },
+  transactionDesc: {
+    fontSize: '0.95rem',
+    color: '#2c3e50',
+    margin: '0 0 0.25rem 0',
+    fontWeight: '500'
+  },
+  transactionDate: {
+    fontSize: '0.8rem',
+    color: '#95a5a6',
+    margin: 0
+  },
+  transactionAmount: {
+    fontSize: '1.1rem',
+    fontWeight: 'bold',
+    margin: 0
+  },
+  noTransactions: {
+    textAlign: 'center',
+    color: '#7f8c8d',
+    padding: '1rem'
   }
 };
 

@@ -6,6 +6,7 @@ import Voucher from "../models/Voucher.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
+import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
 
 const MAX_ORDERS = 20;
@@ -107,19 +108,20 @@ class OrderService {
   }
 
   // Calculate order totals
-  calculateOrderTotals(items, voucherDiscount = 0, shippingFee = 0) {
+  calculateOrderTotals(items, voucherDiscount = 0, shippingFee = 0, coinDiscount = 0) {
     const subtotal = items.reduce((sum, item) => {
       return sum + item.book.price * item.quantity;
     }, 0);
 
     const discount = voucherDiscount;
-    const total = subtotal + shippingFee - discount;
+    const total = subtotal + shippingFee - discount - coinDiscount;
 
     return {
       subtotal: Math.round(subtotal * 100) / 100,
       discount: Math.round(discount * 100) / 100,
       shippingFee: Math.round(shippingFee * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      coinDiscount: Math.round(coinDiscount * 100) / 100,
+      total: Math.max(0, Math.round(total * 100) / 100), // Ensure total is never negative
     };
   }
 
@@ -224,6 +226,7 @@ class OrderService {
       shippingAddressId = null,
       voucherId = null,
       voucherCode = null,
+      useCoin = false,
       notes = "",
       ipAddress = "127.0.0.1",
     } = orderData;
@@ -280,7 +283,19 @@ class OrderService {
       orderAmount,
     );
 
-    const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee);
+    // Calculate coin discount if user wants to use coins
+    let coinsToUse = 0;
+    if (useCoin) {
+      const orderAmountAfterVoucher = orderAmount - voucherDiscount;
+      coinsToUse = coinService.calculateMaxCoinsUsable(user.coinBalance, orderAmountAfterVoucher);
+      console.log("💰 [OrderService] Coin usage:", {
+        userBalance: user.coinBalance,
+        orderAmountAfterVoucher,
+        coinsToUse
+      });
+    }
+
+    const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee, coinsToUse);
 
     // Generate order number
     const orderNumber = this.generateOrderNumber();
@@ -329,6 +344,7 @@ class OrderService {
       items: orderItems,
       subtotal: totals.subtotal,
       discount: totals.discount,
+      coinsUsed: coinsToUse,
       shippingFee: totals.shippingFee,
       total: totals.total,
       paymentMethod,
@@ -361,6 +377,16 @@ class OrderService {
       }
     }
 
+    // Deduct coins from user if coins were used
+    if (coinsToUse > 0) {
+      await coinService.deductCoins(
+        userId,
+        coinsToUse,
+        order._id,
+        `Used ${coinsToUse} coins for order ${orderNumber}`
+      );
+      console.log("💸 [OrderService] Deducted coins:", { coinsToUse, orderId: order._id });
+    }
 
     // Clear cart only after successful order creation
     await Cart.findByIdAndUpdate(cart._id, { items: [] });
