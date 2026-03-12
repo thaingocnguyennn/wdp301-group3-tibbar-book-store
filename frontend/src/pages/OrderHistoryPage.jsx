@@ -200,6 +200,29 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
+                    {/* Row 2.5: Price Breakdown (if discount or coins used) */}
+                    {(order.discount > 0 || order.coinsUsed > 0) && (
+                      <div style={styles.priceBreakdown}>
+                        {order.discount > 0 && (
+                          <span style={styles.breakdownItem}>
+                            <span style={styles.breakdownLabel}>Discount:</span>
+                            <span style={styles.breakdownValueDiscount}>
+                              -{Number(order.discount || 0).toLocaleString("vi-VN")}₫
+                            </span>
+                          </span>
+                        )}
+                        {order.coinsUsed > 0 && (
+                          <span style={styles.breakdownItem}>
+                            <span style={styles.breakdownLabel}>Coins:</span>
+                            <span style={styles.breakdownValueCoins}>
+                              -<span style={styles.coinIcon}>💰</span>
+                              {Number(order.coinsUsed || 0).toLocaleString("vi-VN")}₫
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Row 3: Status badges + actions */}
                     <div style={styles.cardBottomRow}>
                       <div style={styles.badgeGroup}>
@@ -513,6 +536,38 @@ const styles = {
     fontWeight: 800,
     color: "#1e293b",
     letterSpacing: "-0.01em",
+  },
+
+  /* ─── Price Breakdown ─── */
+  priceBreakdown: {
+    display: "flex",
+    gap: "1rem",
+    flexWrap: "wrap",
+    fontSize: "0.8rem",
+    paddingTop: "0.5rem",
+  },
+  breakdownItem: {
+    display: "flex",
+    gap: "0.4rem",
+    alignItems: "center",
+  },
+  breakdownLabel: {
+    color: "#64748b",
+    fontWeight: 500,
+  },
+  breakdownValueDiscount: {
+    color: "#ef4444",
+    fontWeight: 600,
+  },
+  breakdownValueCoins: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.2rem",
+    color: "#f39c12",
+    fontWeight: 600,
+  },
+  coinIcon: {
+    fontSize: "0.75rem",
   },
 
   cardBottomRow: {

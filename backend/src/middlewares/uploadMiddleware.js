@@ -35,7 +35,14 @@ const fileFilter = (req, file, cb) => {
     cb(new Error("Only image files are allowed"), false);
   }
 };
+// Tạo thư mục uploads/delivery-proofs nếu chưa tồn tại
+const deliveryUploadsDir = path.join(uploadsRoot, "delivery-proofs");
 
+[sliderUploadsDir, bookUploadsDir, deliveryUploadsDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 export const sliderUpload = multer({
   storage: createStorage(sliderUploadsDir),
   fileFilter,
@@ -44,6 +51,12 @@ export const sliderUpload = multer({
 
 export const bookUpload = multer({
   storage: createStorage(bookUploadsDir),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+// Middleware upload cho bằng chứng giao hàng của shipper
+export const deliveryProofUpload = multer({
+  storage: createStorage(deliveryUploadsDir),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });

@@ -34,7 +34,7 @@ const AdminWishlist = () => {
               </tr>
             </thead>
             <tbody>
-              {stats.map((item, index) => (
+              {stats.map((item, index) => ( //render bảng
                 <tr key={item.bookId}>
                   <td style={styles.td}>
                     {index === 0 && (

@@ -29,5 +29,29 @@ export const shipperApi = {
   updateOrderStatus: async (orderId, status) => {
     const response = await axiosInstance.put(`/shipper/orders/${orderId}/status`, { status });
     return response.data;
-  }
+  },
+  respondAssignment: async (orderId, action) => {
+    const response = await axiosInstance.post(
+      `/shipper/orders/${orderId}/respond`,
+      { action }
+    );
+    return response.data;
+  },
+  uploadDeliveryProof: async (orderId, formData) => {
+    const response = await axiosInstance.post(
+      `/shipper/orders/${orderId}/upload-proof`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+    return response.data;
+  },
+  // Get assignment history
+  getAssignmentHistory: async () => {
+  const response = await axiosInstance.get("/shipper/assignment-history");
+  return response.data;
+},
 };

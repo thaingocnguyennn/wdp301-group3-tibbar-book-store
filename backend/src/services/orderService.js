@@ -6,7 +6,10 @@ import Voucher from "../models/Voucher.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
+import coinService from "./coinService.js";
+import { ROLES } from "../config/constants.js";
 
+const MAX_ORDERS = 20;
 class OrderService {
   normalizeDateBoundary(dateString, isEndOfDay = false) {
     const parsedDate = new Date(dateString);
@@ -77,7 +80,7 @@ class OrderService {
         });
         continue;
       }
-
+      // validate stock before create order
       if (item.book.stock < item.quantity) {
         validationErrors.push({
           message: `Not enough stock. Available: ${item.book.stock}`,
@@ -105,19 +108,20 @@ class OrderService {
   }
 
   // Calculate order totals
-  calculateOrderTotals(items, voucherDiscount = 0, shippingFee = 0) {
+  calculateOrderTotals(items, voucherDiscount = 0, shippingFee = 0, coinDiscount = 0) {
     const subtotal = items.reduce((sum, item) => {
       return sum + item.book.price * item.quantity;
     }, 0);
 
     const discount = voucherDiscount;
-    const total = subtotal + shippingFee - discount;
+    const total = subtotal + shippingFee - discount - coinDiscount;
 
     return {
       subtotal: Math.round(subtotal * 100) / 100,
       discount: Math.round(discount * 100) / 100,
       shippingFee: Math.round(shippingFee * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      coinDiscount: Math.round(coinDiscount * 100) / 100,
+      total: Math.max(0, Math.round(total * 100) / 100), // Ensure total is never negative
     };
   }
 
@@ -222,6 +226,7 @@ class OrderService {
       shippingAddressId = null,
       voucherId = null,
       voucherCode = null,
+      useCoin = false,
       notes = "",
       ipAddress = "127.0.0.1",
     } = orderData;
@@ -278,7 +283,19 @@ class OrderService {
       orderAmount,
     );
 
-    const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee);
+    // Calculate coin discount if user wants to use coins
+    let coinsToUse = 0;
+    if (useCoin) {
+      const orderAmountAfterVoucher = orderAmount - voucherDiscount;
+      coinsToUse = coinService.calculateMaxCoinsUsable(user.coinBalance, orderAmountAfterVoucher);
+      console.log("💰 [OrderService] Coin usage:", {
+        userBalance: user.coinBalance,
+        orderAmountAfterVoucher,
+        coinsToUse
+      });
+    }
+
+    const totals = this.calculateOrderTotals(validItems, voucherDiscount, shippingFee, coinsToUse);
 
     // Generate order number
     const orderNumber = this.generateOrderNumber();
@@ -327,6 +344,7 @@ class OrderService {
       items: orderItems,
       subtotal: totals.subtotal,
       discount: totals.discount,
+      coinsUsed: coinsToUse,
       shippingFee: totals.shippingFee,
       total: totals.total,
       paymentMethod,
@@ -337,27 +355,38 @@ class OrderService {
       notes,
       transactionId: paymentResult.transactionId || null,
     });
-
-    // Update book stock safely (prevent overselling)
-    for (const item of validItems) {
-      const updatedBook = await Book.findOneAndUpdate(
+    // 🚀 AUTO ASSIGN NGAY
+    await this.autoAssignShipper(order._id);
+    // Update book stock safely + prevent overselling
+    for (const item of validItems) { //Chỉ cập nhật nếu còn đủ stock, tránh overselling
+      const updatedBook = await Book.findOneAndUpdate(  //Chỉ cập nhật nếu còn đủ stock, tránh overselling
         {
-          _id: item.book._id,
-          stock: { $gte: item.quantity }, // only update if enough stock
+          _id: item.book._id, // tìm đúng sách
+          stock: { $gte: item.quantity }, // chỉ cập nhật nếu còn đủ stock, tránh overselling
         },
         {
-          $inc: { stock: -item.quantity },
+          $inc: { stock: -item.quantity },// decrease stock by ordered quantity
         },
-        { new: true }
+        { new: true } //Trả về document sau khi cập nhật
       );
 
-      if (!updatedBook) {
+      if (!updatedBook) { // Nếu không tìm thấy hoặc không đủ stock, throw error
         throw ApiError.badRequest(
           `Product "${item.book.title}" is out of stock or not enough quantity available.`
         );
       }
     }
 
+    // Deduct coins from user if coins were used
+    if (coinsToUse > 0) {
+      await coinService.deductCoins(
+        userId,
+        coinsToUse,
+        order._id,
+        `Used ${coinsToUse} coins for order ${orderNumber}`
+      );
+      console.log("💸 [OrderService] Deducted coins:", { coinsToUse, orderId: order._id });
+    }
 
     // Clear cart only after successful order creation
     await Cart.findByIdAndUpdate(cart._id, { items: [] });
@@ -508,39 +537,25 @@ class OrderService {
     }
 
     const order = await Order.findById(orderId);
+    if (!order) throw ApiError.notFound("Order not found");
 
-    if (!order) {
-      throw ApiError.notFound("Order not found");
-    }
+    const oldStatus = order.orderStatus;
 
     order.orderStatus = status;
 
     if (status === "DELIVERED" && !order.deliveredAt) {
       order.deliveredAt = new Date();
+
+      // 🚀 TRỪ currentOrders
+      if (order.shipper) {
+        await User.findByIdAndUpdate(order.shipper, {
+          $inc: { currentOrders: -1 }
+        });
+      }
     }
 
     await order.save();
-
     await order.populate("items.book user");
-
-    return order;
-  }
-
-  // Get order by ID
-  async getOrderById(orderId, userId) {
-    const order = await Order.findById(orderId)
-      .populate("items.book")
-      .populate("user", "name email")
-      .lean();
-
-    if (!order) {
-      throw ApiError.notFound("Order not found");
-    }
-
-    // Verify order belongs to user (unless admin - will add admin check later)
-    if (order.user._id.toString() !== userId.toString()) {
-      throw ApiError.forbidden("You are not authorized to view this order");
-    }
 
     return order;
   }
@@ -642,55 +657,74 @@ class OrderService {
 
 
 
-  async getRevenue(range) {
-    const filter = { orderStatus: "DELIVERED" };
+  async getRevenue(range) { // Thống kê doanh thu, nếu range = "month" thì thống kê doanh thu trong tháng hiện tại, ngược lại thống kê toàn bộ
+    const filter = { orderStatus: "DELIVERED" };// Chỉ tính doanh thu từ những đơn hàng đã được giao thành công
 
-    const now = new Date();
+    const now = new Date();// Lấy ngày hiện tại để xác định khoảng thời gian thống kê
 
-    if (range === "month") {
-      filter.deliveredAt = {
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1),
+    if (range === "month") { // Nếu range là "month", chỉ thống kê doanh thu từ đầu tháng đến hiện tại
+      filter.deliveredAt = { // Chỉ tính những đơn hàng được giao trong tháng hiện tại
+        $gte: new Date(now.getFullYear(), now.getMonth(), 1),// Ngày đầu tiên của tháng hiện tại
       };
     }
 
-    const orders = await Order.find(filter);
+    const orders = await Order.find(filter);// Lấy tất cả đơn hàng đã được giao thành công (và nếu range là "month" thì chỉ lấy những đơn hàng được giao trong tháng hiện tại)
 
-    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);// Tính tổng doanh thu bằng cách cộng tổng tiền của tất cả đơn hàng đã được giao thành công (đã lọc theo khoảng thời gian nếu range là "month")
 
     // 👇 group theo ngày
-    const chartMap = {};
+    const chartMap = {};// Tạo một object để nhóm doanh thu theo ngày, key là ngày (yyyy-mm-dd) và value là tổng doanh thu của ngày đó
 
     orders.forEach(order => {
       const day = order.deliveredAt.toISOString().slice(0, 10); // yyyy-mm-dd
-      chartMap[day] = (chartMap[day] || 0) + order.total;
+      chartMap[day] = (chartMap[day] || 0) + order.total;// Cộng dồn doanh thu của đơn hàng vào ngày tương ứng trong chartMap
     });
 
-    const chartData = Object.keys(chartMap).map(day => ({
-      date: day,
-      revenue: chartMap[day],
+    const chartData = Object.keys(chartMap).map(day => ({// Chuyển đổi chartMap thành mảng để dễ sử dụng cho biểu đồ, mỗi phần tử có dạng { date: "yyyy-mm-dd", revenue: tổng doanh thu của ngày đó }
+      date: day,// Ngày (yyyy-mm-dd)
+      revenue: chartMap[day],// Tổng doanh thu của ngày đó
     }));
 
-    return {
+    return { // Trả về tổng doanh thu, số lượng đơn hàng đã giao thành công và dữ liệu để vẽ biểu đồ doanh thu theo ngày
       totalRevenue,
       totalOrders: orders.length,
       chartData,
     };
   }
 
+  async getOrderById(orderId) {
+    const order = await Order.findById(orderId)
+      .populate("user", "email firstName lastName")
+      .populate("shipper", "email firstName lastName")
+      .populate("items.book");
 
-
-  async assignShipper(orderId, shipperId) {
-    const shipper = await User.findById(shipperId);
-    if (!shipper || shipper.role?.toLowerCase() !== "shipper") {
-      throw ApiError.badRequest("Invalid shipper");
-    }
-
-    const order = await Order.findById(orderId);
     if (!order) {
       throw ApiError.notFound("Order not found");
     }
 
-    // ❌ Không cho assign lại
+    return order;
+  }
+
+  async assignShipper(orderId, shipperId) { // Lấy orderId và shipperId từ tham số hàm
+    const shipper = await User.findById(shipperId);// Tìm shipper trong database
+    if (!shipper || shipper.role?.toLowerCase() !== "shipper") { // Kiểm tra nếu không tìm thấy hoặc không phải là shipper
+      throw ApiError.badRequest("Invalid shipper"); // Trả về lỗi nếu shipper không hợp lệ
+    }
+
+    const order = await Order.findById(orderId); // Tìm order trong database
+    if (!order) { // Kiểm tra nếu không tìm thấy order
+      throw ApiError.notFound("Order not found");// Trả về lỗi nếu không tìm thấy order
+    }
+    // ⭐ THÊM ĐOẠN NÀY
+    const { province, district } = order.shippingAddress || {};
+
+    const matchAddress = shipper.addresses?.some(addr =>
+      addr.province?.trim() === province?.trim() &&
+      addr.district?.trim() === district?.trim()
+    );
+    if (!matchAddress) {
+      throw ApiError.badRequest("Shipper does not serve this area");
+    }
     if (order.shipper) {
       throw ApiError.badRequest("Order already assigned to a shipper");
     }
@@ -700,16 +734,329 @@ class OrderService {
 
     // ⭐ CHUYỂN TRẠNG THÁI SANG SHIPPED
     order.orderStatus = "SHIPPED";
+    order.assignmentStatus = "PENDING";
+    // ===== ADD ASSIGNMENT HISTORY =====
+    if (!order.assignmentHistory) {
+      order.assignmentHistory = [];
+    }
 
+    order.assignmentHistory.push({
+      shipper: shipperId,
+      assignedAt: new Date(),
+      status: "PENDING"
+    });
+    await order.save(); // Lưu order sau khi gán shipper
+    await User.findByIdAndUpdate(shipper._id, {
+      $inc: { currentOrders: 1 }
+    });
+    await order.populate("shipper", "email");// Populate thông tin shipper (chỉ lấy email)
+
+    return order;
+  }
+  // Lấy số lượng đơn hàng đang được giao (SHIPPED hoặc PROCESSING) của shipper để kiểm tra giới hạn 20 đơn hàng
+  async getActiveOrderCount(shipperId) {
+    return await Order.countDocuments({
+      shipper: shipperId,
+      orderStatus: { $in: ["SHIPPED", "PROCESSING"] }
+    });
+  }
+  // Tự động gán shipper cho đơn hàng dựa trên địa chỉ giao hàng và khu vực phục vụ của shipper
+
+  async autoAssignShipper(orderId) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    if (order.shipper) {
+      throw ApiError.badRequest("Order already assigned");
+    }
+
+    const { province, district } = order.shippingAddress || {};
+
+    if (!province || !district) {
+      throw ApiError.badRequest("Shipping address incomplete");
+    }
+
+    console.log("🔍 Looking for shipper:", province, district);
+
+    const shipper = await User.findOne({
+      role: ROLES.SHIPPER,
+      isActive: true,
+      currentOrders: { $lt: MAX_ORDERS },
+      _id: { $nin: order.rejectedShippers || [] },
+      addresses: {
+        $elemMatch: {
+          province: province.trim(),
+          district: district.trim(),
+        },
+      },
+    }).sort({ currentOrders: 1 });
+
+    // ❌ Nếu không có shipper → KHÔNG throw
+    if (!shipper) {
+      console.log("❌ No available shipper found");
+
+      // giữ order ở trạng thái PROCESSING thay vì SHIPPED
+      order.orderStatus = "PROCESSING";
+      await order.save();
+
+      return order;
+    }
+
+    // ✅ Assign shipper
+    order.shipper = shipper._id;
+    order.assignedAt = new Date();
+    order.orderStatus = "SHIPPED";
+    order.assignmentStatus = "PENDING";
+    if (!order.assignmentHistory) {
+      order.assignmentHistory = [];
+    }
+
+    order.assignmentHistory.push({
+      shipper: shipper._id,
+      assignedAt: new Date(),
+      status: "PENDING"
+    });
     await order.save();
-    await order.populate("shipper", "email");
+
+    // tăng số đơn hiện tại
+    await User.findByIdAndUpdate(shipper._id, {
+      $inc: { currentOrders: 1 }
+    });
+    await order.populate("shipper", "email firstName lastName");
+
+    console.log("✅ Assigned to shipper:", shipper.email);
 
     return order;
   }
 
+  async respondAssignment(orderId, shipperId, action) {
 
+    const order = await Order.findById(orderId);
 
+    if (!order) throw ApiError.notFound("Order not found");
 
+    // ✅ Kiểm tra đúng shipper
+    if (!order.shipper || order.shipper.toString() !== shipperId.toString()) {
+      throw ApiError.forbidden("Not your assignment");
+    }
+
+    if (order.assignmentStatus !== "PENDING") {
+      throw ApiError.badRequest("Assignment already responded");
+    }
+
+    // ================= ACCEPT =================
+    if (action === "ACCEPT") {
+
+      order.assignmentStatus = "ACCEPTED";
+      const lastAssignment = order.assignmentHistory[order.assignmentHistory.length - 1];
+
+      if (lastAssignment) {
+        lastAssignment.status = "ACCEPTED";
+        lastAssignment.respondedAt = new Date();
+      }
+      // ❌ KHÔNG đổi orderStatus nữa
+      // order.orderStatus = "PROCESSING";
+
+      await order.save();
+
+      return { message: "Order accepted successfully" };
+
+    }
+    // ================= REJECT =================
+    if (action === "REJECT") {
+
+      // 1️⃣ Thêm shipper vào danh sách đã reject
+      if (!order.rejectedShippers) {
+        order.rejectedShippers = [];
+      }
+
+      if (!order.rejectedShippers.includes(shipperId)) {
+        order.rejectedShippers.push(shipperId);
+      }
+
+      // ===== UPDATE LAST HISTORY CỦA ĐÚNG SHIPPER =====
+      const lastAssignment = [...order.assignmentHistory]
+        .reverse()
+        .find(a =>
+          a.shipper.toString() === shipperId.toString() &&
+          a.status === "PENDING"
+        );
+
+      if (lastAssignment) {
+        lastAssignment.status = "REJECTED";
+        lastAssignment.respondedAt = new Date();
+      }
+      // ⚡ BẮT BUỘC MARK MODIFIED
+      order.markModified("assignmentHistory");
+
+      // 💥 SAVE NGAY SAU KHI REJECT
+      await order.save();
+      // 2️⃣ Trừ currentOrders
+      await User.findByIdAndUpdate(shipperId, {
+        $inc: { currentOrders: -1 }
+      });
+
+      const { province, district } = order.shippingAddress;
+
+      // 3️⃣ Tìm shipper KHÔNG nằm trong rejectedShippers
+      const newShipper = await User.findOne({
+        role: ROLES.SHIPPER,
+        isActive: true,
+        currentOrders: { $lt: MAX_ORDERS },
+        _id: { $nin: order.rejectedShippers || [] }, // 🔥 CHỖ QUAN TRỌNG
+        addresses: {
+          $elemMatch: {
+            province: province.trim(),
+            district: district.trim()
+          }
+        }
+      }).sort({ currentOrders: 1 });
+
+      if (!newShipper) {
+
+        console.log("⚠ All shippers rejected. Resetting order...");
+
+        order.shipper = null;
+
+        order.orderStatus = "PENDING";
+        order.assignmentStatus = null;
+        order.assignedAt = null;
+
+        await order.save();
+
+        return order;
+      }
+
+      const nextShipper = newShipper;
+
+      order.shipper = nextShipper._id;
+      order.assignmentStatus = "PENDING";
+      order.orderStatus = "SHIPPED";
+      order.assignedAt = new Date();
+      // ===== PUSH NEW HISTORY =====
+      if (!order.assignmentHistory) {
+        order.assignmentHistory = [];
+      }
+
+      order.assignmentHistory.push({
+        shipper: nextShipper._id,
+        assignedAt: new Date(),
+        status: "PENDING"
+      });
+      if (order.assignmentHistory?.length > 0) {
+        const last = order.assignmentHistory[order.assignmentHistory.length - 1];
+        order.assignmentStatus = last.status;
+      }
+      await order.save();
+
+      await User.findByIdAndUpdate(nextShipper._id, {
+        $inc: { currentOrders: 1 }
+      });
+
+      return order;
+
+    }
+
+    throw ApiError.badRequest("Invalid action");
+  }
+  // Lấy hiệu suất làm việc của shipper dựa trên lịch sử phân công (tỷ lệ chấp nhận, từ chối, giao thành công)
+  async getShipperPerformance(shipperId) {
+
+    const orders = await Order.find({
+      "assignmentHistory.shipper": shipperId
+    });
+
+    let totalAssigned = 0;
+    let accepted = 0;
+    let rejected = 0;
+    let delivered = 0;
+    let cancelled = 0;
+    for (const order of orders) {
+
+      // Lấy tất cả history của shipper này trong order
+      const histories = order.assignmentHistory.filter(
+        h => h.shipper.toString() === shipperId.toString()
+      );
+
+      // Nếu shipper từng được assign order này → chỉ +1 lần
+      if (histories.length > 0) {
+        totalAssigned++;
+      }
+
+      // Kiểm tra shipper đã từng ACCEPT order này chưa
+      const acceptedHistory = histories.find(
+        h => h.status === "ACCEPTED"
+      );
+
+      // Kiểm tra shipper đã từng REJECT order này chưa
+      const rejectedHistory = histories.find(
+        h => h.status === "REJECTED"
+      );
+
+      if (acceptedHistory) {
+        accepted++;
+
+        // 🔥 Chỉ tính delivered nếu:
+        // 1. Order đã DELIVERED
+        // 2. Shipper hiện tại chính là shipper này
+        if (
+          order.orderStatus === "DELIVERED" &&
+          order.shipper?.toString() === shipperId.toString()
+        ) {
+          delivered++;
+        }
+        if (
+          order.orderStatus === "CANCELLED" &&
+          order.shipper?.toString() === shipperId.toString()
+        ) {
+          cancelled++;
+        }
+      }
+
+      if (rejectedHistory) {
+        rejected++;
+      }
+    }
+
+    // 📊 Acceptance Rate
+    const acceptanceRate =
+      (accepted + rejected) > 0
+        ? ((accepted / (accepted + rejected)) * 100).toFixed(1)
+        : 0;
+
+    // 📊 Success Rate (chuẩn thực tế)
+    const successRate =
+      (delivered + cancelled) > 0
+        ? ((delivered / (delivered + cancelled)) * 100).toFixed(1)
+        : 0;
+
+    return {
+      totalAssigned,
+      accepted,
+      rejected,
+      delivered,
+      cancelled,
+      acceptanceRate,
+      successRate
+    };
+  }
+  // Lấy lịch sử phân công của shipper, bao gồm tất cả đơn hàng từng được phân công (dù đã accept hay reject), trạng thái phân công và thông tin đơn hàng
+  async getAssignmentHistory(shipperId) {
+    const orders = await Order.find({
+      "assignmentHistory.shipper": shipperId
+    })
+      .populate("items.book")
+      .populate("user", "email firstName lastName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      orders
+    };
+  }
 }
 
 export default new OrderService();

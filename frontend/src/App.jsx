@@ -31,6 +31,8 @@ import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
 import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
+import RecentlyViewedPage from "./pages/RecentlyViewedPage";
+import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
@@ -102,7 +104,7 @@ function AppContent() {
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
-
+        <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
           path="/login"
@@ -198,7 +200,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/assignment-history" element={<AssignmentHistoryPage />} />
         <Route
           path="/admin/books"
           element={

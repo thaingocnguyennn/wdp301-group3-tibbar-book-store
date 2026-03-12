@@ -7,13 +7,14 @@ class OrderController {
   async createOrder(req, res, next) {
     try {
       const userId = req.user._id;
-      const { paymentMethod, shippingAddressId, voucherId, voucherCode, notes } = req.body;
+      const { paymentMethod, shippingAddressId, voucherId, voucherCode, useCoin, notes } = req.body;
       const ipAddress = req.headers["x-forwarded-for"] || req.connection.remoteAddress || "127.0.0.1";
 
       console.log("🛒 [OrderController] Create order request:", {
         userId,
         userEmail: req.user.email,
         paymentMethod,
+        useCoin,
         timestamp: new Date().toISOString()
       });
 
@@ -22,6 +23,7 @@ class OrderController {
         shippingAddressId,
         voucherId,
         voucherCode,
+        useCoin,
         notes,
         ipAddress,
       });
@@ -177,12 +179,13 @@ class OrderController {
       next(err);
     }
   };
+
   assignShipper = async (req, res, next) => {
     try {
-      const { shipperId } = req.body;
-      const orderId = req.params.id;
+      const { shipperId } = req.body; // Lấy shipperId từ body thay vì params
+      const orderId = req.params.id;// Lấy orderId từ params
 
-      const order = await orderService.assignShipper(orderId, shipperId);
+      const order = await orderService.assignShipper(orderId, shipperId); // Gọi service để gán shipper cho đơn hàng
 
       return ApiResponse.success(
         res,

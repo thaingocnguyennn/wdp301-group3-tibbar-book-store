@@ -2,7 +2,7 @@ import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import { MESSAGES, ROLES } from '../config/constants.js';
 import Order from "../models/Order.js";
-
+import orderService from "./orderService.js";
 class UserService {
   async getProfile(userId) {
     const user = await User.findById(userId);
@@ -57,7 +57,40 @@ class UserService {
     }
 
     const users = await User.find(filter).sort({ createdAt: -1 });
-    return users;
+
+    if (!users.length) {
+      return users;
+    }
+
+    const userIds = users.map((user) => user._id);
+
+    const coinUsage = await Order.aggregate([
+      {
+        $match: {
+          user: { $in: userIds },
+          coinsUsed: { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: "$user",
+          totalCoinsUsed: { $sum: "$coinsUsed" },
+        },
+      },
+    ]);
+
+    const coinUsageMap = {};
+    coinUsage.forEach((item) => {
+      coinUsageMap[item._id.toString()] = item.totalCoinsUsed;
+    });
+
+    return users.map((user) => {
+      const plainUser = user.toObject();
+      return {
+        ...plainUser,
+        totalCoinsUsed: coinUsageMap[user._id.toString()] || 0,
+      };
+    });
   }
 
   async updateUserRole(userId, newRole) {
@@ -109,7 +142,7 @@ class UserService {
 
     const shipperIds = shippers.map(s => s._id);
 
-    // 2️⃣ Đếm số order theo shipper
+    // 2️⃣ Đếm tổng số order đã được assign cho shipper
     const orderCounts = await Order.aggregate([
       {
         $match: {
@@ -124,17 +157,27 @@ class UserService {
       }
     ]);
 
-    // 3️⃣ Map shipperId → total orders
     const countMap = {};
     orderCounts.forEach(item => {
       countMap[item._id.toString()] = item.total;
     });
 
-    // 4️⃣ Gộp dữ liệu
-    return shippers.map(shipper => ({
-      ...shipper.toObject(),
-      assignedOrders: countMap[shipper._id.toString()] || 0
-    }));
+    // 🔥 3️⃣ TÍNH PERFORMANCE CHO TỪNG SHIPPER
+    const result = [];
+
+    for (const shipper of shippers) {
+
+      const performance = await orderService.getShipperPerformance(shipper._id);
+
+      result.push({
+        ...shipper.toObject(),
+        assignedOrders: countMap[shipper._id.toString()] || 0,
+        acceptanceRate: performance.acceptanceRate,
+        successRate: performance.successRate
+      });
+    }
+
+    return result;
   }
 
   async changePassword(userId, currentPassword, newPassword) {
