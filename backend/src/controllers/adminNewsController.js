@@ -17,7 +17,6 @@ class AdminNewsController {
       const payload = {
         title: req.body.title,
         content: req.body.content,
-        showOnHomepage: String(req.body.showOnHomepage) === "true",
       };
 
       if (req.file) {
@@ -40,10 +39,6 @@ class AdminNewsController {
         title: req.body.title,
         content: req.body.content,
       };
-
-      if (req.body.showOnHomepage !== undefined) {
-        payload.showOnHomepage = String(req.body.showOnHomepage) === "true";
-      }
 
       if (req.file) {
         payload.imageUrl = `/uploads/news/${req.file.filename}`;

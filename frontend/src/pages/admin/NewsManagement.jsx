@@ -10,7 +10,6 @@ const NewsManagement = () => {
   const [formData, setFormData] = useState({
     title: "",
     content: "",
-    showOnHomepage: false,
   });
 
   const serverBaseUrl = useMemo(() => {
@@ -34,7 +33,7 @@ const NewsManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ title: "", content: "", showOnHomepage: false });
+    setFormData({ title: "", content: "" });
     setSelectedFile(null);
     setEditingNews(null);
   };
@@ -46,7 +45,6 @@ const NewsManagement = () => {
     const payload = new FormData();
     payload.append("title", formData.title);
     payload.append("content", formData.content);
-    payload.append("showOnHomepage", String(formData.showOnHomepage));
 
     if (selectedFile) {
       payload.append("image", selectedFile);
@@ -73,7 +71,6 @@ const NewsManagement = () => {
     setFormData({
       title: news.title || "",
       content: news.content || "",
-      showOnHomepage: Boolean(news.showOnHomepage),
     });
     setSelectedFile(null);
   };
@@ -118,15 +115,6 @@ const NewsManagement = () => {
         />
 
         <div style={styles.formRow}>
-          <label style={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={formData.showOnHomepage}
-              onChange={(e) => setFormData({ ...formData, showOnHomepage: e.target.checked })}
-            />
-            Show on Homepage
-          </label>
-
           <input
             type="file"
             accept="image/*"
@@ -163,10 +151,8 @@ const NewsManagement = () => {
                 )}
                 <div style={styles.cardBody}>
                   <h4 style={styles.cardTitle}>{news.title}</h4>
-                  <p style={styles.cardMeta}>{new Date(news.createdAt).toLocaleDateString()}</p>
-                  <p style={styles.cardFlag}>
-                    Homepage: {news.showOnHomepage ? "Yes" : "No"}
-                  </p>
+                  <p style={styles.cardMeta}>Created: {new Date(news.createdAt).toLocaleDateString()}</p>
+                  <p style={styles.cardMeta}>Updated: {new Date(news.updatedAt).toLocaleDateString()}</p>
                   <div style={styles.cardActions}>
                     <button style={styles.editBtn} onClick={() => handleEdit(news)}>Edit</button>
                     <button style={styles.deleteBtn} onClick={() => handleDelete(news)}>Delete</button>
@@ -190,7 +176,6 @@ const styles = {
   input: { width: "100%", padding: "0.7rem", border: "1px solid #ddd", borderRadius: "6px", marginBottom: "0.8rem" },
   textarea: { width: "100%", padding: "0.7rem", border: "1px solid #ddd", borderRadius: "6px", marginBottom: "0.8rem", fontFamily: "inherit" },
   formRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", alignItems: "center", marginBottom: "0.8rem" },
-  checkboxLabel: { display: "flex", alignItems: "center", gap: "0.5rem", color: "#2c3e50", fontWeight: 600 },
   actions: { display: "flex", gap: "0.7rem" },
   submitBtn: { border: "none", backgroundColor: "#3498db", color: "#fff", borderRadius: "6px", padding: "0.6rem 1.2rem", cursor: "pointer" },
   cancelBtn: { border: "none", backgroundColor: "#95a5a6", color: "#fff", borderRadius: "6px", padding: "0.6rem 1.2rem", cursor: "pointer" },
@@ -204,7 +189,6 @@ const styles = {
   cardBody: { padding: "0.8rem" },
   cardTitle: { margin: "0 0 0.4rem 0", color: "#2c3e50" },
   cardMeta: { margin: "0 0 0.3rem 0", color: "#7f8c8d", fontSize: "0.9rem" },
-  cardFlag: { margin: "0 0 0.8rem 0", color: "#34495e", fontSize: "0.9rem" },
   cardActions: { display: "flex", gap: "0.6rem" },
   editBtn: { border: "none", backgroundColor: "#667eea", color: "#fff", borderRadius: "5px", padding: "0.45rem 0.8rem", cursor: "pointer" },
   deleteBtn: { border: "none", backgroundColor: "#e74c3c", color: "#fff", borderRadius: "5px", padding: "0.45rem 0.8rem", cursor: "pointer" },
