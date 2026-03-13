@@ -82,6 +82,14 @@ const AdminDashboard = () => {
             Review recent return and refund requests from customers
           </p>
         </Link>
+
+        <Link to="/admin/review-replies" style={styles.card}>
+          <div style={styles.icon}>💬</div>
+          <h3 style={styles.cardTitle}>Reply Reviews</h3>
+          <p style={styles.cardDesc}>
+            View customer reviews and reply directly as admin
+          </p>
+        </Link>
       </div>
     </div>
   );

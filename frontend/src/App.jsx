@@ -37,6 +37,7 @@ import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
 import NewsPage from "./pages/NewsPage";
 import NewsManagement from "./pages/admin/NewsManagement";
 import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
+import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -258,6 +259,14 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <RecentRequestHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review-replies"
+          element={
+            <ProtectedRoute adminOnly>
+              <ReviewRepliesManagementPage />
             </ProtectedRoute>
           }
         />

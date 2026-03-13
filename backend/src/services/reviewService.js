@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Review from "../models/Review.js";
 import Book from "../models/Book.js";
 import Order from "../models/Order.js";
+import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 
 class ReviewService {
@@ -60,6 +61,14 @@ class ReviewService {
     );
   }
 
+  normalizeReplies(replies = []) {
+    if (!Array.isArray(replies)) return [];
+    return replies.map((reply) => ({
+      ...reply,
+      comment: String(reply.comment || "").trim(),
+    }));
+  }
+
   async getBookReviews(bookId, page = 1, limit = 10, options = {}) {
     const ratingFilter = this.parseRatingFilter(options.rating);
     const skip = (page - 1) * limit;
@@ -74,6 +83,7 @@ class ReviewService {
     const [reviews, total, summaryResult] = await Promise.all([
       Review.find(match)
         .populate("user", "firstName lastName email")
+        .populate("replies.user", "firstName lastName email role")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -112,6 +122,7 @@ class ReviewService {
       ...review,
       images: this.normalizeImagePaths(review.images || []),
       reactionSummary: this.getReactionSummary(review.reactions || []),
+      replies: this.normalizeReplies(review.replies || []),
     }));
 
     return {
@@ -130,8 +141,87 @@ class ReviewService {
     };
   }
 
+  async getAllReviewsForAdmin({
+    page = 1,
+    limit = 20,
+    search = "",
+    rating,
+    replyStatus = "all",
+  } = {}) {
+    const skip = (page - 1) * limit;
+    const match = {};
+    const ratingFilter = this.parseRatingFilter(rating);
+
+    if (ratingFilter) {
+      match.rating = ratingFilter;
+    }
+
+    if (replyStatus === "replied") {
+      match["replies.0"] = { $exists: true };
+    }
+
+    if (replyStatus === "pending") {
+      match["replies.0"] = { $exists: false };
+    }
+
+    const trimmedSearch = String(search || "").trim();
+    if (trimmedSearch) {
+      const regex = new RegExp(trimmedSearch, "i");
+      const [bookCandidates, userCandidates] = await Promise.all([
+        Book.find({ title: regex }).select("_id").lean(),
+        User.find({
+          $or: [{ email: regex }, { firstName: regex }, { lastName: regex }],
+        })
+          .select("_id")
+          .lean(),
+      ]);
+
+      const bookIds = bookCandidates.map((item) => item._id);
+      const userIds = userCandidates.map((item) => item._id);
+
+      match.$or = [{ comment: regex }];
+      if (bookIds.length > 0) {
+        match.$or.push({ book: { $in: bookIds } });
+      }
+      if (userIds.length > 0) {
+        match.$or.push({ user: { $in: userIds } });
+      }
+    }
+
+    const [reviews, total] = await Promise.all([
+      Review.find(match)
+        .populate("user", "firstName lastName email role")
+        .populate("book", "title")
+        .populate("replies.user", "firstName lastName email role")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Review.countDocuments(match),
+    ]);
+
+    const normalizedReviews = reviews.map((review) => ({
+      ...review,
+      images: this.normalizeImagePaths(review.images || []),
+      reactionSummary: this.getReactionSummary(review.reactions || []),
+      replies: this.normalizeReplies(review.replies || []),
+    }));
+
+    return {
+      reviews: normalizedReviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getMyReviewForBook(userId, bookId) {
-    const review = await Review.findOne({ user: userId, book: bookId }).lean();
+    const review = await Review.findOne({ user: userId, book: bookId })
+      .populate("replies.user", "firstName lastName email role")
+      .lean();
     if (!review) {
       return null;
     }
@@ -140,7 +230,32 @@ class ReviewService {
       ...review,
       images: this.normalizeImagePaths(review.images || []),
       reactionSummary: this.getReactionSummary(review.reactions || []),
+      replies: this.normalizeReplies(review.replies || []),
     };
+  }
+
+  async addReplyToReview(userId, userRole, reviewId, payload) {
+    const comment = String(payload?.comment || "").trim();
+    if (!comment) {
+      throw ApiError.badRequest("Reply content is required");
+    }
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      throw ApiError.notFound("Review not found");
+    }
+
+    review.replies.push({
+      user: userId,
+      role: String(userRole || "customer").toLowerCase(),
+      comment,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await review.save();
+
+    return review;
   }
 
   async createReview(userId, bookId, payload) {
