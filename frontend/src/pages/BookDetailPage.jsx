@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { bookApi } from "../api/bookApi";
 import { reviewApi } from "../api/reviewApi";
@@ -10,6 +10,7 @@ const BookDetailPage = () => {
   const navigate = useNavigate();
   const { add } = useCart();
   const { isAuthenticated, user } = useAuth();
+  const bookInfoRef = useRef(null);
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +69,19 @@ const BookDetailPage = () => {
       fetchMyReview();
     }
   }, [id, isAuthenticated]);
+
+  useEffect(() => {
+    if (loading || !book || !bookInfoRef.current) return;
+
+    const stickyNavbarOffset = 100;
+    const targetTop =
+      bookInfoRef.current.getBoundingClientRect().top +
+      window.pageYOffset -
+      stickyNavbarOffset;
+
+    window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+    bookInfoRef.current.focus({ preventScroll: true });
+  }, [loading, book, id]);
 
   const fetchBook = async () => {
     try {
@@ -363,7 +377,7 @@ const BookDetailPage = () => {
 
   return (
     <div style={styles.container}>
-      <div style={styles.content}>
+      <div ref={bookInfoRef} tabIndex={-1} style={styles.content}>
         <div style={styles.imageSection}>
           {imageSrc ? (
             <img src={imageSrc} alt={book.title} style={styles.image} />
