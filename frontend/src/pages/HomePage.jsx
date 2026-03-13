@@ -10,6 +10,15 @@ import Slider from "../components/common/Slider";
 const HomePage = () => {
   const [books, setBooks] = useState([]);
   const [bestSellingBooks, setBestSellingBooks] = useState([]);
+  const [personalizedBooks, setPersonalizedBooks] = useState([]);
+  const [personalizedLoading, setPersonalizedLoading] = useState(true);
+  const [recommendationMeta, setRecommendationMeta] = useState({
+    strategy: null,
+    signals: {
+      hasRecentlyViewed: false,
+      hasPurchaseHistory: false,
+    },
+  });
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState([]);
@@ -33,6 +42,7 @@ const HomePage = () => {
     fetchSliders();
     fetchHomepageNews();
     fetchBestSellingBooks();
+    fetchPersonalizedBooks();
   }, []);
 
   useEffect(() => {
@@ -70,6 +80,26 @@ const HomePage = () => {
       setBestSellingBooks(response.data.books || []);
     } catch (error) {
       console.error("Error fetching best-selling books:", error);
+    }
+  };
+
+  const fetchPersonalizedBooks = async () => {
+    try {
+      setPersonalizedLoading(true);
+      const response = await bookApi.getPersonalizedBooks(8);
+      setPersonalizedBooks(response?.data?.books || []);
+      setRecommendationMeta({
+        strategy: response?.data?.strategy || null,
+        signals: response?.data?.signals || {
+          hasRecentlyViewed: false,
+          hasPurchaseHistory: false,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching personalized books:", error);
+      setPersonalizedBooks([]);
+    } finally {
+      setPersonalizedLoading(false);
     }
   };
 
@@ -138,7 +168,11 @@ const HomePage = () => {
               <article key={item._id} style={styles.newsCard}>
                 <Link to={`/news/${item._id}`} style={styles.newsImageLink}>
                   {item.imageUrl ? (
-                    <img src={`${serverBaseUrl}${item.imageUrl}`} alt={item.title} style={styles.newsImage} />
+                    <img
+                      src={`${serverBaseUrl}${item.imageUrl}`}
+                      alt={item.title}
+                      style={styles.newsImage}
+                    />
                   ) : (
                     <div style={styles.newsPlaceholder}>📰</div>
                   )}
@@ -205,6 +239,46 @@ const HomePage = () => {
             style={styles.input}
           />
         </div>
+      </section>
+
+      {/* Best Selling Books */}
+      <section style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>✨ Recommended For You</h2>
+          <div style={styles.titleUnderline}></div>
+          {recommendationMeta.strategy === "behavior-based" && (
+            <p style={styles.sectionHint}>
+              Personalized from your browsing and purchase history.
+            </p>
+          )}
+        </div>
+
+        {personalizedLoading ? (
+          <div style={styles.loading}>
+            <div style={styles.spinner}></div>
+            <p>Building your personalized recommendations...</p>
+          </div>
+        ) : personalizedBooks.length === 0 ? (
+          <div style={styles.empty}>
+            <p>No personalized recommendations yet</p>
+            <p style={styles.emptySmall}>
+              Explore more books to unlock smarter suggestions.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div style={styles.grid}>
+              {personalizedBooks.map((book) => (
+                <BookCard key={book._id} book={book} />
+              ))}
+            </div>
+            {recommendationMeta.strategy === "fallback-newest" && (
+              <p style={styles.sectionHint}>
+                Showing newest books while we learn your preferences.
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       {/* Best Selling Books */}
@@ -344,6 +418,11 @@ const styles = {
     height: "4px",
     background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
     borderRadius: "2px",
+  },
+  sectionHint: {
+    marginTop: "0.75rem",
+    color: "#5f6f8d",
+    fontSize: "0.95rem",
   },
   filterSection: {
     maxWidth: "1200px",
