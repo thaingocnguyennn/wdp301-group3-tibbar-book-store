@@ -7,15 +7,25 @@ class OrderController {
   async createOrder(req, res, next) {
     try {
       const userId = req.user._id;
-      const { paymentMethod, shippingAddressId, voucherId, voucherCode, useCoin, notes } = req.body;
-      const ipAddress = req.headers["x-forwarded-for"] || req.connection.remoteAddress || "127.0.0.1";
+      const {
+        paymentMethod,
+        shippingAddressId,
+        voucherId,
+        voucherCode,
+        useCoin,
+        notes,
+      } = req.body;
+      const ipAddress =
+        req.headers["x-forwarded-for"] ||
+        req.connection.remoteAddress ||
+        "127.0.0.1";
 
       console.log("🛒 [OrderController] Create order request:", {
         userId,
         userEmail: req.user.email,
         paymentMethod,
         useCoin,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       const result = await orderService.createOrder(userId, {
@@ -32,7 +42,7 @@ class OrderController {
         res,
         HTTP_STATUS.CREATED,
         "Order created successfully",
-        result
+        result,
       );
     } catch (error) {
       next(error);
@@ -44,7 +54,10 @@ class OrderController {
       const userId = req.user._id;
       const { voucherCode } = req.body;
 
-      const result = await orderService.validateVoucherForCheckout(userId, voucherCode);
+      const result = await orderService.validateVoucherForCheckout(
+        userId,
+        voucherCode,
+      );
 
       return ApiResponse.success(
         res,
@@ -70,7 +83,7 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Orders retrieved successfully",
-        result
+        result,
       );
     } catch (error) {
       next(error);
@@ -89,7 +102,7 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Order retrieved successfully",
-        { order }
+        { order },
       );
     } catch (error) {
       next(error);
@@ -108,7 +121,7 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Order retrieved successfully",
-        { order }
+        { order },
       );
     } catch (error) {
       next(error);
@@ -126,7 +139,7 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Payment confirmed successfully",
-        result
+        result,
       );
     } catch (error) {
       next(error);
@@ -145,7 +158,87 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Order cancelled successfully",
-        { order }
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Reorder from a previous order
+  async reorderOrder(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const { paymentMethod, notes } = req.body;
+      const ipAddress =
+        req.headers["x-forwarded-for"] ||
+        req.connection.remoteAddress ||
+        "127.0.0.1";
+
+      const result = await orderService.reorderOrder(orderId, userId, {
+        paymentMethod,
+        notes,
+        ipAddress,
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Order reordered successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Download or print invoice for delivered order
+  async downloadInvoice(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const shouldDownload = String(req.query.download || "true") === "true";
+
+      const { html, fileName } = await orderService.getInvoiceHtml(
+        orderId,
+        userId,
+      );
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `${shouldDownload ? "attachment" : "inline"}; filename=\"${fileName}\"`,
+      );
+
+      return res.status(HTTP_STATUS.OK).send(html);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Submit return / refund request
+  async submitReturnRefundRequest(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const { type, reason, details } = req.body;
+
+      const order = await orderService.submitReturnRefundRequest(
+        orderId,
+        userId,
+        {
+          type,
+          reason,
+          details,
+        },
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Return/refund request submitted successfully",
+        { order },
       );
     } catch (error) {
       next(error);
@@ -161,13 +254,12 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Payment methods retrieved successfully",
-        { methods }
+        { methods },
       );
     } catch (error) {
       next(error);
     }
   }
-
 
   getRevenue = async (req, res, next) => {
     try {
@@ -183,7 +275,7 @@ class OrderController {
   assignShipper = async (req, res, next) => {
     try {
       const { shipperId } = req.body; // Lấy shipperId từ body thay vì params
-      const orderId = req.params.id;// Lấy orderId từ params
+      const orderId = req.params.id; // Lấy orderId từ params
 
       const order = await orderService.assignShipper(orderId, shipperId); // Gọi service để gán shipper cho đơn hàng
 
@@ -191,14 +283,12 @@ class OrderController {
         res,
         HTTP_STATUS.OK,
         "Shipper assigned successfully",
-        { order }
+        { order },
       );
     } catch (err) {
       next(err);
     }
   };
-
-
 }
 
 export default new OrderController();

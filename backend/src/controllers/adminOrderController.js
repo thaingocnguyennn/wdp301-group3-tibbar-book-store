@@ -7,7 +7,8 @@ class AdminOrderController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      const { status, paymentStatus, search, userId, fromDate, toDate } = req.query;
+      const { status, paymentStatus, search, userId, fromDate, toDate } =
+        req.query;
 
       const result = await orderService.getAllOrders({
         page,
@@ -47,6 +48,22 @@ class AdminOrderController {
     }
   }
 
+  async getRecentCustomerRequests(req, res, next) {
+    try {
+      const limit = parseInt(req.query.limit) || 8;
+      const result = await orderService.getRecentCustomerRequestHistory(limit);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Recent customer requests retrieved successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateOrderStatus(req, res, next) {
     try {
       const { id } = req.params;
@@ -64,6 +81,28 @@ class AdminOrderController {
       next(error);
     }
   }
+
+  async reviewReturnRefundRequest(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { status, adminNote } = req.body;
+
+      const order = await orderService.reviewReturnRefundRequest(id, {
+        status,
+        adminNote,
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Return/refund request updated successfully",
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async autoAssignShipper(req, res, next) {
     try {
       const { id } = req.params;
@@ -74,7 +113,7 @@ class AdminOrderController {
         res,
         HTTP_STATUS.OK,
         "Auto assigned shipper successfully",
-        { order }
+        { order },
       );
     } catch (error) {
       next(error);

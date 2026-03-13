@@ -105,6 +105,8 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "1rem",
+    flexWrap: "wrap",
   },
   logo: {
     fontSize: "1.6rem",
@@ -112,11 +114,17 @@ const styles = {
     color: "#fff",
     textDecoration: "none",
     transition: "all 0.3s ease",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   links: {
     display: "flex",
-    gap: "1.5rem",
+    gap: "1rem",
     alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    flex: 1,
+    minWidth: "260px",
   },
   link: {
     color: "#fff",
@@ -125,6 +133,8 @@ const styles = {
     fontWeight: "500",
     padding: "0.5rem 0",
     borderBottom: "2px solid transparent",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   button: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -138,11 +148,15 @@ const styles = {
     fontWeight: "600",
     transition: "all 0.3s ease",
     backdropFilter: "blur(10px)",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   user: {
     color: "#fff",
     fontSize: "0.95rem",
     fontWeight: "500",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
 };
 
