@@ -48,6 +48,10 @@ const Navbar = () => {
                 My Orders
               </Link>
 
+              <Link to="/my-vouchers" style={styles.link}>
+                My Vouchers
+              </Link>
+
               {isShipper && (
                 <Link to="/assignment-history" style={styles.link}>
                   Assignment History

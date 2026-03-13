@@ -12,5 +12,6 @@ router.use(authorize(ROLES.ADMIN));
 router.get("/", adminVoucherController.getAllVouchers);
 router.post("/", adminVoucherController.createVoucher);
 router.put("/:id", adminVoucherController.updateVoucher);
+router.post("/:id/assign-users", adminVoucherController.assignVoucherToUsers);
 
 export default router;

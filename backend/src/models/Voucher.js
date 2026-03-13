@@ -44,6 +44,16 @@ const voucherSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    audienceType: {
+      type: String,
+      enum: ["PUBLIC", "ASSIGNED"],
+      default: "PUBLIC",
+    },
+    maxUsagePerUser: {
+      type: Number,
+      default: 1,
+      min: [1, "Max usage per user must be at least 1"],
+    },
   },
   {
     timestamps: true,
