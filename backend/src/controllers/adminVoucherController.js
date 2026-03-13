@@ -35,13 +35,34 @@ class AdminVoucherController {
 
   async updateVoucher(req, res, next) {
     try {
-      const voucher = await voucherService.updateVoucher(req.params.id, req.body);
+      const voucher = await voucherService.updateVoucher(
+        req.params.id,
+        req.body,
+      );
 
       return ApiResponse.success(
         res,
         HTTP_STATUS.OK,
         "Voucher updated successfully",
         { voucher },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async assignVoucherToUsers(req, res, next) {
+    try {
+      const result = await voucherService.assignVoucherToUsers(
+        req.params.id,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Voucher assigned successfully",
+        result,
       );
     } catch (error) {
       next(error);

@@ -26,6 +26,7 @@ import OrderSuccessPage from "./pages/OrderSuccessPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import MyVouchersPage from "./pages/MyVouchersPage";
 import AdminWishlist from "./pages/admin/AdminWishlist";
 import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
@@ -161,6 +162,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <OrderDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-vouchers"
+          element={
+            <ProtectedRoute>
+              <MyVouchersPage />
             </ProtectedRoute>
           }
         />

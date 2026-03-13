@@ -3,6 +3,7 @@ import Cart from "../models/Cart.js";
 import Book from "../models/Book.js";
 import User from "../models/User.js";
 import Voucher from "../models/Voucher.js";
+import UserVoucher from "../models/UserVoucher.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
@@ -396,7 +397,7 @@ class OrderService {
     }
 
     const now = new Date();
-    if (new Date(voucher.expiryDate) < now) {
+    if (voucher.expiryDate && new Date(voucher.expiryDate) < now) {
       throw ApiError.badRequest("Voucher has expired");
     }
 
@@ -428,9 +429,50 @@ class OrderService {
     return Math.round(discount * 100) / 100;
   }
 
-  async resolveVoucher({ voucherId = null, voucherCode = null }, orderAmount) {
+  validateUserVoucherEligibility(userVoucher) {
+    if (!userVoucher) {
+      throw ApiError.badRequest("This voucher is not assigned to your account");
+    }
+
+    const now = new Date();
+    if (userVoucher.status === "EXPIRED") {
+      throw ApiError.badRequest("Your assigned voucher has expired");
+    }
+
+    if (userVoucher.expiresAt && new Date(userVoucher.expiresAt) < now) {
+      throw ApiError.badRequest("Your assigned voucher has expired");
+    }
+
+    const usageCount = Number(userVoucher.usageCount || 0);
+    const maxUsage = Number(userVoucher.maxUsage || 1);
+
+    if (usageCount >= maxUsage) {
+      throw ApiError.badRequest("Your assigned voucher has been fully used");
+    }
+  }
+
+  async consumeAssignedVoucherUsage(userVoucherId) {
+    const assignedVoucher = await UserVoucher.findById(userVoucherId);
+    if (!assignedVoucher) {
+      return;
+    }
+
+    const nextUsage = Number(assignedVoucher.usageCount || 0) + 1;
+    const maxUsage = Number(assignedVoucher.maxUsage || 1);
+
+    assignedVoucher.usageCount = nextUsage;
+    assignedVoucher.usedAt = new Date();
+    assignedVoucher.status = nextUsage >= maxUsage ? "USED" : "UNUSED";
+
+    await assignedVoucher.save();
+  }
+
+  async resolveVoucher(
+    { voucherId = null, voucherCode = null, userId = null },
+    orderAmount,
+  ) {
     if (!voucherId && !voucherCode) {
-      return { voucher: null, voucherDiscount: 0 };
+      return { voucher: null, voucherDiscount: 0, assignedVoucher: null };
     }
 
     let voucher = null;
@@ -443,11 +485,39 @@ class OrderService {
       });
     }
 
+    const now = new Date();
+    if (
+      voucher?.isActive &&
+      voucher?.expiryDate &&
+      new Date(voucher.expiryDate) < now
+    ) {
+      await Promise.all([
+        Voucher.updateOne(
+          { _id: voucher._id, isActive: true },
+          { $set: { isActive: false } },
+        ),
+        UserVoucher.updateMany(
+          { voucher: voucher._id, status: { $ne: "EXPIRED" } },
+          { $set: { status: "EXPIRED" } },
+        ),
+      ]);
+      voucher.isActive = false;
+    }
+
     this.validateVoucherEligibility(voucher, orderAmount);
+
+    let assignedVoucher = null;
+    if (voucher.audienceType === "ASSIGNED") {
+      assignedVoucher = await UserVoucher.findOne({
+        user: userId,
+        voucher: voucher._id,
+      });
+      this.validateUserVoucherEligibility(assignedVoucher);
+    }
 
     const voucherDiscount = this.calculateVoucherDiscount(voucher, orderAmount);
 
-    return { voucher, voucherDiscount };
+    return { voucher, voucherDiscount, assignedVoucher };
   }
 
   async validateVoucherForCheckout(userId, voucherCode) {
@@ -465,7 +535,7 @@ class OrderService {
     const orderAmount = subtotal + shippingFee;
 
     const { voucher, voucherDiscount } = await this.resolveVoucher(
-      { voucherCode },
+      { voucherCode, userId },
       orderAmount,
     );
 
@@ -552,10 +622,11 @@ class OrderService {
 
     const orderAmount = subtotal + shippingFee;
 
-    const { voucher, voucherDiscount } = await this.resolveVoucher(
-      { voucherId, voucherCode },
-      orderAmount,
-    );
+    const { voucher, voucherDiscount, assignedVoucher } =
+      await this.resolveVoucher(
+        { voucherId, voucherCode, userId },
+        orderAmount,
+      );
 
     // Calculate coin discount if user wants to use coins
     let coinsToUse = 0;
@@ -683,6 +754,10 @@ class OrderService {
 
       // Populate order details
       await order.populate("items.book user");
+
+      if (assignedVoucher?._id) {
+        await this.consumeAssignedVoucherUsage(assignedVoucher._id);
+      }
     } catch (error) {
       await this.rollbackOrderCreation({
         order,
