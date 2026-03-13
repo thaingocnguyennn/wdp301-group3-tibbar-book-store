@@ -3,8 +3,8 @@ import ApiError from "../utils/ApiError.js";
 
 class NewsService {
   async getHomepageNews() {
-    return News.find({ showOnHomepage: true })
-      .sort({ createdAt: -1 })
+    return News.find({})
+      .sort({ updatedAt: -1 })
       .limit(4)
       .lean();
   }

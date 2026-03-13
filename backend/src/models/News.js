@@ -18,17 +18,13 @@ const newsSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    showOnHomepage: {
-      type: Boolean,
-      default: false,
-    },
   },
   {
     timestamps: true,
   },
 );
 
-newsSchema.index({ showOnHomepage: 1, createdAt: -1 });
+newsSchema.index({ updatedAt: -1 });
 newsSchema.index({ createdAt: -1 });
 
 const News = mongoose.model("News", newsSchema);
