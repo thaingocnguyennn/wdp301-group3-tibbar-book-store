@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { bookApi } from "../api/bookApi";
 import { categoryApi } from "../api/categoryApi";
 import { sliderApi } from "../api/sliderApi";
+import { newsApi } from "../api/newsApi";
 import BookCard from "../components/books/BookCard";
 import Slider from "../components/common/Slider";
 
@@ -11,6 +13,7 @@ const HomePage = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState([]);
+  const [homepageNews, setHomepageNews] = useState([]);
   const [filters, setFilters] = useState({
     category: "",
     minPrice: "",
@@ -28,6 +31,7 @@ const HomePage = () => {
   useEffect(() => {
     fetchCategories();
     fetchSliders();
+    fetchHomepageNews();
     fetchBestSellingBooks();
   }, []);
 
@@ -88,6 +92,15 @@ const HomePage = () => {
     }
   };
 
+  const fetchHomepageNews = async () => {
+    try {
+      const response = await newsApi.getHomepageNews();
+      setHomepageNews(response.data.news || []);
+    } catch (error) {
+      console.error("Error fetching homepage news:", error);
+    }
+  };
+
   const handleFilterChange = (e) => {
     setFilters({
       ...filters,
@@ -106,6 +119,43 @@ const HomePage = () => {
       {/* Slider Section */}
       <section style={styles.sliderWrapper}>
         <Slider images={sliders} />
+      </section>
+
+      {/* Homepage News */}
+      <section style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>📰 Latest News</h2>
+          <div style={styles.titleUnderline}></div>
+        </div>
+
+        {homepageNews.length === 0 ? (
+          <div style={styles.empty}>
+            <p>No news available yet</p>
+          </div>
+        ) : (
+          <div style={styles.newsGrid}>
+            {homepageNews.slice(0, 4).map((item) => (
+              <article key={item._id} style={styles.newsCard}>
+                <Link to={`/news/${item._id}`} style={styles.newsImageLink}>
+                  {item.imageUrl ? (
+                    <img src={`${serverBaseUrl}${item.imageUrl}`} alt={item.title} style={styles.newsImage} />
+                  ) : (
+                    <div style={styles.newsPlaceholder}>📰</div>
+                  )}
+                </Link>
+
+                <div style={styles.newsBody}>
+                  <Link to={`/news/${item._id}`} style={styles.newsTitleLink}>
+                    {item.title}
+                  </Link>
+                  <div style={styles.newsDate}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Filters */}
@@ -342,6 +392,51 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "2rem",
+  },
+  newsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "1.25rem",
+  },
+  newsCard: {
+    backgroundColor: "#fff",
+    borderRadius: "12px",
+    overflow: "hidden",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
+  },
+  newsImageLink: {
+    display: "block",
+    height: "180px",
+  },
+  newsImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  newsPlaceholder: {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "2rem",
+    backgroundColor: "#f1f2f6",
+    color: "#bdc3c7",
+  },
+  newsBody: {
+    padding: "0.9rem",
+  },
+  newsTitleLink: {
+    color: "#2c3e50",
+    fontWeight: 700,
+    textDecoration: "none",
+    lineHeight: 1.4,
+    display: "inline-block",
+    marginBottom: "0.5rem",
+  },
+  newsDate: {
+    color: "#7f8c8d",
+    fontSize: "0.9rem",
   },
   loading: {
     textAlign: "center",

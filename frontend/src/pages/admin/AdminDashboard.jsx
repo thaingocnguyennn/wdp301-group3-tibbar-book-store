@@ -74,6 +74,14 @@ const AdminDashboard = () => {
             View, create and update voucher campaigns
           </p>
         </Link>
+
+        <Link to="/admin/news" style={styles.card}>
+          <div style={styles.icon}>📰</div>
+          <h3 style={styles.cardTitle}>News Management</h3>
+          <p style={styles.cardDesc}>
+            Create and manage news articles shown on homepage
+          </p>
+        </Link>
       </div>
     </div>
   );

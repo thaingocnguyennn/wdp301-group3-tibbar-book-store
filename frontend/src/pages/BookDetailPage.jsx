@@ -22,6 +22,19 @@ const BookDetailPage = () => {
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewPageIndex, setPreviewPageIndex] = useState(0);
+  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+  const resolveImageUrl = (path) => {
+    if (!path) return "";
+    return path.startsWith("http")
+      ? path
+      : `${serverBaseUrl}/${String(path).replace(/^\/+/, "")}`;
+  };
+  const imageSrc = resolveImageUrl(book?.imageUrl);
+  const previewPages = Array.isArray(book?.previewPages) ? book.previewPages.slice(0, 10) : [];
+  const currentPreviewSrc = resolveImageUrl(previewPages[previewPageIndex]);
 
   useEffect(() => {
     fetchBook();
@@ -133,6 +146,24 @@ const BookDetailPage = () => {
     return "★★★★★".slice(0, rounded) + "☆☆☆☆☆".slice(rounded);
   };
 
+  const openPreviewReader = () => {
+    if (previewPages.length === 0) return;
+    setPreviewPageIndex(0);
+    setIsPreviewOpen(true);
+  };
+
+  const closePreviewReader = () => {
+    setIsPreviewOpen(false);
+  };
+
+  const goToNextPreviewPage = () => {
+    setPreviewPageIndex((prev) => Math.min(prev + 1, previewPages.length - 1));
+  };
+
+  const goToPreviousPreviewPage = () => {
+    setPreviewPageIndex((prev) => Math.max(prev - 1, 0));
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -159,8 +190,8 @@ const BookDetailPage = () => {
     <div style={styles.container}>
       <div style={styles.content}>
         <div style={styles.imageSection}>
-          {book.imageUrl ? (
-            <img src={book.imageUrl} alt={book.title} style={styles.image} />
+          {imageSrc ? (
+            <img src={imageSrc} alt={book.title} style={styles.image} />
           ) : (
             <div style={styles.placeholder}>📖</div>
           )}
@@ -234,6 +265,17 @@ const BookDetailPage = () => {
               style={styles.continueShopping}
             >
               ← Continue Shopping
+            </button>
+            <button
+              type="button"
+              onClick={openPreviewReader}
+              disabled={previewPages.length === 0}
+              style={{
+                ...styles.previewButton,
+                ...(previewPages.length === 0 && styles.disabled),
+              }}
+            >
+              Preview Book
             </button>
           </div>
 
@@ -342,6 +384,53 @@ const BookDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {isPreviewOpen && (
+        <div style={styles.previewOverlay}>
+          <div style={styles.previewModal}>
+            <div style={styles.previewHeader}>
+              <h3 style={styles.previewTitle}>Book Preview</h3>
+              <button type="button" onClick={closePreviewReader} style={styles.previewCloseButton}>
+                Close
+              </button>
+            </div>
+
+            <div style={styles.previewImageWrapper}>
+              {currentPreviewSrc ? (
+                <img
+                  src={currentPreviewSrc}
+                  alt={`Preview page ${previewPageIndex + 1}`}
+                  style={styles.previewImage}
+                />
+              ) : (
+                <div style={styles.previewPlaceholder}>No preview image</div>
+              )}
+            </div>
+
+            <div style={styles.previewControls}>
+              <button
+                type="button"
+                onClick={goToPreviousPreviewPage}
+                disabled={previewPageIndex === 0}
+                style={styles.previewNavButton}
+              >
+                Previous Page
+              </button>
+              <span style={styles.previewPageCounter}>
+                Page {previewPageIndex + 1} / {previewPages.length}
+              </span>
+              <button
+                type="button"
+                onClick={goToNextPreviewPage}
+                disabled={previewPageIndex >= previewPages.length - 1}
+                style={styles.previewNavButton}
+              >
+                Next Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -672,6 +761,97 @@ const styles = {
     fontWeight: "600",
     cursor: "pointer",
     transition: "all 0.3s ease",
+  },
+  previewButton: {
+    flex: 0.6,
+    backgroundColor: "#f39c12",
+    color: "#fff",
+    padding: "0.75rem 1.2rem",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+  },
+  previewOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "1rem",
+  },
+  previewModal: {
+    width: "100%",
+    maxWidth: "900px",
+    backgroundColor: "#fff",
+    borderRadius: "10px",
+    padding: "1rem",
+    boxShadow: "0 16px 40px rgba(0, 0, 0, 0.28)",
+  },
+  previewHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "0.8rem",
+  },
+  previewTitle: {
+    margin: 0,
+    color: "#2c3e50",
+  },
+  previewCloseButton: {
+    border: "none",
+    backgroundColor: "#e74c3c",
+    color: "#fff",
+    borderRadius: "6px",
+    padding: "0.45rem 0.8rem",
+    cursor: "pointer",
+  },
+  previewImageWrapper: {
+    width: "100%",
+    maxHeight: "70vh",
+    overflow: "auto",
+    border: "1px solid #e0e0e0",
+    borderRadius: "8px",
+    backgroundColor: "#f8f9fa",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.75rem",
+  },
+  previewImage: {
+    width: "100%",
+    height: "auto",
+    borderRadius: "6px",
+  },
+  previewPlaceholder: {
+    color: "#7f8c8d",
+    padding: "2rem",
+  },
+  previewControls: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "1rem",
+    marginTop: "1rem",
+  },
+  previewNavButton: {
+    border: "none",
+    backgroundColor: "#34495e",
+    color: "#fff",
+    borderRadius: "6px",
+    padding: "0.55rem 0.9rem",
+    cursor: "pointer",
+  },
+  previewPageCounter: {
+    color: "#2c3e50",
+    fontWeight: 600,
   },
   disabled: {
     backgroundColor: "#bdc3c7",

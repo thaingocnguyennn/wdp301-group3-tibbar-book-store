@@ -33,6 +33,8 @@ import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
 import RecentlyViewedPage from "./pages/RecentlyViewedPage";
 import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
+import NewsPage from "./pages/NewsPage";
+import NewsManagement from "./pages/admin/NewsManagement";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
@@ -104,6 +106,7 @@ function AppContent() {
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
+        <Route path="/news/:id" element={<NewsPage />} />
         <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
@@ -251,6 +254,14 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <UsersManagement />x
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/news"
+          element={
+            <ProtectedRoute adminOnly>
+              <NewsManagement />
             </ProtectedRoute>
           }
         />
