@@ -24,6 +24,35 @@ const reviewSchema = new mongoose.Schema(
       maxlength: [1000, "Review comment cannot exceed 1000 characters"],
       default: "",
     },
+    images: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (value) => Array.isArray(value) && value.length <= 5,
+        message: "You can upload up to 5 images per review",
+      },
+    },
+    reactions: {
+      type: [
+        {
+          user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          type: {
+            type: String,
+            enum: ["HELPFUL", "DISLIKE"],
+            required: true,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
     isEdited: {
       type: Boolean,
       default: false,
@@ -36,6 +65,7 @@ const reviewSchema = new mongoose.Schema(
 
 reviewSchema.index({ book: 1, createdAt: -1 });
 reviewSchema.index({ user: 1, book: 1 }, { unique: true });
+reviewSchema.index({ "reactions.user": 1 });
 
 const Review = mongoose.model("Review", reviewSchema);
 

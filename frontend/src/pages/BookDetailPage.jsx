@@ -9,19 +9,33 @@ const BookDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { add } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviews, setReviews] = useState([]);
-  const [reviewSummary, setReviewSummary] = useState({ averageRating: 0, totalReviews: 0 });
-  const [reviewPagination, setReviewPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 10 });
+  const [reviewSummary, setReviewSummary] = useState({
+    averageRating: 0,
+    totalReviews: 0,
+  });
+  const [reviewPagination, setReviewPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    total: 0,
+    limit: 10,
+  });
   const [reviewLoading, setReviewLoading] = useState(true);
   const [reviewError, setReviewError] = useState("");
   const [myReview, setMyReview] = useState(null);
+  const [selectedRatingFilter, setSelectedRatingFilter] = useState("");
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");
+  const [existingReviewImages, setExistingReviewImages] = useState([]);
+  const [newReviewImages, setNewReviewImages] = useState([]);
+  const [newReviewImagePreviews, setNewReviewImagePreviews] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDeleting, setReviewDeleting] = useState(false);
+  const [reactionSubmittingId, setReactionSubmittingId] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -33,13 +47,19 @@ const BookDetailPage = () => {
       : `${serverBaseUrl}/${String(path).replace(/^\/+/, "")}`;
   };
   const imageSrc = resolveImageUrl(book?.imageUrl);
-  const previewPages = Array.isArray(book?.previewPages) ? book.previewPages.slice(0, 10) : [];
+  const previewPages = Array.isArray(book?.previewPages)
+    ? book.previewPages.slice(0, 10)
+    : [];
   const currentPreviewSrc = resolveImageUrl(previewPages[previewPageIndex]);
 
   useEffect(() => {
     fetchBook();
-    fetchReviews(1);
+    fetchReviews(1, selectedRatingFilter);
   }, [id]);
+
+  useEffect(() => {
+    fetchReviews(1, selectedRatingFilter);
+  }, [selectedRatingFilter]);
 
   useEffect(() => {
     if (isAuthenticated && id) {
@@ -59,15 +79,22 @@ const BookDetailPage = () => {
     }
   };
 
-  const fetchReviews = async (page = 1) => {
+  const fetchReviews = async (page = 1, rating = "") => {
     try {
       setReviewLoading(true);
       setReviewError("");
-      const response = await reviewApi.getBookReviews(id, page, 10);
+      const response = await reviewApi.getBookReviews(id, page, 10, rating);
       setReviews(response.data.reviews || []);
-      setReviewSummary(response.data.summary || { averageRating: 0, totalReviews: 0 });
+      setReviewSummary(
+        response.data.summary || { averageRating: 0, totalReviews: 0 },
+      );
       setReviewPagination(
-        response.data.pagination || { page: 1, totalPages: 1, total: 0, limit: 10 },
+        response.data.pagination || {
+          page: 1,
+          totalPages: 1,
+          total: 0,
+          limit: 10,
+        },
       );
     } catch (err) {
       setReviewError(err.response?.data?.message || "Failed to load reviews");
@@ -85,13 +112,55 @@ const BookDetailPage = () => {
       if (review) {
         setRatingInput(review.rating);
         setCommentInput(review.comment || "");
+        setExistingReviewImages(
+          Array.isArray(review.images) ? review.images : [],
+        );
       } else {
         setRatingInput(5);
         setCommentInput("");
+        setExistingReviewImages([]);
       }
     } catch (err) {
       setMyReview(null);
+      setExistingReviewImages([]);
     }
+  };
+
+  const handleSelectNewReviewImages = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const remainingSlots =
+      5 - existingReviewImages.length - newReviewImages.length;
+    if (remainingSlots <= 0) {
+      setReviewError("You can upload up to 5 review images");
+      return;
+    }
+
+    const selectedFiles = files.slice(0, remainingSlots);
+    const previews = selectedFiles.map((file) => URL.createObjectURL(file));
+
+    setNewReviewImages((prev) => [...prev, ...selectedFiles]);
+    setNewReviewImagePreviews((prev) => [...prev, ...previews]);
+  };
+
+  const removeNewImageAt = (index) => {
+    setNewReviewImages((prev) =>
+      prev.filter((_, itemIndex) => itemIndex !== index),
+    );
+    setNewReviewImagePreviews((prev) => {
+      const target = prev[index];
+      if (target) {
+        URL.revokeObjectURL(target);
+      }
+      return prev.filter((_, itemIndex) => itemIndex !== index);
+    });
+  };
+
+  const removeExistingImageAt = (index) => {
+    setExistingReviewImages((prev) =>
+      prev.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
 
   const handleAddToCart = async () => {
@@ -120,26 +189,98 @@ const BookDetailPage = () => {
       setReviewSubmitting(true);
       setReviewError("");
 
-      const payload = {
-        rating: Number(ratingInput),
-        comment: commentInput.trim(),
-      };
+      const payload = new FormData();
+      payload.append("rating", String(Number(ratingInput)));
+      payload.append("comment", commentInput.trim());
+
+      existingReviewImages.forEach((imagePath) => {
+        payload.append("keepExistingImages", imagePath);
+      });
+
+      newReviewImages.forEach((file) => {
+        payload.append("images", file);
+      });
 
       if (myReview?._id) {
-        await reviewApi.updateReview(myReview._id, payload);
+        await reviewApi.updateReview(myReview._id, payload, true);
       } else {
-        await reviewApi.createReview(id, payload);
+        await reviewApi.createReview(id, payload, true);
       }
 
-      await Promise.all([fetchReviews(1), fetchMyReview()]);
+      setNewReviewImages([]);
+      setNewReviewImagePreviews((prev) => {
+        prev.forEach((url) => URL.revokeObjectURL(url));
+        return [];
+      });
+
+      await Promise.all([
+        fetchReviews(1, selectedRatingFilter),
+        fetchMyReview(),
+      ]);
     } catch (err) {
-      setReviewError(
-        err.response?.data?.message || "Failed to submit review",
-      );
+      setReviewError(err.response?.data?.message || "Failed to submit review");
     } finally {
       setReviewSubmitting(false);
     }
   };
+
+  const handleDeleteMyReview = async () => {
+    if (!myReview?._id || reviewDeleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your review?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setReviewDeleting(true);
+      setReviewError("");
+      await reviewApi.deleteReview(myReview._id);
+      setMyReview(null);
+      setRatingInput(5);
+      setCommentInput("");
+      setExistingReviewImages([]);
+      setNewReviewImages([]);
+      setNewReviewImagePreviews((prev) => {
+        prev.forEach((url) => URL.revokeObjectURL(url));
+        return [];
+      });
+      await fetchReviews(1, selectedRatingFilter);
+    } catch (err) {
+      setReviewError(err.response?.data?.message || "Failed to delete review");
+    } finally {
+      setReviewDeleting(false);
+    }
+  };
+
+  const handleReviewReaction = async (reviewId, type) => {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: `/books/${id}` } });
+      return;
+    }
+
+    try {
+      setReactionSubmittingId(reviewId);
+      await reviewApi.reactToReview(reviewId, type);
+      await fetchReviews(reviewPagination.page, selectedRatingFilter);
+    } catch (err) {
+      setReviewError(
+        err.response?.data?.message || "Failed to react to review",
+      );
+    } finally {
+      setReactionSubmittingId("");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      newReviewImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [newReviewImagePreviews]);
 
   const renderStars = (rating) => {
     const rounded = Math.round(Number(rating) || 0);
@@ -217,8 +358,12 @@ const BookDetailPage = () => {
           )}
 
           <div style={styles.priceSection}>
-            <span style={styles.price}>{book.price.toLocaleString('vi-VN')}₫</span>
-            <p style={styles.priceNote}>Free shipping on orders over 200,000₫</p>
+            <span style={styles.price}>
+              {book.price.toLocaleString("vi-VN")}₫
+            </span>
+            <p style={styles.priceNote}>
+              Free shipping on orders over 200,000₫
+            </p>
           </div>
 
           <div style={styles.divider}></div>
@@ -285,20 +430,45 @@ const BookDetailPage = () => {
             <h3 style={styles.sectionTitle}>⭐ Reviews & Ratings</h3>
 
             <div style={styles.reviewSummary}>
-              <strong>{reviewSummary.averageRating?.toFixed(1) || "0.0"}/5</strong>
+              <strong>
+                {reviewSummary.averageRating?.toFixed(1) || "0.0"}/5
+              </strong>
               <span style={styles.reviewSummaryText}>
-                {renderStars(reviewSummary.averageRating)} • {reviewSummary.totalReviews || 0} review(s)
+                {renderStars(reviewSummary.averageRating)} •{" "}
+                {reviewSummary.totalReviews || 0} review(s)
               </span>
             </div>
 
+            <div style={styles.reviewFilterRow}>
+              <label style={styles.infoLabel}>Filter by star</label>
+              <select
+                value={selectedRatingFilter}
+                onChange={(event) =>
+                  setSelectedRatingFilter(event.target.value)
+                }
+                style={styles.ratingSelect}
+              >
+                <option value="">All ratings</option>
+                {[5, 4, 3, 2, 1].map((value) => (
+                  <option key={value} value={value}>
+                    {value} star{value > 1 ? "s" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div style={styles.myReviewBox}>
-              <h4 style={styles.myReviewTitle}>{myReview ? "Edit Your Review" : "Write a Review"}</h4>
+              <h4 style={styles.myReviewTitle}>
+                {myReview ? "Edit Your Review" : "Write a Review"}
+              </h4>
 
               <div style={styles.ratingRow}>
                 <label style={styles.infoLabel}>Rating</label>
                 <select
                   value={ratingInput}
-                  onChange={(event) => setRatingInput(Number(event.target.value))}
+                  onChange={(event) =>
+                    setRatingInput(Number(event.target.value))
+                  }
                   style={styles.ratingSelect}
                 >
                   {[5, 4, 3, 2, 1].map((value) => (
@@ -317,18 +487,96 @@ const BookDetailPage = () => {
                 style={styles.reviewTextarea}
               />
 
-              <button
-                type="button"
-                onClick={handleSubmitReview}
-                disabled={reviewSubmitting}
-                style={styles.reviewSubmitBtn}
-              >
-                {reviewSubmitting
-                  ? "Saving..."
-                  : myReview
-                    ? "Update My Review"
-                    : "Submit Review"}
-              </button>
+              {existingReviewImages.length > 0 && (
+                <div style={styles.reviewImagesRow}>
+                  {existingReviewImages.map((imagePath, index) => (
+                    <div
+                      key={`${imagePath}-${index}`}
+                      style={styles.reviewImageCard}
+                    >
+                      <img
+                        src={resolveImageUrl(imagePath)}
+                        alt="Review"
+                        style={styles.reviewImageThumb}
+                      />
+                      <button
+                        type="button"
+                        style={styles.removeImageBtn}
+                        onClick={() => removeExistingImageAt(index)}
+                        disabled={reviewSubmitting}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {newReviewImagePreviews.length > 0 && (
+                <div style={styles.reviewImagesRow}>
+                  {newReviewImagePreviews.map((previewUrl, index) => (
+                    <div
+                      key={`${previewUrl}-${index}`}
+                      style={styles.reviewImageCard}
+                    >
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        style={styles.reviewImageThumb}
+                      />
+                      <button
+                        type="button"
+                        style={styles.removeImageBtn}
+                        onClick={() => removeNewImageAt(index)}
+                        disabled={reviewSubmitting}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label style={styles.imageUploadLabel}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={handleSelectNewReviewImages}
+                  disabled={
+                    reviewSubmitting ||
+                    existingReviewImages.length + newReviewImages.length >= 5
+                  }
+                />
+                Upload images (max 5)
+              </label>
+
+              <div style={styles.reviewActionRow}>
+                <button
+                  type="button"
+                  onClick={handleSubmitReview}
+                  disabled={reviewSubmitting}
+                  style={styles.reviewSubmitBtn}
+                >
+                  {reviewSubmitting
+                    ? "Saving..."
+                    : myReview
+                      ? "Update My Review"
+                      : "Submit Review"}
+                </button>
+
+                {myReview && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteMyReview}
+                    disabled={reviewDeleting || reviewSubmitting}
+                    style={styles.deleteReviewBtn}
+                  >
+                    {reviewDeleting ? "Deleting..." : "Delete My Review"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {reviewError && <div style={styles.reviewError}>{reviewError}</div>}
@@ -344,13 +592,63 @@ const BookDetailPage = () => {
                     <div key={review._id} style={styles.reviewItem}>
                       <div style={styles.reviewHeader}>
                         <strong>
-                          {review.user?.firstName || "User"} {review.user?.lastName || ""}
+                          {review.user?.firstName || "User"}{" "}
+                          {review.user?.lastName || ""}
                         </strong>
-                        <span style={styles.reviewStars}>{renderStars(review.rating)}</span>
+                        <span style={styles.reviewStars}>
+                          {renderStars(review.rating)}
+                        </span>
                       </div>
-                      <p style={styles.reviewComment}>{review.comment || "(No comment)"}</p>
+                      <p style={styles.reviewComment}>
+                        {review.comment || "(No comment)"}
+                      </p>
+
+                      {Array.isArray(review.images) &&
+                        review.images.length > 0 && (
+                          <div style={styles.reviewImageGallery}>
+                            {review.images.map((imagePath, index) => (
+                              <img
+                                key={`${review._id}-image-${index}`}
+                                src={resolveImageUrl(imagePath)}
+                                alt="Review attachment"
+                                style={styles.reviewImageInList}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                      <div style={styles.reactionRow}>
+                        <button
+                          type="button"
+                          style={styles.reactionBtn}
+                          onClick={() =>
+                            handleReviewReaction(review._id, "HELPFUL")
+                          }
+                          disabled={
+                            reactionSubmittingId === review._id ||
+                            review.user?._id === user?._id
+                          }
+                        >
+                          Helpful ({review.reactionSummary?.helpful || 0})
+                        </button>
+                        <button
+                          type="button"
+                          style={styles.reactionBtn}
+                          onClick={() =>
+                            handleReviewReaction(review._id, "DISLIKE")
+                          }
+                          disabled={
+                            reactionSubmittingId === review._id ||
+                            review.user?._id === user?._id
+                          }
+                        >
+                          Dislike ({review.reactionSummary?.dislike || 0})
+                        </button>
+                      </div>
+
                       <span style={styles.reviewDate}>
-                        {new Date(review.createdAt).toLocaleDateString()} {review.isEdited ? "• Edited" : ""}
+                        {new Date(review.createdAt).toLocaleDateString()}{" "}
+                        {review.isEdited ? "• Edited" : ""}
                       </span>
                     </div>
                   ))}
@@ -361,18 +659,31 @@ const BookDetailPage = () => {
                         type="button"
                         style={styles.reviewPageButton}
                         disabled={reviewPagination.page <= 1}
-                        onClick={() => fetchReviews(reviewPagination.page - 1)}
+                        onClick={() =>
+                          fetchReviews(
+                            reviewPagination.page - 1,
+                            selectedRatingFilter,
+                          )
+                        }
                       >
                         Previous
                       </button>
                       <span style={styles.reviewPageInfo}>
-                        Page {reviewPagination.page} / {reviewPagination.totalPages}
+                        Page {reviewPagination.page} /{" "}
+                        {reviewPagination.totalPages}
                       </span>
                       <button
                         type="button"
                         style={styles.reviewPageButton}
-                        disabled={reviewPagination.page >= reviewPagination.totalPages}
-                        onClick={() => fetchReviews(reviewPagination.page + 1)}
+                        disabled={
+                          reviewPagination.page >= reviewPagination.totalPages
+                        }
+                        onClick={() =>
+                          fetchReviews(
+                            reviewPagination.page + 1,
+                            selectedRatingFilter,
+                          )
+                        }
                       >
                         Next
                       </button>
@@ -390,7 +701,11 @@ const BookDetailPage = () => {
           <div style={styles.previewModal}>
             <div style={styles.previewHeader}>
               <h3 style={styles.previewTitle}>Book Preview</h3>
-              <button type="button" onClick={closePreviewReader} style={styles.previewCloseButton}>
+              <button
+                type="button"
+                onClick={closePreviewReader}
+                style={styles.previewCloseButton}
+              >
                 Close
               </button>
             </div>
@@ -632,6 +947,11 @@ const styles = {
     color: "#7f8c8d",
     fontSize: "0.9rem",
   },
+  reviewFilterRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.6rem",
+  },
   myReviewBox: {
     border: "1px solid #e0e0e0",
     borderRadius: "8px",
@@ -663,9 +983,63 @@ const styles = {
     borderRadius: "6px",
     fontFamily: "inherit",
   },
+  reviewImagesRow: {
+    display: "flex",
+    gap: "0.65rem",
+    flexWrap: "wrap",
+  },
+  reviewImageCard: {
+    border: "1px solid #e5e7eb",
+    borderRadius: "6px",
+    padding: "0.4rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.35rem",
+    width: "96px",
+  },
+  reviewImageThumb: {
+    width: "100%",
+    height: "70px",
+    objectFit: "cover",
+    borderRadius: "4px",
+  },
+  removeImageBtn: {
+    border: "none",
+    backgroundColor: "#ef4444",
+    color: "#fff",
+    borderRadius: "4px",
+    padding: "0.25rem 0.35rem",
+    fontSize: "0.72rem",
+    cursor: "pointer",
+  },
+  imageUploadLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px dashed #94a3b8",
+    color: "#334155",
+    borderRadius: "6px",
+    padding: "0.5rem 0.75rem",
+    width: "fit-content",
+    fontSize: "0.82rem",
+    cursor: "pointer",
+  },
+  reviewActionRow: {
+    display: "flex",
+    gap: "0.6rem",
+    flexWrap: "wrap",
+  },
   reviewSubmitBtn: {
-    alignSelf: "flex-start",
     backgroundColor: "#667eea",
+    color: "#fff",
+    border: "none",
+    borderRadius: "6px",
+    padding: "0.55rem 0.9rem",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+  deleteReviewBtn: {
+    backgroundColor: "#dc2626",
     color: "#fff",
     border: "none",
     borderRadius: "6px",
@@ -706,6 +1080,34 @@ const styles = {
     color: "#34495e",
     fontSize: "0.9rem",
     lineHeight: "1.5",
+  },
+  reviewImageGallery: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "0.5rem",
+    marginBottom: "0.45rem",
+  },
+  reviewImageInList: {
+    width: "92px",
+    height: "72px",
+    borderRadius: "6px",
+    objectFit: "cover",
+    border: "1px solid #e5e7eb",
+  },
+  reactionRow: {
+    display: "flex",
+    gap: "0.5rem",
+    marginBottom: "0.45rem",
+  },
+  reactionBtn: {
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#fff",
+    color: "#334155",
+    borderRadius: "999px",
+    padding: "0.25rem 0.65rem",
+    cursor: "pointer",
+    fontSize: "0.78rem",
+    fontWeight: 600,
   },
   reviewDate: {
     color: "#95a5a6",
