@@ -245,6 +245,93 @@ class BookService {
     return book;
   }
 
+  async updatePreviewPages(bookId, previewPages = []) {
+    if (!Array.isArray(previewPages) || previewPages.length === 0) {
+      throw ApiError.badRequest('Please upload at least one preview image');
+    }
+
+    if (previewPages.length > 10) {
+      throw ApiError.badRequest('Preview pages cannot exceed 10 images');
+    }
+
+    const book = await Book.findByIdAndUpdate(
+      bookId,
+      { $set: { previewPages } },
+      { new: true, runValidators: true }
+    ).populate('category', 'name');
+
+    if (!book) {
+      throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    }
+
+    return book;
+  }
+
+  async managePreviewPage(bookId, { operation, pageNumber, previewPageUrl }) {
+    const normalizedOperation = String(operation || '').toLowerCase();
+    const position = Number(pageNumber);
+
+    if (!Number.isInteger(position) || position < 1) {
+      throw ApiError.badRequest('Page number must be a positive integer');
+    }
+
+    if (!['insert', 'replace', 'delete'].includes(normalizedOperation)) {
+      throw ApiError.badRequest('Invalid preview operation');
+    }
+
+    const book = await Book.findById(bookId);
+    if (!book) {
+      throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    }
+
+    const currentPages = Array.isArray(book.previewPages) ? [...book.previewPages] : [];
+
+    if (normalizedOperation === 'insert') {
+      if (!previewPageUrl) {
+        throw ApiError.badRequest('Preview image is required for insert');
+      }
+      if (currentPages.length >= 10) {
+        throw ApiError.badRequest('Cannot insert more preview pages. Maximum is 10');
+      }
+      if (position > currentPages.length + 1) {
+        throw ApiError.badRequest(`Insert page must be between 1 and ${currentPages.length + 1}`);
+      }
+
+      currentPages.splice(position - 1, 0, previewPageUrl);
+    }
+
+    if (normalizedOperation === 'replace') {
+      if (!previewPageUrl) {
+        throw ApiError.badRequest('Preview image is required for replace');
+      }
+      if (currentPages.length === 0) {
+        throw ApiError.badRequest('No preview page to replace');
+      }
+      if (position > currentPages.length) {
+        throw ApiError.badRequest(`Replace page must be between 1 and ${currentPages.length}`);
+      }
+
+      currentPages[position - 1] = previewPageUrl;
+    }
+
+    if (normalizedOperation === 'delete') {
+      if (currentPages.length === 0) {
+        throw ApiError.badRequest('No preview page to delete');
+      }
+      if (position > currentPages.length) {
+        throw ApiError.badRequest(`Delete page must be between 1 and ${currentPages.length}`);
+      }
+
+      currentPages.splice(position - 1, 1);
+    }
+
+    book.previewPages = currentPages;
+    await book.save();
+    await book.populate('category', 'name');
+
+    return book;
+  }
+
   async deleteBook(bookId) {
     const book = await Book.findByIdAndDelete(bookId);
 
