@@ -36,6 +36,8 @@ const BookDetailPage = () => {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewDeleting, setReviewDeleting] = useState(false);
   const [reactionSubmittingId, setReactionSubmittingId] = useState("");
+  const [replyInputs, setReplyInputs] = useState({});
+  const [replySubmittingId, setReplySubmittingId] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -273,6 +275,38 @@ const BookDetailPage = () => {
       );
     } finally {
       setReactionSubmittingId("");
+    }
+  };
+
+  const handleReplyInputChange = (reviewId, value) => {
+    setReplyInputs((prev) => ({
+      ...prev,
+      [reviewId]: value,
+    }));
+  };
+
+  const handleReplyToReview = async (reviewId) => {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: `/books/${id}` } });
+      return;
+    }
+
+    const comment = String(replyInputs[reviewId] || "").trim();
+    if (!comment) {
+      setReviewError("Please enter reply content");
+      return;
+    }
+
+    try {
+      setReplySubmittingId(reviewId);
+      setReviewError("");
+      await reviewApi.replyToReview(reviewId, comment);
+      setReplyInputs((prev) => ({ ...prev, [reviewId]: "" }));
+      await fetchReviews(reviewPagination.page, selectedRatingFilter);
+    } catch (err) {
+      setReviewError(err.response?.data?.message || "Failed to submit reply");
+    } finally {
+      setReplySubmittingId("");
     }
   };
 
@@ -643,6 +677,66 @@ const BookDetailPage = () => {
                           }
                         >
                           Dislike ({review.reactionSummary?.dislike || 0})
+                        </button>
+                      </div>
+
+                      {Array.isArray(review.replies) &&
+                        review.replies.length > 0 && (
+                          <div style={styles.replyList}>
+                            {review.replies.map((reply) => (
+                              <div
+                                key={
+                                  reply._id ||
+                                  `${review._id}-${reply.createdAt}`
+                                }
+                                style={styles.replyItem}
+                              >
+                                <div style={styles.replyHeader}>
+                                  <strong style={styles.replyAuthor}>
+                                    {reply.user?.firstName || "User"}{" "}
+                                    {reply.user?.lastName || ""}
+                                  </strong>
+                                  {(reply.role === "admin" ||
+                                    reply.role === "manager") && (
+                                    <span style={styles.adminReplyBadge}>
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                                <p style={styles.replyComment}>
+                                  {reply.comment}
+                                </p>
+                                <span style={styles.replyDate}>
+                                  {new Date(reply.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      <div style={styles.replyComposer}>
+                        <input
+                          type="text"
+                          value={replyInputs[review._id] || ""}
+                          onChange={(event) =>
+                            handleReplyInputChange(
+                              review._id,
+                              event.target.value,
+                            )
+                          }
+                          placeholder="Write a reply to this review"
+                          style={styles.replyInput}
+                          disabled={replySubmittingId === review._id}
+                        />
+                        <button
+                          type="button"
+                          style={styles.replyButton}
+                          onClick={() => handleReplyToReview(review._id)}
+                          disabled={replySubmittingId === review._id}
+                        >
+                          {replySubmittingId === review._id
+                            ? "Replying..."
+                            : "Reply"}
                         </button>
                       </div>
 
@@ -1108,6 +1202,69 @@ const styles = {
     cursor: "pointer",
     fontSize: "0.78rem",
     fontWeight: 600,
+  },
+  replyList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.45rem",
+    marginBottom: "0.45rem",
+  },
+  replyItem: {
+    marginLeft: "0.65rem",
+    borderLeft: "3px solid #dbeafe",
+    backgroundColor: "#f8fafc",
+    padding: "0.45rem 0.6rem",
+    borderRadius: "6px",
+  },
+  replyHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.4rem",
+  },
+  replyAuthor: {
+    color: "#1e293b",
+    fontSize: "0.82rem",
+  },
+  adminReplyBadge: {
+    backgroundColor: "#1d4ed8",
+    color: "#fff",
+    fontSize: "0.66rem",
+    fontWeight: 700,
+    borderRadius: "999px",
+    padding: "0.15rem 0.45rem",
+  },
+  replyComment: {
+    margin: "0.25rem 0",
+    color: "#334155",
+    fontSize: "0.82rem",
+    lineHeight: 1.45,
+  },
+  replyDate: {
+    color: "#94a3b8",
+    fontSize: "0.72rem",
+  },
+  replyComposer: {
+    display: "flex",
+    gap: "0.45rem",
+    marginBottom: "0.45rem",
+  },
+  replyInput: {
+    flex: 1,
+    border: "1px solid #cbd5e1",
+    borderRadius: "6px",
+    padding: "0.42rem 0.55rem",
+    fontSize: "0.82rem",
+  },
+  replyButton: {
+    border: "none",
+    backgroundColor: "#0ea5e9",
+    color: "#fff",
+    borderRadius: "6px",
+    padding: "0.42rem 0.75rem",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.78rem",
+    whiteSpace: "nowrap",
   },
   reviewDate: {
     color: "#95a5a6",

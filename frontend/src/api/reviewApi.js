@@ -1,6 +1,25 @@
 import axiosInstance from "./axios.js";
 
 export const reviewApi = {
+  getAdminReviews: async ({
+    page = 1,
+    limit = 20,
+    search = "",
+    rating = "",
+    replyStatus = "all",
+  } = {}) => {
+    const response = await axiosInstance.get("/reviews/admin/list", {
+      params: {
+        page,
+        limit,
+        search: search || undefined,
+        rating: rating || undefined,
+        replyStatus: replyStatus || "all",
+      },
+    });
+    return response.data;
+  },
+
   getBookReviews: async (bookId, page = 1, limit = 10, rating = "") => {
     const response = await axiosInstance.get(`/reviews/book/${bookId}`, {
       params: { page, limit, rating: rating || undefined },
@@ -55,6 +74,13 @@ export const reviewApi = {
         type,
       },
     );
+    return response.data;
+  },
+
+  replyToReview: async (reviewId, comment) => {
+    const response = await axiosInstance.post(`/reviews/${reviewId}/replies`, {
+      comment,
+    });
     return response.data;
   },
 };
