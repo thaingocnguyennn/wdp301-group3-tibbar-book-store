@@ -52,6 +52,33 @@ export const bookApi = {
     return response.data;
   },
 
+  uploadBookPreview: async (id, previewData) => {
+    const response = await axiosInstance.post(
+      `/admin/books/${id}/preview`,
+      previewData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  updateBookPreview: async (id, previewData) => {
+    const response = await axiosInstance.put(
+      `/admin/books/${id}/preview`,
+      previewData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  manageBookPreviewPage: async (id, payload) => {
+    const response = await axiosInstance.patch(
+      `/admin/books/${id}/preview/manage`,
+      payload,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
   deleteBook: async (id) => {
     const response = await axiosInstance.delete(`/admin/books/${id}`);
     return response.data;

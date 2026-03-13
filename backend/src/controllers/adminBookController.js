@@ -76,6 +76,47 @@ class AdminBookController {
     }
   }
 
+    async updatePreviewPages(req, res, next) {
+      try {
+        const files = Array.isArray(req.files) ? req.files : [];
+
+        const previewPages = files.map((file) => `/uploads/book-previews/${file.filename}`);
+
+        const book = await bookService.updatePreviewPages(req.params.id, previewPages);
+
+        return ApiResponse.success(
+          res,
+          HTTP_STATUS.OK,
+          'Book preview pages updated successfully',
+          { book }
+        );
+      } catch (error) {
+        next(error);
+      }
+    }
+
+  async managePreviewPage(req, res, next) {
+    try {
+      const { operation, pageNumber } = req.body;
+      const previewPageUrl = req.file ? `/uploads/book-previews/${req.file.filename}` : undefined;
+
+      const book = await bookService.managePreviewPage(req.params.id, {
+        operation,
+        pageNumber,
+        previewPageUrl
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        'Book preview page managed successfully',
+        { book }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteBook(req, res, next) {
     try {
       await bookService.deleteBook(req.params.id);
