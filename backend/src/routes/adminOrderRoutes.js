@@ -10,7 +10,12 @@ router.use(authenticate);
 router.use(authorize(ROLES.ADMIN));
 
 router.get("/", adminOrderController.getAllOrders);
+router.get("/requests/recent", adminOrderController.getRecentCustomerRequests);
 router.get("/:id", adminOrderController.getOrderById);
 router.patch("/:id/status", adminOrderController.updateOrderStatus);
+router.patch(
+  "/:id/return-refund",
+  adminOrderController.reviewReturnRefundRequest,
+);
 
 export default router;

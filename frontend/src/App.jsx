@@ -33,8 +33,15 @@ import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
 import RecentlyViewedPage from "./pages/RecentlyViewedPage";
 import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
+import NewsPage from "./pages/NewsPage";
+import NewsManagement from "./pages/admin/NewsManagement";
+import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 // Protected Route Component - Only for authenticated routes
-const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
+const ProtectedRoute = ({
+  children,
+  adminOnly = false,
+  shipperOnly = false,
+}) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
 
   if (loading) {
@@ -55,7 +62,7 @@ const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) =>
     return <Navigate to="/" replace />;
   }
 
-  if (shipperOnly && user?.role !== 'shipper') {
+  if (shipperOnly && user?.role !== "shipper") {
     return <Navigate to="/" replace />;
   }
 
@@ -82,12 +89,12 @@ const RoleBasedHome = () => {
   const { isAuthenticated, user } = useAuth();
 
   // Redirect shippers to their dashboard
-  if (isAuthenticated && user?.role === 'shipper') {
+  if (isAuthenticated && user?.role === "shipper") {
     return <Navigate to="/shipper/dashboard" replace />;
   }
 
   // Redirect admins to admin dashboard
-  if (isAuthenticated && (user?.role === 'admin' || user?.role === 'manager')) {
+  if (isAuthenticated && (user?.role === "admin" || user?.role === "manager")) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
@@ -104,6 +111,7 @@ function AppContent() {
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
+        <Route path="/news/:id" element={<NewsPage />} />
         <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
@@ -236,6 +244,14 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/request-history"
+          element={
+            <ProtectedRoute adminOnly>
+              <RecentRequestHistoryPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/admin/vouchers"
@@ -250,7 +266,15 @@ function AppContent() {
           path="/admin/users"
           element={
             <ProtectedRoute adminOnly>
-              <UsersManagement />x
+              <UsersManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/news"
+          element={
+            <ProtectedRoute adminOnly>
+              <NewsManagement />
             </ProtectedRoute>
           }
         />
@@ -270,11 +294,13 @@ function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!googleClientId) {
-    console.warn('Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file');
+    console.warn(
+      "Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file",
+    );
   }
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId || ''}>
+    <GoogleOAuthProvider clientId={googleClientId || ""}>
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>

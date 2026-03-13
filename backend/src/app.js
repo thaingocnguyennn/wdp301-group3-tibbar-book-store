@@ -23,6 +23,8 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import shipperRoutes from "./routes/shipperRoutes.js";
 import coinRoutes from "./routes/coinRoutes.js";
+import newsRoutes from "./routes/newsRoutes.js";
+import adminNewsRoutes from "./routes/adminNewsRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
@@ -78,6 +80,8 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/shipper", shipperRoutes);
 app.use("/api/coins", coinRoutes);
+app.use("/api/news", newsRoutes);
+app.use("/api/admin/news", adminNewsRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

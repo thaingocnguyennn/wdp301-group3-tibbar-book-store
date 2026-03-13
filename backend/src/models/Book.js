@@ -38,6 +38,21 @@ const bookSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  previewPages: {
+    type: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
+    default: [],
+    validate: {
+      validator: function(value) {
+        return Array.isArray(value) && value.length <= 10;
+      },
+      message: 'Preview pages cannot exceed 10 images'
+    }
+  },
   isbn: {
     type: String,
     unique: true,
