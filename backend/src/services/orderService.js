@@ -12,6 +12,10 @@ import { ROLES } from "../config/constants.js";
 
 const MAX_ORDERS = 20;
 const RETURN_REQUEST_WINDOW_DAYS = 7;
+const ADMIN_STATUS_TRANSITIONS = {
+  PENDING: ["PROCESSING"],
+  PROCESSING: ["SHIPPED"],
+};
 class OrderService {
   escapeHtml(value = "") {
     return String(value)
@@ -280,6 +284,20 @@ class OrderService {
     }
 
     return parsedDate;
+  }
+
+  getAdminAllowedStatuses(currentStatus) {
+    return ADMIN_STATUS_TRANSITIONS[currentStatus] || [];
+  }
+
+  validateAdminStatusTransition(currentStatus, nextStatus) {
+    const allowedStatuses = this.getAdminAllowedStatuses(currentStatus);
+
+    if (!allowedStatuses.includes(nextStatus)) {
+      throw ApiError.badRequest(
+        `Invalid status transition: ${currentStatus} -> ${nextStatus}. Allowed: ${allowedStatuses.join(", ") || "none"}`,
+      );
+    }
   }
 
   // Calculate shipping fee based on subtotal
@@ -742,16 +760,6 @@ class OrderService {
       // Clear cart only after successful order creation
       await Cart.findByIdAndUpdate(cart._id, { items: [] });
 
-      // Assign shipper should not break checkout flow
-      try {
-        await this.autoAssignShipper(order._id);
-      } catch (assignmentError) {
-        console.error(
-          "⚠️ [OrderService] Auto assignment failed:",
-          assignmentError.message,
-        );
-      }
-
       // Populate order details
       await order.populate("items.book user");
 
@@ -876,6 +884,7 @@ class OrderService {
       Order.find(filter)
         .populate("items.book")
         .populate("user", "email firstName lastName")
+        .populate("shipper", "email firstName lastName")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -899,6 +908,7 @@ class OrderService {
     const order = await Order.findById(orderId)
       .populate("items.book")
       .populate("user", "email firstName lastName")
+      .populate("shipper", "email firstName lastName")
       .lean();
 
     if (!order) {
@@ -910,36 +920,29 @@ class OrderService {
 
   // Admin: update order status
   async updateOrderStatus(orderId, status) {
-    const allowedStatuses = [
-      "PENDING",
-      "PROCESSING",
-      "SHIPPED",
-      "DELIVERED",
-      "CANCELLED",
-    ];
+    const allowedStatuses = ["PROCESSING", "SHIPPED"];
 
     if (!allowedStatuses.includes(status)) {
-      throw ApiError.badRequest("Invalid order status");
+      throw ApiError.badRequest(
+        "Admin can only update order status to PROCESSING or SHIPPED",
+      );
     }
 
     const order = await Order.findById(orderId);
     if (!order) throw ApiError.notFound("Order not found");
 
-    order.orderStatus = status;
+    this.validateAdminStatusTransition(order.orderStatus, status);
 
-    if (status === "DELIVERED" && !order.deliveredAt) {
-      order.deliveredAt = new Date();
-
-      // 🚀 TRỪ currentOrders
-      if (order.shipper) {
-        await User.findByIdAndUpdate(order.shipper, {
-          $inc: { currentOrders: -1 },
-        });
-      }
+    if (status === "SHIPPED" && !order.shipper) {
+      throw ApiError.badRequest(
+        "A shipper must be assigned before marking order as SHIPPED",
+      );
     }
 
+    order.orderStatus = status;
+
     await order.save();
-    await order.populate("items.book user");
+    await order.populate("items.book user shipper");
 
     return order;
   }
@@ -1107,15 +1110,6 @@ class OrderService {
         notes,
         transactionId: paymentResult.transactionId || null,
       });
-
-      try {
-        await this.autoAssignShipper(order._id);
-      } catch (assignmentError) {
-        console.error(
-          "⚠️ [OrderService] Auto assignment failed:",
-          assignmentError.message,
-        );
-      }
 
       await order.populate("items.book user");
 
@@ -1361,7 +1355,6 @@ class OrderService {
     if (confirmResult.success) {
       order.transactionId = confirmResult.transactionId || order.transactionId;
       order.paidAt = new Date();
-      order.orderStatus = "PROCESSING"; // Move to processing after payment
     } else {
       order.paymentStatus = "FAILED";
     }
@@ -1478,6 +1471,13 @@ class OrderService {
       // Kiểm tra nếu không tìm thấy order
       throw ApiError.notFound("Order not found"); // Trả về lỗi nếu không tìm thấy order
     }
+
+    if (!["PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
+      throw ApiError.badRequest(
+        "Order can only be assigned while in PROCESSING or SHIPPED status",
+      );
+    }
+
     // ⭐ THÊM ĐOẠN NÀY
     const { province, district } = order.shippingAddress || {};
 
@@ -1496,8 +1496,10 @@ class OrderService {
     order.shipper = shipperId;
     order.assignedAt = new Date();
 
-    // ⭐ CHUYỂN TRẠNG THÁI SANG SHIPPED
-    order.orderStatus = "SHIPPED";
+    if (order.orderStatus === "PROCESSING") {
+      order.orderStatus = "PROCESSING";
+    }
+
     order.assignmentStatus = "PENDING";
     // ===== ADD ASSIGNMENT HISTORY =====
     if (!order.assignmentHistory) {
@@ -1513,7 +1515,7 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
-    await order.populate("shipper", "email"); // Populate thông tin shipper (chỉ lấy email)
+    await order.populate("shipper", "email firstName lastName");
 
     return order;
   }
@@ -1535,6 +1537,12 @@ class OrderService {
 
     if (order.shipper) {
       throw ApiError.badRequest("Order already assigned");
+    }
+
+    if (order.orderStatus !== "PROCESSING") {
+      throw ApiError.badRequest(
+        "Auto assign is only available for PROCESSING orders",
+      );
     }
 
     const { province, district } = order.shippingAddress || {};
@@ -1561,9 +1569,6 @@ class OrderService {
     // ❌ Nếu không có shipper → KHÔNG throw
     if (!shipper) {
       console.log("❌ No available shipper found");
-
-      // giữ order ở trạng thái PROCESSING thay vì SHIPPED
-      order.orderStatus = "PROCESSING";
       await order.save();
 
       return order;
@@ -1681,8 +1686,7 @@ class OrderService {
         console.log("⚠ All shippers rejected. Resetting order...");
 
         order.shipper = null;
-
-        order.orderStatus = "PENDING";
+        order.orderStatus = "SHIPPED";
         order.assignmentStatus = null;
         order.assignedAt = null;
 
