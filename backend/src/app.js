@@ -34,9 +34,36 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+const parseAllowedOrigins = () => {
+  const defaults = ["http://localhost:5173"];
+  const configuredOrigins = process.env.CLIENT_URLS || process.env.CLIENT_URL;
+
+  if (!configuredOrigins) {
+    return defaults;
+  }
+
+  return configuredOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const allowedOrigins = parseAllowedOrigins();
+
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  origin: (origin, callback) => {
+    // Allow non-browser clients like Postman that do not send Origin.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
 };
