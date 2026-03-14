@@ -11,6 +11,18 @@ const ORDER_STATUSES = [
 ];
 const PAYMENT_STATUSES = ["PENDING", "PAID", "FAILED", "REFUNDED"];
 
+const getAllowedAdminStatusTransitions = (currentStatus, hasShipper) => {
+  if (currentStatus === "PENDING") {
+    return ["PROCESSING"];
+  }
+
+  if (currentStatus === "PROCESSING") {
+    return hasShipper ? ["SHIPPED"] : [];
+  }
+
+  return [];
+};
+
 const getAllowedReturnRequestStatuses = (currentStatus) => {
   if (currentStatus === "APPROVED") {
     return ["COMPLETED", "REJECTED"];
@@ -77,6 +89,7 @@ const OrdersManagement = () => {
         if (updated) {
           setSelectedOrder(updated);
           setStatusDraft(updated.orderStatus);
+          setSelectedShipper(updated.shipper?._id || "");
           setReturnStatusDraft(
             updated.returnRequest?.status === "APPROVED"
               ? "COMPLETED"
@@ -100,6 +113,7 @@ const OrdersManagement = () => {
   const handleSelectOrder = (order) => {
     setSelectedOrder(order);
     setStatusDraft(order.orderStatus);
+    setSelectedShipper(order.shipper?._id || "");
     setReturnStatusDraft(
       order.returnRequest?.status === "APPROVED" ? "COMPLETED" : "APPROVED",
     );
@@ -111,14 +125,31 @@ const OrdersManagement = () => {
   const handleUpdateStatus = async () => {
     if (!selectedOrder) return;
 
+    const allowedNextStatuses = getAllowedAdminStatusTransitions(
+      selectedOrder.orderStatus,
+      Boolean(selectedOrder.shipper || selectedShipper),
+    );
+
+    const nextStatus = allowedNextStatuses.includes(statusDraft)
+      ? statusDraft
+      : allowedNextStatuses[0];
+
+    if (!nextStatus) {
+      setError(
+        "Invalid status transition. Admin can only move PENDING -> PROCESSING and PROCESSING -> SHIPPED.",
+      );
+      return;
+    }
+
     try {
       setMessage("");
       setError("");
       const response = await adminOrderApi.updateOrderStatus(
         selectedOrder._id,
-        statusDraft,
+        nextStatus,
       );
       setSelectedOrder(response.data.order);
+      setStatusDraft(response.data.order?.orderStatus || "");
       setMessage("Order status updated successfully");
       fetchOrders();
     } catch (err) {
@@ -132,8 +163,13 @@ const OrdersManagement = () => {
       setMessage("");
       setError("");
 
-      await adminOrderApi.assignShipper(selectedOrder._id, selectedShipper);
+      const response = await adminOrderApi.assignShipper(
+        selectedOrder._id,
+        selectedShipper,
+      );
 
+      setSelectedOrder(response.data.order);
+      setSelectedShipper(response.data.order?.shipper?._id || selectedShipper);
       setMessage("Shipper assigned successfully");
       fetchOrders();
     } catch (err) {
@@ -196,6 +232,13 @@ const OrdersManagement = () => {
   }
 
   const currentReturnStatus = selectedOrder?.returnRequest?.status || "PENDING";
+  const allowedAdminStatusTransitions = getAllowedAdminStatusTransitions(
+    selectedOrder?.orderStatus,
+    Boolean(selectedOrder?.shipper || selectedShipper),
+  );
+  const resolvedStatusDraft = allowedAdminStatusTransitions.includes(statusDraft)
+    ? statusDraft
+    : (allowedAdminStatusTransitions[0] || "");
   const allowedReturnRequestStatuses =
     getAllowedReturnRequestStatuses(currentReturnStatus);
   const resolvedReturnStatusDraft = allowedReturnRequestStatuses.includes(
@@ -388,11 +431,12 @@ const OrdersManagement = () => {
             <label style={styles.label}>Update Status</label>
             <div style={styles.statusControls}>
               <select
-                value={statusDraft}
+                value={resolvedStatusDraft}
                 onChange={(e) => setStatusDraft(e.target.value)}
                 style={styles.select}
+                disabled={allowedAdminStatusTransitions.length === 0}
               >
-                {ORDER_STATUSES.map((status) => (
+                {allowedAdminStatusTransitions.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
@@ -402,10 +446,16 @@ const OrdersManagement = () => {
                 type="button"
                 style={styles.actionButton}
                 onClick={handleUpdateStatus}
+                disabled={allowedAdminStatusTransitions.length === 0}
               >
                 Update
               </button>
             </div>
+            {selectedOrder.orderStatus === "PROCESSING" && !selectedOrder.shipper && (
+              <small style={styles.helperText}>
+                Assign a shipper before moving this order to SHIPPED.
+              </small>
+            )}
           </div>
           {/* Assign Shipper */}
           <div style={styles.statusRow}>
@@ -574,6 +624,10 @@ const styles = {
     fontSize: "0.9rem",
     fontWeight: 600,
     color: "#34495e",
+  },
+  helperText: {
+    color: "#7f8c8d",
+    fontSize: "0.84rem",
   },
   searchInput: {
     padding: "0.75rem",

@@ -75,21 +75,25 @@ class ShipperService {
       throw new ApiError(403, 'You do not have access to this order');
     }
 
+    if (order.orderStatus !== 'SHIPPED') {
+      throw new ApiError(
+        400,
+        `Invalid status transition: ${order.orderStatus} -> ${newStatus}. Shipper can only update from SHIPPED.`
+      );
+    }
+
     // 🚨 BẮT BUỘC có ảnh nếu muốn DELIVERED
     if (newStatus === 'DELIVERED') {
-      if (!order.deliveryProof) {
+      if (!order.deliveryProof?.imageUrl) {
         throw new ApiError(400, 'Please upload delivery proof before marking as delivered');
       }
     }
 
     // Nếu chuyển sang DELIVERED hoặc CANCELLED
     if (['DELIVERED', 'CANCELLED'].includes(newStatus)) {
-
-      if (['SHIPPED', 'PROCESSING'].includes(order.orderStatus)) {
-        await User.findByIdAndUpdate(shipperId, {
-          $inc: { currentOrders: -1 }
-        });
-      }
+      await User.findByIdAndUpdate(shipperId, {
+        $inc: { currentOrders: -1 }
+      });
 
       if (newStatus === 'DELIVERED' && !order.deliveredAt) {
         order.deliveredAt = new Date();
