@@ -124,7 +124,6 @@ function AppContent() {
           }
         />
         <Route path="/news/:id" element={<NewsPage />} />
-        <Route path="/news/:id" element={<NewsPage />} />
         <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
