@@ -1,18 +1,29 @@
-import axiosInstance from './axios.js';
+import axiosInstance from "./axios.js";
 
 export const bookApi = {
   getPublicBooks: async (params) => {
-    const response = await axiosInstance.get('/books', { params });
+    const response = await axiosInstance.get("/books", { params });
     return response.data;
   },
 
   getNewestBooks: async (limit = 10) => {
-    const response = await axiosInstance.get('/books/newest', { params: { limit } });
+    const response = await axiosInstance.get("/books/newest", {
+      params: { limit },
+    });
     return response.data;
   },
 
   getBestSellingBooks: async (limit = 8) => {
-    const response = await axiosInstance.get('/books/best-selling', { params: { limit } });
+    const response = await axiosInstance.get("/books/best-selling", {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  getPersonalizedBooks: async (limit = 8) => {
+    const response = await axiosInstance.get("/books/personalized", {
+      params: { limit },
+    });
     return response.data;
   },
 
@@ -28,16 +39,18 @@ export const bookApi = {
 
   // Admin endpoints
   getAllBooksAdmin: async (params) => {
-    const response = await axiosInstance.get('/admin/books', { params });
+    const response = await axiosInstance.get("/admin/books", { params });
     return response.data;
   },
 
   createBook: async (bookData) => {
     const isFormData = bookData instanceof FormData;
     const response = await axiosInstance.post(
-      '/admin/books',
+      "/admin/books",
       bookData,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined,
     );
     return response.data;
   },
@@ -47,18 +60,50 @@ export const bookApi = {
     const response = await axiosInstance.put(
       `/admin/books/${id}`,
       bookData,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined,
     );
     return response.data;
   },
 
   updateVisibility: async (id, visibility) => {
-    const response = await axiosInstance.patch(`/admin/books/${id}/visibility`, { visibility });
+    const response = await axiosInstance.patch(
+      `/admin/books/${id}/visibility`,
+      { visibility },
+    );
+    return response.data;
+  },
+
+  uploadBookPreview: async (id, previewData) => {
+    const response = await axiosInstance.post(
+      `/admin/books/${id}/preview`,
+      previewData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data;
+  },
+
+  updateBookPreview: async (id, previewData) => {
+    const response = await axiosInstance.put(
+      `/admin/books/${id}/preview`,
+      previewData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data;
+  },
+
+  manageBookPreviewPage: async (id, payload) => {
+    const response = await axiosInstance.patch(
+      `/admin/books/${id}/preview/manage`,
+      payload,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
     return response.data;
   },
 
   deleteBook: async (id) => {
     const response = await axiosInstance.delete(`/admin/books/${id}`);
     return response.data;
-  }
+  },
 };

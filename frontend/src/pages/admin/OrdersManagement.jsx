@@ -2,8 +2,34 @@ import { useEffect, useState } from "react";
 import { adminOrderApi } from "../../api/orderApi";
 import axios from "../../api/axios";
 
-const ORDER_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
+const ORDER_STATUSES = [
+  "PENDING",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+];
 const PAYMENT_STATUSES = ["PENDING", "PAID", "FAILED", "REFUNDED"];
+
+const getAllowedAdminStatusTransitions = (currentStatus, hasShipper) => {
+  if (currentStatus === "PENDING") {
+    return ["PROCESSING"];
+  }
+
+  if (currentStatus === "PROCESSING") {
+    return hasShipper ? ["SHIPPED"] : [];
+  }
+
+  return [];
+};
+
+const getAllowedReturnRequestStatuses = (currentStatus) => {
+  if (currentStatus === "APPROVED") {
+    return ["COMPLETED", "REJECTED"];
+  }
+
+  return ["APPROVED", "REJECTED"];
+};
 
 const OrdersManagement = () => {
   const [orders, setOrders] = useState([]);
@@ -25,6 +51,9 @@ const OrdersManagement = () => {
   const [error, setError] = useState("");
   const [shippers, setShippers] = useState([]);
   const [selectedShipper, setSelectedShipper] = useState("");
+  const [returnStatusDraft, setReturnStatusDraft] = useState("APPROVED");
+  const [returnAdminNote, setReturnAdminNote] = useState("");
+  const [isUpdatingReturnRequest, setIsUpdatingReturnRequest] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -54,10 +83,19 @@ const OrdersManagement = () => {
       setOrders(response.data.orders);
       setPagination(response.data.pagination);
       if (selectedOrder) {
-        const updated = response.data.orders.find((order) => order._id === selectedOrder._id);
+        const updated = response.data.orders.find(
+          (order) => order._id === selectedOrder._id,
+        );
         if (updated) {
           setSelectedOrder(updated);
           setStatusDraft(updated.orderStatus);
+          setSelectedShipper(updated.shipper?._id || "");
+          setReturnStatusDraft(
+            updated.returnRequest?.status === "APPROVED"
+              ? "COMPLETED"
+              : "APPROVED",
+          );
+          setReturnAdminNote(updated.returnRequest?.adminNote || "");
         }
       }
     } catch (err) {
@@ -75,6 +113,11 @@ const OrdersManagement = () => {
   const handleSelectOrder = (order) => {
     setSelectedOrder(order);
     setStatusDraft(order.orderStatus);
+    setSelectedShipper(order.shipper?._id || "");
+    setReturnStatusDraft(
+      order.returnRequest?.status === "APPROVED" ? "COMPLETED" : "APPROVED",
+    );
+    setReturnAdminNote(order.returnRequest?.adminNote || "");
     setMessage("");
     setError("");
   };
@@ -82,11 +125,31 @@ const OrdersManagement = () => {
   const handleUpdateStatus = async () => {
     if (!selectedOrder) return;
 
+    const allowedNextStatuses = getAllowedAdminStatusTransitions(
+      selectedOrder.orderStatus,
+      Boolean(selectedOrder.shipper || selectedShipper),
+    );
+
+    const nextStatus = allowedNextStatuses.includes(statusDraft)
+      ? statusDraft
+      : allowedNextStatuses[0];
+
+    if (!nextStatus) {
+      setError(
+        "Invalid status transition. Admin can only move PENDING -> PROCESSING and PROCESSING -> SHIPPED.",
+      );
+      return;
+    }
+
     try {
       setMessage("");
       setError("");
-      const response = await adminOrderApi.updateOrderStatus(selectedOrder._id, statusDraft);
+      const response = await adminOrderApi.updateOrderStatus(
+        selectedOrder._id,
+        nextStatus,
+      );
       setSelectedOrder(response.data.order);
+      setStatusDraft(response.data.order?.orderStatus || "");
       setMessage("Order status updated successfully");
       fetchOrders();
     } catch (err) {
@@ -100,15 +163,52 @@ const OrdersManagement = () => {
       setMessage("");
       setError("");
 
-      await adminOrderApi.assignShipper(
+      const response = await adminOrderApi.assignShipper(
         selectedOrder._id,
-        selectedShipper
+        selectedShipper,
       );
 
+      setSelectedOrder(response.data.order);
+      setSelectedShipper(response.data.order?.shipper?._id || selectedShipper);
       setMessage("Shipper assigned successfully");
       fetchOrders();
     } catch (err) {
       setError(err.response?.data?.message || "Failed to assign shipper");
+    }
+  };
+
+  const handleReviewReturnRequest = async () => {
+    if (!selectedOrder?.returnRequest?.requestedAt) return;
+
+    const currentStatus = selectedOrder.returnRequest.status || "PENDING";
+    const allowedStatuses = getAllowedReturnRequestStatuses(currentStatus);
+    const safeStatus = allowedStatuses.includes(returnStatusDraft)
+      ? returnStatusDraft
+      : allowedStatuses[0];
+
+    try {
+      setIsUpdatingReturnRequest(true);
+      setMessage("");
+      setError("");
+
+      const response = await adminOrderApi.reviewReturnRefundRequest(
+        selectedOrder._id,
+        {
+          status: safeStatus,
+          adminNote: returnAdminNote,
+        },
+      );
+
+      setSelectedOrder(response.data.order);
+      setReturnAdminNote(response.data.order?.returnRequest?.adminNote || "");
+      setMessage("Return/refund request updated successfully");
+      fetchOrders();
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Failed to update return/refund request",
+      );
+    } finally {
+      setIsUpdatingReturnRequest(false);
     }
   };
 
@@ -131,6 +231,21 @@ const OrdersManagement = () => {
     );
   }
 
+  const currentReturnStatus = selectedOrder?.returnRequest?.status || "PENDING";
+  const allowedAdminStatusTransitions = getAllowedAdminStatusTransitions(
+    selectedOrder?.orderStatus,
+    Boolean(selectedOrder?.shipper || selectedShipper),
+  );
+  const resolvedStatusDraft = allowedAdminStatusTransitions.includes(statusDraft)
+    ? statusDraft
+    : (allowedAdminStatusTransitions[0] || "");
+  const allowedReturnRequestStatuses =
+    getAllowedReturnRequestStatuses(currentReturnStatus);
+  const resolvedReturnStatusDraft = allowedReturnRequestStatuses.includes(
+    returnStatusDraft,
+  )
+    ? returnStatusDraft
+    : allowedReturnRequestStatuses[0];
 
   return (
     <div style={styles.container}>
@@ -173,7 +288,9 @@ const OrdersManagement = () => {
           <label style={styles.label}>Payment Status</label>
           <select
             value={filters.paymentStatus}
-            onChange={(e) => handleFilterChange("paymentStatus", e.target.value)}
+            onChange={(e) =>
+              handleFilterChange("paymentStatus", e.target.value)
+            }
             style={styles.select}
           >
             <option value="all">All</option>
@@ -223,9 +340,7 @@ const OrdersManagement = () => {
             {orders.map((order) => (
               <tr key={order._id} style={styles.tr}>
                 <td style={styles.td}>{order.orderNumber}</td>
-                <td style={styles.td}>
-                  {order.user?.email || "Unknown"}
-                </td>
+                <td style={styles.td}>{order.user?.email || "Unknown"}</td>
                 <td style={styles.td}>{formatCurrency(order.total)}</td>
                 <td style={styles.td}>{order.paymentStatus}</td>
                 <td style={styles.td}>{order.orderStatus}</td>
@@ -262,7 +377,9 @@ const OrdersManagement = () => {
         <button
           type="button"
           style={styles.pageButton}
-          onClick={() => setPage((prev) => Math.min(pagination.totalPages || 1, prev + 1))}
+          onClick={() =>
+            setPage((prev) => Math.min(pagination.totalPages || 1, prev + 1))
+          }
           disabled={page >= (pagination.totalPages || 1)}
         >
           Next
@@ -284,14 +401,29 @@ const OrdersManagement = () => {
 
           <div style={styles.detailGrid}>
             <div>
-              <p><strong>Order Number:</strong> {selectedOrder.orderNumber}</p>
-              <p><strong>Customer:</strong> {selectedOrder.user?.email || "Unknown"}</p>
-              <p><strong>Payment Method:</strong> {selectedOrder.paymentMethod}</p>
+              <p>
+                <strong>Order Number:</strong> {selectedOrder.orderNumber}
+              </p>
+              <p>
+                <strong>Customer:</strong>{" "}
+                {selectedOrder.user?.email || "Unknown"}
+              </p>
+              <p>
+                <strong>Payment Method:</strong> {selectedOrder.paymentMethod}
+              </p>
             </div>
             <div>
-              <p><strong>Subtotal:</strong> {formatCurrency(selectedOrder.subtotal)}</p>
-              <p><strong>Shipping Fee:</strong> {formatCurrency(selectedOrder.shippingFee)}</p>
-              <p><strong>Total:</strong> {formatCurrency(selectedOrder.total)}</p>
+              <p>
+                <strong>Subtotal:</strong>{" "}
+                {formatCurrency(selectedOrder.subtotal)}
+              </p>
+              <p>
+                <strong>Shipping Fee:</strong>{" "}
+                {formatCurrency(selectedOrder.shippingFee)}
+              </p>
+              <p>
+                <strong>Total:</strong> {formatCurrency(selectedOrder.total)}
+              </p>
             </div>
           </div>
 
@@ -299,20 +431,31 @@ const OrdersManagement = () => {
             <label style={styles.label}>Update Status</label>
             <div style={styles.statusControls}>
               <select
-                value={statusDraft}
+                value={resolvedStatusDraft}
                 onChange={(e) => setStatusDraft(e.target.value)}
                 style={styles.select}
+                disabled={allowedAdminStatusTransitions.length === 0}
               >
-                {ORDER_STATUSES.map((status) => (
+                {allowedAdminStatusTransitions.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
                 ))}
               </select>
-              <button type="button" style={styles.actionButton} onClick={handleUpdateStatus}>
+              <button
+                type="button"
+                style={styles.actionButton}
+                onClick={handleUpdateStatus}
+                disabled={allowedAdminStatusTransitions.length === 0}
+              >
                 Update
               </button>
             </div>
+            {selectedOrder.orderStatus === "PROCESSING" && !selectedOrder.shipper && (
+              <small style={styles.helperText}>
+                Assign a shipper before moving this order to SHIPPED.
+              </small>
+            )}
           </div>
           {/* Assign Shipper */}
           <div style={styles.statusRow}>
@@ -343,6 +486,75 @@ const OrdersManagement = () => {
             </div>
           </div>
 
+          {selectedOrder.returnRequest?.requestedAt && (
+            <div style={styles.returnRequestCard}>
+              <h4 style={styles.returnRequestTitle}>
+                Customer Return / Refund Request
+              </h4>
+              <div style={styles.returnRequestGrid}>
+                <p>
+                  <strong>Type:</strong>{" "}
+                  {selectedOrder.returnRequest.type || "-"}
+                </p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  {selectedOrder.returnRequest.status || "PENDING"}
+                </p>
+                <p>
+                  <strong>Reason:</strong>{" "}
+                  {selectedOrder.returnRequest.reason || "-"}
+                </p>
+                <p>
+                  <strong>Requested At:</strong>{" "}
+                  {new Date(
+                    selectedOrder.returnRequest.requestedAt,
+                  ).toLocaleString("vi-VN")}
+                </p>
+                <p style={styles.returnRequestDetails}>
+                  <strong>Details:</strong>{" "}
+                  {selectedOrder.returnRequest.details || "-"}
+                </p>
+              </div>
+
+              {!["REJECTED", "COMPLETED"].includes(
+                selectedOrder.returnRequest.status || "PENDING",
+              ) ? (
+                <div style={styles.statusControls}>
+                  <select
+                    value={resolvedReturnStatusDraft}
+                    onChange={(e) => setReturnStatusDraft(e.target.value)}
+                    style={styles.select}
+                  >
+                    {allowedReturnRequestStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={returnAdminNote}
+                    onChange={(e) => setReturnAdminNote(e.target.value)}
+                    placeholder="Admin note for customer"
+                    style={styles.searchInput}
+                  />
+                  <button
+                    type="button"
+                    style={styles.actionButton}
+                    onClick={handleReviewReturnRequest}
+                    disabled={isUpdatingReturnRequest}
+                  >
+                    {isUpdatingReturnRequest ? "Saving..." : "Update Request"}
+                  </button>
+                </div>
+              ) : (
+                <p style={styles.returnRequestClosedText}>
+                  This request is closed. Admin note:{" "}
+                  {selectedOrder.returnRequest.adminNote || "-"}
+                </p>
+              )}
+            </div>
+          )}
 
           <h4 style={styles.itemsTitle}>Items</h4>
           <div style={styles.itemsTable}>
@@ -412,6 +624,10 @@ const styles = {
     fontSize: "0.9rem",
     fontWeight: 600,
     color: "#34495e",
+  },
+  helperText: {
+    color: "#7f8c8d",
+    fontSize: "0.84rem",
   },
   searchInput: {
     padding: "0.75rem",
@@ -518,6 +734,35 @@ const styles = {
     display: "flex",
     gap: "0.75rem",
     alignItems: "center",
+    flexWrap: "wrap",
+  },
+  returnRequestCard: {
+    border: "1px solid #dfe6ee",
+    borderRadius: "8px",
+    padding: "1rem",
+    marginBottom: "1.5rem",
+    backgroundColor: "#fafcff",
+  },
+  returnRequestTitle: {
+    margin: "0 0 0.75rem",
+    fontSize: "1rem",
+    color: "#2c3e50",
+  },
+  returnRequestGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "0.5rem 1rem",
+    marginBottom: "0.85rem",
+    fontSize: "0.9rem",
+    color: "#2c3e50",
+  },
+  returnRequestDetails: {
+    gridColumn: "1 / -1",
+  },
+  returnRequestClosedText: {
+    margin: 0,
+    color: "#2f3640",
+    fontSize: "0.88rem",
   },
   itemsTitle: {
     marginBottom: "0.75rem",

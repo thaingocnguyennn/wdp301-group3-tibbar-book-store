@@ -26,6 +26,7 @@ import OrderSuccessPage from "./pages/OrderSuccessPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import MyVouchersPage from "./pages/MyVouchersPage";
 import AdminWishlist from "./pages/admin/AdminWishlist";
 import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
@@ -35,8 +36,16 @@ import RecentlyViewedPage from "./pages/RecentlyViewedPage";
 import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
 import EbookReaderPage from "./pages/EbookReaderPage";
 import MyEbooksPage from "./pages/MyEbooksPage";
+import NewsPage from "./pages/NewsPage";
+import NewsManagement from "./pages/admin/NewsManagement";
+import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
+import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 // Protected Route Component - Only for authenticated routes
-const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
+const ProtectedRoute = ({
+  children,
+  adminOnly = false,
+  shipperOnly = false,
+}) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
 
   if (loading) {
@@ -57,7 +66,7 @@ const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) =>
     return <Navigate to="/" replace />;
   }
 
-  if (shipperOnly && user?.role !== 'shipper') {
+  if (shipperOnly && user?.role !== "shipper") {
     return <Navigate to="/" replace />;
   }
 
@@ -84,12 +93,12 @@ const RoleBasedHome = () => {
   const { isAuthenticated, user } = useAuth();
 
   // Redirect shippers to their dashboard
-  if (isAuthenticated && user?.role === 'shipper') {
+  if (isAuthenticated && user?.role === "shipper") {
     return <Navigate to="/shipper/dashboard" replace />;
   }
 
   // Redirect admins to admin dashboard
-  if (isAuthenticated && (user?.role === 'admin' || user?.role === 'manager')) {
+  if (isAuthenticated && (user?.role === "admin" || user?.role === "manager")) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
@@ -114,6 +123,8 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/news/:id" element={<NewsPage />} />
+        <Route path="/news/:id" element={<NewsPage />} />
         <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
@@ -163,6 +174,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <OrderDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-vouchers"
+          element={
+            <ProtectedRoute>
+              <MyVouchersPage />
             </ProtectedRoute>
           }
         />
@@ -254,6 +273,22 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/request-history"
+          element={
+            <ProtectedRoute adminOnly>
+              <RecentRequestHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review-replies"
+          element={
+            <ProtectedRoute adminOnly>
+              <ReviewRepliesManagementPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/admin/vouchers"
@@ -268,7 +303,15 @@ function AppContent() {
           path="/admin/users"
           element={
             <ProtectedRoute adminOnly>
-              <UsersManagement />x
+              <UsersManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/news"
+          element={
+            <ProtectedRoute adminOnly>
+              <NewsManagement />
             </ProtectedRoute>
           }
         />
@@ -288,11 +331,13 @@ function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!googleClientId) {
-    console.warn('Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file');
+    console.warn(
+      "Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file",
+    );
   }
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId || ''}>
+    <GoogleOAuthProvider clientId={googleClientId || ""}>
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>

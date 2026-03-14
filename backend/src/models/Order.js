@@ -30,7 +30,7 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Main order schema
@@ -106,13 +106,13 @@ const orderSchema = new mongoose.Schema(
     rejectedShippers: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-      }
+        ref: "User",
+      },
     ],
     // Bằng chứng giao hàng (ảnh chụp bằng điện thoại của shipper khi giao hàng thành công)
     deliveryProof: {
       imageUrl: String,
-      uploadedAt: Date
+      uploadedAt: Date,
     },
     // Shipping address snapshot (stored at order time)
     shippingAddress: {
@@ -144,6 +144,40 @@ const orderSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Customer return / refund request
+    returnRequest: {
+      type: {
+        type: String,
+        enum: ["RETURN", "REFUND"],
+        default: null,
+      },
+      reason: {
+        type: String,
+        default: "",
+      },
+      details: {
+        type: String,
+        default: "",
+      },
+      status: {
+        type: String,
+        enum: ["PENDING", "APPROVED", "REJECTED", "COMPLETED"],
+        default: null,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+      adminNote: {
+        type: String,
+        default: "",
+      },
+    },
+
     // Timestamps for payment and delivery
     paidAt: {
       type: Date,
@@ -154,7 +188,6 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
     // ================= ASSIGNMENT FIELDS =================
-
 
     assignmentExpiresAt: {
       type: Date,
@@ -174,16 +207,16 @@ const orderSchema = new mongoose.Schema(
           respondedAt: Date,
           status: {
             type: String,
-            enum: ["PENDING", "ACCEPTED", "REJECTED"]
-          }
-        }
+            enum: ["PENDING", "ACCEPTED", "REJECTED"],
+          },
+        },
       ],
-      default: []
+      default: [],
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for efficient querying

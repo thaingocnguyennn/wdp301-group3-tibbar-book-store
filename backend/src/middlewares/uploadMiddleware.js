@@ -10,8 +10,18 @@ const uploadsRoot = path.resolve(__dirname, "../../uploads");
 const sliderUploadsDir = path.join(uploadsRoot, "sliders");
 const bookUploadsDir = path.join(uploadsRoot, "books");
 const ebooksUploadsDir = path.join(uploadsRoot, "ebooks");
+const previewUploadsDir = path.join(uploadsRoot, "book-previews");
+const newsUploadsDir = path.join(uploadsRoot, "news");
+const reviewUploadsDir = path.join(uploadsRoot, "reviews");
 
-[sliderUploadsDir, bookUploadsDir, ebooksUploadsDir].forEach((dir) => {
+[
+  sliderUploadsDir,
+  bookUploadsDir,
+  ebooksUploadsDir,
+  previewUploadsDir,
+  newsUploadsDir,
+  reviewUploadsDir,
+].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -73,7 +83,15 @@ const combinedBookStorage = multer.diskStorage({
 // Tạo thư mục uploads/delivery-proofs nếu chưa tồn tại
 const deliveryUploadsDir = path.join(uploadsRoot, "delivery-proofs");
 
-[sliderUploadsDir, bookUploadsDir, deliveryUploadsDir, ebooksUploadsDir].forEach((dir) => {
+[
+  sliderUploadsDir,
+  bookUploadsDir,
+  ebooksUploadsDir,
+  previewUploadsDir,
+  newsUploadsDir,
+  reviewUploadsDir,
+  deliveryUploadsDir,
+].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -89,6 +107,25 @@ export const bookUpload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+export const previewUpload = multer({
+  storage: createStorage(previewUploadsDir),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+});
+
+export const newsUpload = multer({
+  storage: createStorage(newsUploadsDir),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+export const reviewUpload = multer({
+  storage: createStorage(reviewUploadsDir),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024, files: 5 },
+});
+
 // Middleware upload cho bằng chứng giao hàng của shipper
 export const deliveryProofUpload = multer({
   storage: createStorage(deliveryUploadsDir),

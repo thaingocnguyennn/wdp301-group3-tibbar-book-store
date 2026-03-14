@@ -47,6 +47,33 @@ export const orderApi = {
     return response.data;
   },
 
+  // Reorder from a previous order
+  reorderOrder: async (orderId, payload = {}) => {
+    const response = await axiosInstance.post(
+      `/orders/${orderId}/reorder`,
+      payload,
+    );
+    return response.data;
+  },
+
+  // Download invoice (returns HTML blob)
+  downloadInvoice: async (orderId, download = true) => {
+    const response = await axiosInstance.get(`/orders/${orderId}/invoice`, {
+      params: { download },
+      responseType: "blob",
+    });
+    return response;
+  },
+
+  // Submit return / refund request
+  submitReturnRefundRequest: async (orderId, payload) => {
+    const response = await axiosInstance.post(
+      `/orders/${orderId}/return-refund`,
+      payload,
+    );
+    return response.data;
+  },
+
   // Confirm payment (for VNPAY callback)
   confirmPayment: async (queryParams) => {
     const response = await axiosInstance.get("/orders/payment/confirm", {
@@ -62,21 +89,37 @@ export const adminOrderApi = {
     return response.data;
   },
 
+  getRecentCustomerRequests: async (limit = 8) => {
+    const response = await axiosInstance.get("/admin/orders/requests/recent", {
+      params: { limit },
+    });
+    return response.data;
+  },
+
   getOrderById: async (orderId) => {
     const response = await axiosInstance.get(`/admin/orders/${orderId}`);
     return response.data;
   },
 
   updateOrderStatus: async (orderId, status) => {
-    const response = await axiosInstance.patch(`/admin/orders/${orderId}/status`, { status });
+    const response = await axiosInstance.patch(
+      `/admin/orders/${orderId}/status`,
+      { status },
+    );
+    return response.data;
+  },
+  reviewReturnRefundRequest: async (orderId, payload) => {
+    const response = await axiosInstance.patch(
+      `/admin/orders/${orderId}/return-refund`,
+      payload,
+    );
     return response.data;
   },
   assignShipper: async (orderId, shipperId) => {
     const response = await axiosInstance.patch(
       `/orders/admin/orders/${orderId}/assign-shipper`,
-      { shipperId }
+      { shipperId },
     );
     return response.data;
   },
-
 };

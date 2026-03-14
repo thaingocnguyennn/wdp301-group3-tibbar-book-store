@@ -4,6 +4,7 @@ import { authenticate } from '../middlewares/authMiddleware.js';
 import { authorize } from '../middlewares/roleMiddleware.js';
 import { ROLES } from '../config/constants.js';
 import { adminBookCombinedUpload } from '../middlewares/uploadMiddleware.js';
+import { previewUpload } from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -19,6 +20,9 @@ router.get('/', adminBookController.getAllBooks);
 router.post('/', bookFields, adminBookController.createBook);
 router.put('/:id', bookFields, adminBookController.updateBook);
 router.patch('/:id/visibility', adminBookController.updateVisibility);
+router.post('/:id/preview', previewUpload.array('previewPages', 10), adminBookController.updatePreviewPages);
+router.put('/:id/preview', previewUpload.array('previewPages', 10), adminBookController.updatePreviewPages);
+router.patch('/:id/preview/manage', previewUpload.single('previewPage'), adminBookController.managePreviewPage);
 router.delete('/:id', adminBookController.deleteBook);
 
 export default router;

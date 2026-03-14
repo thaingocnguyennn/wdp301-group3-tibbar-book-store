@@ -32,19 +32,34 @@ export const verifyRefreshToken = (token) => {
   }
 };
 
-export const setRefreshTokenCookie = (res, refreshToken) => {
-  res.cookie('refreshToken', refreshToken, {
+const getCookieOptions = () => {
+  const configuredSameSite = process.env.COOKIE_SAME_SITE;
+  const sameSite = configuredSameSite || (process.env.NODE_ENV === 'production' ? 'none' : 'lax');
+  const secure = process.env.COOKIE_SECURE
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production';
+
+  // Browsers require secure=true when sameSite is set to "none".
+  const normalizedSecure = sameSite === 'none' ? true : secure;
+
+  return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-  });
+    secure: normalizedSecure,
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+};
+
+export const setRefreshTokenCookie = (res, refreshToken) => {
+  res.cookie('refreshToken', refreshToken, getCookieOptions());
 };
 
 export const clearRefreshTokenCookie = (res) => {
+  const cookieOptions = getCookieOptions();
+
   res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+    httpOnly: cookieOptions.httpOnly,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
   });
 };

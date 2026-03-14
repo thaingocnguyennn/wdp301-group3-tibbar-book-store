@@ -13,7 +13,18 @@ export const voucherApi = {
   },
 
   updateVoucher: async (voucherId, voucherData) => {
-    const response = await axiosInstance.put(`/admin/vouchers/${voucherId}`, voucherData);
+    const response = await axiosInstance.put(
+      `/admin/vouchers/${voucherId}`,
+      voucherData,
+    );
+    return response.data;
+  },
+
+  assignVoucherToUsers: async (voucherId, payload) => {
+    const response = await axiosInstance.post(
+      `/admin/vouchers/${voucherId}/assign-users`,
+      payload,
+    );
     return response.data;
   },
 
@@ -26,6 +37,11 @@ export const voucherApi = {
     const response = await axiosInstance.get("/vouchers/available", {
       params: { subtotal },
     });
+    return response.data;
+  },
+
+  getMyVouchers: async () => {
+    const response = await axiosInstance.get("/vouchers/mine");
     return response.data;
   },
 };

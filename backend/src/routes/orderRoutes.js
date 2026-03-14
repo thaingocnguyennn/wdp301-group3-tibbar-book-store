@@ -27,6 +27,15 @@ router.get("/", orderController.getUserOrders);
 // Get order by order number
 router.get("/number/:orderNumber", orderController.getOrderByNumber);
 
+// Reorder from previous order
+router.post("/:id/reorder", orderController.reorderOrder);
+
+// Download or print invoice
+router.get("/:id/invoice", orderController.downloadInvoice);
+
+// Submit return / refund request
+router.post("/:id/return-refund", orderController.submitReturnRefundRequest);
+
 // Get single order by ID
 router.get("/:id", orderController.getOrderById);
 
@@ -34,16 +43,15 @@ router.get("/:id", orderController.getOrderById);
 router.patch("/:id/cancel", orderController.cancelOrder);
 
 router.get(
-    "/admin/revenue",
-    authenticate,
-    authorize(ROLES.ADMIN),
-    orderController.getRevenue
+  "/admin/revenue",
+  authenticate,
+  authorize(ROLES.ADMIN),
+  orderController.getRevenue,
 );
 router.patch(
-    "/admin/orders/:id/assign-shipper",
-    authorize(ROLES.ADMIN),
-    orderController.assignShipper
+  "/admin/orders/:id/assign-shipper",
+  authorize(ROLES.ADMIN),
+  orderController.assignShipper,
 );
-
 
 export default router;
