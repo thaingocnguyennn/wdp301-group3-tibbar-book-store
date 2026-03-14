@@ -50,6 +50,11 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
+// Block direct access to ebook files (must be before static middleware)
+app.use("/uploads/ebooks", (_req, res) => {
+  return res.status(403).json({ message: "Direct access not allowed" });
+});
+
 // Health check
 app.get("/health", (req, res) => {
   return ApiResponse.success(res, HTTP_STATUS.OK, "Server is running", {

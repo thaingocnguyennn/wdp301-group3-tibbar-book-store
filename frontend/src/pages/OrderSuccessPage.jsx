@@ -22,6 +22,9 @@ const PAYMENT_METHOD_LABELS = {
   VNPAY: "VNPay Online Payment",
 };
 
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+
 const OrderSuccessPage = () => {
   const { orderNumber } = useParams();
   const navigate = useNavigate();
@@ -32,21 +35,28 @@ const OrderSuccessPage = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!order && orderNumber) {
-      fetchOrder();
+    if (orderNumber) {
+      // Always refresh from API to get fully populated order items (including imageUrl)
+      fetchOrder(!order);
     }
-  }, [orderNumber, order]);
+  }, [orderNumber]);
 
-  const fetchOrder = async () => {
+  const fetchOrder = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const response = await orderApi.getOrderByNumber(orderNumber);
       setOrder(response.data.order);
     } catch (err) {
       console.error("Failed to fetch order:", err);
-      setError("Failed to load order details");
+      if (!order) {
+        setError("Failed to load order details");
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -80,6 +90,11 @@ const OrderSuccessPage = () => {
 
   const paymentConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
   const statusConfig = ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
+  const getItemImageSrc = (item) => {
+    const imageUrl = item?.book?.imageUrl;
+    if (!imageUrl) return "";
+    return imageUrl.startsWith("http") ? imageUrl : `${serverBaseUrl}${imageUrl}`;
+  };
 
   return (
     <div style={styles.container}>
@@ -180,12 +195,23 @@ const OrderSuccessPage = () => {
           <div style={styles.itemsList}>
             {order.items.map((item) => (
               <div key={item.book?._id || item._id} style={styles.itemCard}>
-                <div style={styles.itemInfo}>
-                  <span style={styles.itemTitle}>{item.title}</span>
-                  <span style={styles.itemAuthor}>by {item.author}</span>
-                  <span style={styles.itemPriceQty}>
-                    {item.price.toLocaleString("vi-VN")}₫ × {item.quantity}
-                  </span>
+                <div style={styles.itemMain}>
+                  {getItemImageSrc(item) ? (
+                    <img
+                      src={getItemImageSrc(item)}
+                      alt={item.title}
+                      style={styles.itemThumb}
+                    />
+                  ) : (
+                    <span style={styles.itemThumbPlaceholder}>📘</span>
+                  )}
+                  <div style={styles.itemInfo}>
+                    <span style={styles.itemTitle}>{item.title}</span>
+                    <span style={styles.itemAuthor}>by {item.author}</span>
+                    <span style={styles.itemPriceQty}>
+                      {item.price.toLocaleString("vi-VN")}₫ × {item.quantity}
+                    </span>
+                  </div>
                 </div>
                 <div style={styles.itemSubtotal}>
                   {item.subtotal.toLocaleString("vi-VN")}₫
@@ -524,6 +550,36 @@ const styles = {
     backgroundColor: "#f8fafc",
     borderRadius: "10px",
     border: "1px solid #e2e8f0",
+  },
+  itemMain: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.8rem",
+    minWidth: 0,
+    flex: 1,
+  },
+  itemThumb: {
+    width: "56px",
+    height: "76px",
+    borderRadius: "8px",
+    objectFit: "cover",
+    objectPosition: "center",
+    border: "1px solid #dbe3ee",
+    backgroundColor: "#f1f5f9",
+    flexShrink: 0,
+  },
+  itemThumbPlaceholder: {
+    width: "56px",
+    height: "76px",
+    borderRadius: "8px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid #dbe3ee",
+    backgroundColor: "#f1f5f9",
+    color: "#94a3b8",
+    fontSize: "1.15rem",
+    flexShrink: 0,
   },
   itemInfo: {
     display: "flex",

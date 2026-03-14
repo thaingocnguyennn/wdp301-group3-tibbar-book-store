@@ -58,6 +58,10 @@ const Navbar = () => {
                 Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
               </Link>
 
+              <Link to="/ebooks" style={styles.link}>
+                E-Books
+              </Link>
+
               <Link to="/cart" style={styles.link}>
                 Cart {cartCount > 0 && `(${cartCount})`}
               </Link>
@@ -92,57 +96,72 @@ const Navbar = () => {
 const styles = {
   nav: {
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    padding: "1rem 0",
+    padding: "0.75rem 0",
     boxShadow: "0 4px 15px rgba(102, 126, 234, 0.3)",
     position: "sticky",
     top: "0",
     zIndex: "1000",
   },
   container: {
-    maxWidth: "1200px",
+    maxWidth: "1320px",
     margin: "0 auto",
-    padding: "0 2rem",
+    padding: "0 1.25rem",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "1rem",
   },
   logo: {
-    fontSize: "1.6rem",
+    fontSize: "1.9rem",
     fontWeight: "bold",
     color: "#fff",
     textDecoration: "none",
     transition: "all 0.3s ease",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   links: {
     display: "flex",
-    gap: "1.5rem",
+    gap: "0.35rem",
     alignItems: "center",
+    justifyContent: "flex-end",
+    flex: 1,
+    overflowX: "auto",
+    scrollbarWidth: "none",
   },
   link: {
     color: "#fff",
     textDecoration: "none",
     transition: "all 0.3s ease",
-    fontWeight: "500",
-    padding: "0.5rem 0",
-    borderBottom: "2px solid transparent",
+    fontWeight: "600",
+    fontSize: "0.92rem",
+    padding: "0.45rem 0.75rem",
+    borderRadius: "8px",
+    borderBottom: "none",
+    whiteSpace: "nowrap",
+    lineHeight: 1.1,
   },
   button: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
     color: "#fff",
-    border: "2px solid #fff",
-    padding: "0.6rem 1.2rem",
+    border: "1px solid rgba(255, 255, 255, 0.75)",
+    padding: "0.5rem 0.9rem",
     borderRadius: "8px",
     cursor: "pointer",
     textDecoration: "none",
-    fontSize: "1rem",
+    fontSize: "0.9rem",
     fontWeight: "600",
     transition: "all 0.3s ease",
     backdropFilter: "blur(10px)",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   user: {
     color: "#fff",
-    fontSize: "0.95rem",
-    fontWeight: "500",
+    fontSize: "0.86rem",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    opacity: 0.95,
   },
 };
 

@@ -11,6 +11,17 @@ router.get(
     authenticate,
     bookController.getRecentlyViewed
 );
+// E-book routes (must be before /:id to avoid route collision)
+router.get(
+    '/:id/ebook-access',
+    authenticate,
+    bookController.checkEbookAccess
+);
+router.get(
+    '/:id/ebook',
+    authenticate,
+    bookController.streamEbookFile
+);
 router.get(
     '/:id',
     authenticate,

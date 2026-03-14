@@ -22,8 +22,16 @@ class AdminBookController {
     try {
       const payload = { ...req.body };
 
-      if (req.file) {
-        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      // Handle isEbook coercion from string to boolean
+      if (payload.isEbook !== undefined) {
+        payload.isEbook = payload.isEbook === 'true' || payload.isEbook === true;
+      }
+
+      if (req.files?.image?.[0]) {
+        payload.imageUrl = `/uploads/books/${req.files.image[0].filename}`;
+      }
+      if (req.files?.ebook?.[0]) {
+        payload.ebookFile = `/uploads/ebooks/${req.files.ebook[0].filename}`;
       }
 
       const book = await bookService.createBook(payload);
@@ -43,8 +51,16 @@ class AdminBookController {
     try {
       const payload = { ...req.body };
 
-      if (req.file) {
-        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      // Handle isEbook coercion from string to boolean
+      if (payload.isEbook !== undefined) {
+        payload.isEbook = payload.isEbook === 'true' || payload.isEbook === true;
+      }
+
+      if (req.files?.image?.[0]) {
+        payload.imageUrl = `/uploads/books/${req.files.image[0].filename}`;
+      }
+      if (req.files?.ebook?.[0]) {
+        payload.ebookFile = `/uploads/ebooks/${req.files.ebook[0].filename}`;
       }
 
       const book = await bookService.updateBook(req.params.id, payload);

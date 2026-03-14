@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 const CartPage = () => {
   const { cart, update, remove } = useCart();
   const navigate = useNavigate();
+  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
 
   const totals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
@@ -53,15 +55,23 @@ const CartPage = () => {
             <div key={item.book?._id} style={styles.itemCard}>
               <div style={styles.itemInfo}>
                 <div style={styles.thumbWrapper}>
-                  {item.book?.imageUrl ? (
+                  {(() => {
+                    const imageSrc = item.book?.imageUrl
+                      ? item.book.imageUrl.startsWith("http")
+                        ? item.book.imageUrl
+                        : `${serverBaseUrl}${item.book.imageUrl}`
+                      : "";
+
+                    return imageSrc ? (
                     <img
-                      src={item.book.imageUrl}
+                      src={imageSrc}
                       alt={item.book?.title}
                       style={styles.thumb}
                     />
                   ) : (
                     <div style={styles.thumbPlaceholder}>📘</div>
-                  )}
+                    );
+                  })()}
                 </div>
                 <div style={styles.itemText}>
                   <h3 style={styles.itemTitle}>{item.book?.title}</h3>
@@ -183,7 +193,8 @@ const styles = {
     height: "110px",
     borderRadius: "8px",
     overflow: "hidden",
-    backgroundColor: "#f1f2f6",
+    background: "#f1f5f9",
+    border: "1px solid #e1e8f2",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -192,6 +203,7 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
+    objectPosition: "center",
   },
   thumbPlaceholder: {
     fontSize: "2rem",
