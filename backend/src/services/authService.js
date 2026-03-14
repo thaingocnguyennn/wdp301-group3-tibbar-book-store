@@ -4,8 +4,18 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { MESSAGES } from '../config/constants.js';
 import { sendOTPEmail, sendPasswordResetConfirmationEmail } from '../utils/emailHelper.js';
 import { OAuth2Client } from 'google-auth-library';
+import captchaService from './captchaService.js';
+
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const ACCOUNT_LOCK_DURATION_MS = 30 * 60 * 1000;
+const ACCOUNT_LOCKED_MESSAGE =
+  'Your account is locked due to 5 failed login attempts. Please try again after 30 minutes.';
 
 class AuthService {
+  async getCaptcha() {
+    return captchaService.generateCaptcha();
+  }
+
   async register(userData) {
     const { email, password, firstName, lastName } = userData;
 
@@ -30,10 +40,18 @@ class AuthService {
     return { user, accessToken, refreshToken };
   }
 
-  async login(email, password) {
-    const user = await User.findOne({ email }).select('+password +refreshToken');
-    
-    if (!user || !(await user.comparePassword(password))) {
+  async login(email, password, captchaId, captchaAnswer) {
+    const isCaptchaValid = captchaService.verifyCaptcha(captchaId, captchaAnswer);
+
+    if (!isCaptchaValid) {
+      throw ApiError.badRequest('Captcha verification failed. Please try again.');
+    }
+
+    const user = await User.findOne({ email }).select(
+      '+password +refreshToken +failedLoginAttempts +lockUntil'
+    );
+
+    if (!user) {
       throw ApiError.unauthorized(MESSAGES.INVALID_CREDENTIALS);
     }
 
@@ -41,6 +59,31 @@ class AuthService {
     if (!user.isActive) {
       throw ApiError.forbidden('Your account has been locked. Please contact support.');
     }
+
+    // Lockout after too many failed attempts.
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      throw ApiError.forbidden(ACCOUNT_LOCKED_MESSAGE);
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+
+    if (!isPasswordValid) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (user.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+        user.lockUntil = new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS);
+        user.failedLoginAttempts = 0;
+        await user.save();
+
+        throw ApiError.forbidden(ACCOUNT_LOCKED_MESSAGE);
+      }
+
+      await user.save();
+      throw ApiError.unauthorized(MESSAGES.INVALID_CREDENTIALS);
+    }
+
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
 
     const accessToken = generateAccessToken(user._id, user.role);
     const refreshToken = generateRefreshToken(user._id);
@@ -135,6 +178,8 @@ class AuthService {
 
     // Update password
     user.password = newPassword;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
     user.otp = undefined;
     user.otpExpires = undefined;
     await user.save();

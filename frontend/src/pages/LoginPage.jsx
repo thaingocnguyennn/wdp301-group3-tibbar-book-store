@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import authApi from '../api/authApi';
@@ -12,6 +12,10 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
 
   // Forgot password flow states
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -32,6 +36,27 @@ const LoginPage = () => {
   // Get the page user was trying to access, or default to home
   const from = location.state?.from || '/';
 
+  const loadCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const response = await authApi.getCaptcha();
+      const captcha = response?.data || {};
+      setCaptchaId(captcha.captchaId || '');
+      setCaptchaQuestion(captcha.question || '');
+      setCaptchaAnswer('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load captcha');
+      setCaptchaId('');
+      setCaptchaQuestion('');
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCaptcha();
+  }, []);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -42,14 +67,25 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!captchaId || !captchaAnswer.trim()) {
+      setError('Please complete CAPTCHA before logging in.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(formData);
+      await login({
+        ...formData,
+        captchaId,
+        captchaAnswer: captchaAnswer.trim()
+      });
       // Redirect to the page user was trying to access, or home
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
+      await loadCaptcha();
     } finally {
       setLoading(false);
     }
@@ -221,7 +257,37 @@ const LoginPage = () => {
               />
             </div>
 
-            <button type="submit" disabled={loading} style={styles.button}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>CAPTCHA</label>
+              <div style={styles.captchaQuestionWrap}>
+                <span style={styles.captchaQuestion}>
+                  {captchaLoading ? 'Loading CAPTCHA...' : captchaQuestion || 'Unable to load CAPTCHA'}
+                </span>
+                <button
+                  type="button"
+                  onClick={loadCaptcha}
+                  disabled={captchaLoading || loading}
+                  style={styles.captchaRefreshBtn}
+                >
+                  Refresh
+                </button>
+              </div>
+              <input
+                type="text"
+                value={captchaAnswer}
+                onChange={(e) => setCaptchaAnswer(e.target.value)}
+                required
+                style={styles.input}
+                placeholder="Enter CAPTCHA answer"
+                disabled={captchaLoading || loading}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || captchaLoading || !captchaId}
+              style={styles.button}
+            >
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
@@ -550,6 +616,30 @@ const styles = {
     margin: '1.5rem 0',
     fontSize: '0.9rem',
     color: '#7f8c8d'
+  },
+  captchaQuestionWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+    padding: '0.75rem',
+    border: '1px dashed #bdc3c7',
+    borderRadius: '4px',
+    backgroundColor: '#f8f9fa'
+  },
+  captchaQuestion: {
+    color: '#2c3e50',
+    fontWeight: '600',
+    fontSize: '1rem'
+  },
+  captchaRefreshBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#3498db',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    padding: 0
   },
   dividerLine: {
     flex: 1,

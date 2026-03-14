@@ -144,6 +144,17 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+      min: 0,
+      select: false,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
+      select: false,
+    },
     otp: {
       type: String,
       select: false,
