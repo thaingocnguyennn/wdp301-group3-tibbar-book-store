@@ -1,16 +1,59 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useWishlist } from "../../hooks/useWishlist";
 import { useCart } from "../../hooks/useCart";
+import { orderApi } from "../../api/orderApi";
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const { wishlist } = useWishlist();
   const { cart } = useCart();
+  const [ebookCount, setEbookCount] = useState(0);
   const isShipper = user?.role?.toLowerCase() === "shipper";
   const showCustomerNavLinks = !isAdmin;
   const cartCount = Array.isArray(cart?.items) ? cart.items.length : 0;
+
+  useEffect(() => {
+    if (!isAuthenticated || !showCustomerNavLinks) {
+      setEbookCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchEbookCount = async () => {
+      try {
+        const response = await orderApi.getUserOrders(1, 100);
+        const orders = response?.data?.orders || [];
+        const uniqueEbookIds = new Set();
+
+        orders.forEach((order) => {
+          (order.items || []).forEach((item) => {
+            const book = item?.book;
+            if (book?._id && book?.isEbook) {
+              uniqueEbookIds.add(book._id);
+            }
+          });
+        });
+
+        if (!cancelled) {
+          setEbookCount(uniqueEbookIds.size);
+        }
+      } catch {
+        if (!cancelled) {
+          setEbookCount(0);
+        }
+      }
+    };
+
+    fetchEbookCount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, showCustomerNavLinks]);
 
   const handleLogout = async () => {
     await logout();
@@ -82,7 +125,7 @@ const Navbar = () => {
 
                 {showCustomerNavLinks && (
                   <Link to="/ebooks" style={styles.link}>
-                    E-Books
+                    E-Books {ebookCount > 0 && `(${ebookCount})`}
                   </Link>
                 )}
 

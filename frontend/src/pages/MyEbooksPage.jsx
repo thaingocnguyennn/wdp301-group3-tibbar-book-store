@@ -35,7 +35,6 @@ const MyEbooksPage = () => {
         if (!book?._id || !book?.isEbook) return;
 
         const isPaid = order.paymentStatus === "PAID";
-        const isPending = order.paymentStatus === "PENDING";
 
         if (!uniqueByBookId.has(book._id)) {
           uniqueByBookId.set(book._id, {
@@ -47,7 +46,6 @@ const MyEbooksPage = () => {
             latestOrderAt: order.createdAt,
             latestPaidAt: isPaid ? order.createdAt : null,
             hasPaidOrder: isPaid,
-            hasPendingOrder: isPending,
           });
           return;
         }
@@ -67,21 +65,17 @@ const MyEbooksPage = () => {
               ? order.createdAt
               : existing.latestPaidAt,
           hasPaidOrder: existing.hasPaidOrder || isPaid,
-          hasPendingOrder: existing.hasPendingOrder || isPending,
         });
       });
     });
 
-    return Array.from(uniqueByBookId.values())
-      .map((book) => ({
-        ...book,
-        paymentBadge: book.hasPaidOrder ? "PAID" : "UNPAID",
-      }))
-      .sort((a, b) => new Date(b.latestOrderAt) - new Date(a.latestOrderAt));
+    return Array.from(uniqueByBookId.values()).sort(
+      (a, b) => new Date(b.latestOrderAt) - new Date(a.latestOrderAt),
+    );
   }, [orders]);
 
-  const paidCount = ebooks.filter((book) => book.paymentBadge === "PAID").length;
-  const unpaidCount = ebooks.length - paidCount;
+  const paidCount = ebooks.filter((book) => book.hasPaidOrder).length;
+  const pendingCount = ebooks.length - paidCount;
 
   if (loading) {
     return (
@@ -100,7 +94,7 @@ const MyEbooksPage = () => {
         <h1 style={styles.title}>📚 My E-Books</h1>
         <p style={styles.subtitle}>
           {ebooks.length > 0
-            ? `${paidCount} Paid • ${unpaidCount} Unpaid`
+            ? `${paidCount} Ready to read • ${pendingCount} pending payment`
             : "Your e-books will appear here"}
         </p>
       </div>
@@ -116,7 +110,7 @@ const MyEbooksPage = () => {
           <div style={styles.emptyIcon}>📖</div>
           <h2 style={styles.emptyTitle}>No e-books yet</h2>
           <p style={styles.emptyText}>
-            Buy an e-book to see Paid and Unpaid statuses here.
+            Buy an e-book to access your reader library here.
           </p>
           <button style={styles.shopBtn} onClick={() => navigate("/")}>
             Explore Books
@@ -144,26 +138,24 @@ const MyEbooksPage = () => {
                 <div style={styles.cardContent}>
                   <h3 style={styles.bookTitle}>{book.title}</h3>
                   <p style={styles.bookAuthor}>by {book.author}</p>
-                  {book.paymentBadge === "PAID" ? (
+                  {book.hasPaidOrder ? (
                     <span style={styles.paidBadge}>● Paid</span>
-                  ) : (
-                    <span style={styles.unpaidBadge}>○ Unpaid</span>
-                  )}
+                  ) : null}
                   <p style={styles.bookMeta}>
-                    {book.paymentBadge === "PAID" ? "Purchased" : "Ordered"}: {new Date(book.paymentBadge === "PAID" ? book.latestPaidAt : book.latestOrderAt).toLocaleDateString("vi-VN")}
+                    {book.hasPaidOrder ? "Purchased" : "Ordered"}: {new Date(book.hasPaidOrder ? book.latestPaidAt : book.latestOrderAt).toLocaleDateString("vi-VN")}
                   </p>
                   <button
                     style={{
                       ...styles.readBtn,
-                      ...(book.paymentBadge !== "PAID" ? styles.readBtnDisabled : {}),
+                      ...(!book.hasPaidOrder ? styles.readBtnDisabled : {}),
                     }}
                     onClick={() =>
-                      book.paymentBadge === "PAID"
+                      book.hasPaidOrder
                         ? navigate(`/books/${book._id}/read`)
                         : navigate("/orders")
                     }
                   >
-                    {book.paymentBadge === "PAID" ? "📖 Read Now" : "⏳ Pending Payment"}
+                    {book.hasPaidOrder ? "📖 Read Now" : "⏳ Pending Payment"}
                   </button>
                 </div>
               </div>
@@ -336,17 +328,6 @@ const styles = {
     backgroundColor: "#dcfce7",
     color: "#15803d",
     border: "1px solid #86efac",
-    borderRadius: "999px",
-    padding: "0.2rem 0.55rem",
-    fontSize: "0.75rem",
-    fontWeight: 700,
-  },
-  unpaidBadge: {
-    display: "inline-flex",
-    alignSelf: "flex-start",
-    backgroundColor: "#fff8e1",
-    color: "#d97706",
-    border: "1px solid #fcd34d",
     borderRadius: "999px",
     padding: "0.2rem 0.55rem",
     fontSize: "0.75rem",
