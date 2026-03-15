@@ -40,11 +40,14 @@ import NewsPage from "./pages/NewsPage";
 import NewsManagement from "./pages/admin/NewsManagement";
 import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
+import SupportChatPage from "./pages/SupportChatPage";
+import AdminSupportPage from "./pages/admin/AdminSupportPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
   adminOnly = false,
   shipperOnly = false,
+  customerOnly = false,
 }) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
 
@@ -67,6 +70,10 @@ const ProtectedRoute = ({
   }
 
   if (shipperOnly && user?.role !== "shipper") {
+    return <Navigate to="/" replace />;
+  }
+
+  if (customerOnly && user?.role !== "customer") {
     return <Navigate to="/" replace />;
   }
 
@@ -181,6 +188,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <MyVouchersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute customerOnly>
+              <SupportChatPage />
             </ProtectedRoute>
           }
         />
@@ -311,6 +326,14 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <NewsManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminSupportPage />
             </ProtectedRoute>
           }
         />
