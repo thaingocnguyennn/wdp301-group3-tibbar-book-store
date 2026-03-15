@@ -4,6 +4,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useWishlist } from "../../hooks/useWishlist";
 import { useCart } from "../../hooks/useCart";
 import { orderApi } from "../../api/orderApi";
+import { supportApi } from "../../api/supportApi";
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -11,6 +12,7 @@ const Navbar = () => {
   const { wishlist } = useWishlist();
   const { cart } = useCart();
   const [ebookCount, setEbookCount] = useState(0);
+  const [adminUnreadMessages, setAdminUnreadMessages] = useState(0);
   const isShipper = user?.role?.toLowerCase() === "shipper";
   const showCustomerNavLinks = !isAdmin;
   const cartCount = Array.isArray(cart?.items) ? cart.items.length : 0;
@@ -55,6 +57,36 @@ const Navbar = () => {
     };
   }, [isAuthenticated, showCustomerNavLinks]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) {
+      setAdminUnreadMessages(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchUnreadSummary = async () => {
+      try {
+        const response = await supportApi.getAdminUnreadSummary();
+        if (!cancelled) {
+          setAdminUnreadMessages(response?.data?.unreadMessages || 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminUnreadMessages(0);
+        }
+      }
+    };
+
+    fetchUnreadSummary();
+    const intervalId = setInterval(fetchUnreadSummary, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, isAdmin]);
+
   const handleLogout = async () => {
     await logout();
     navigate("/");
@@ -75,6 +107,11 @@ const Navbar = () => {
             {isAdmin && (
               <Link to="/admin/dashboard" style={styles.link}>
                 Admin Dashboard
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin/support" style={styles.link}>
+                Support Inbox {adminUnreadMessages > 0 && `(${adminUnreadMessages})`}
               </Link>
             )}
             {isAuthenticated && (
@@ -108,6 +145,12 @@ const Navbar = () => {
                 {showCustomerNavLinks && (
                   <Link to="/my-vouchers" style={styles.link}>
                     My Vouchers
+                  </Link>
+                )}
+
+                {showCustomerNavLinks && (
+                  <Link to="/support" style={styles.link}>
+                    Support
                   </Link>
                 )}
 
