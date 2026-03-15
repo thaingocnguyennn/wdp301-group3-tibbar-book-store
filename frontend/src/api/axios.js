@@ -28,12 +28,13 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle locked account (403 Forbidden)
+    // Handle disabled account (403 Forbidden) for authenticated sessions only.
     if (error.response?.status === 403) {
       const message = error.response?.data?.message || '';
+      const hasAccessToken = !!localStorage.getItem('accessToken');
       
-      // If account is locked, logout and redirect
-      if (message.toLowerCase().includes('locked') || message.toLowerCase().includes('disabled')) {
+      // Temporary login lockouts should surface as page-level errors, not forced logout redirects.
+      if (hasAccessToken && message.toLowerCase().includes('disabled')) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         alert('Your account has been disabled. Please contact support.');

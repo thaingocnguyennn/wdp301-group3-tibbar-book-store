@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { orderApi } from "../api/orderApi";
 import { voucherApi } from "../api/voucherApi";
 import { addressApi } from "../api/addressApi";
+import { coinApi } from "../api/coinApi";
 import AvailableVouchers from "../components/payment/AvailableVouchers";
 
 const CheckoutPage = () => {
@@ -25,13 +26,20 @@ const CheckoutPage = () => {
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [voucherMessage, setVoucherMessage] = useState("");
   const [availableVouchers, setAvailableVouchers] = useState([]);
-  const [availableVouchersLoading, setAvailableVouchersLoading] = useState(false);
+  const [availableVouchersLoading, setAvailableVouchersLoading] =
+    useState(false);
   const [showAvailableVouchers, setShowAvailableVouchers] = useState(false);
 
   // Address state
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressesLoading, setAddressesLoading] = useState(true);
+
+  // Coin state
+  const [useCoin, setUseCoin] = useState(false);
+  const [coinStatus, setCoinStatus] = useState(null);
+  const [coinDiscount, setCoinDiscount] = useState(0);
+  const [acceptedReturnPolicy, setAcceptedReturnPolicy] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -42,7 +50,11 @@ const CheckoutPage = () => {
 
   // Redirect to cart if cart is empty
   useEffect(() => {
-    if (!loading && isAuthenticated && (!cart.items || cart.items.length === 0)) {
+    if (
+      !loading &&
+      isAuthenticated &&
+      (!cart.items || cart.items.length === 0)
+    ) {
       navigate("/cart");
     }
   }, [cart.items, loading, isAuthenticated, navigate]);
@@ -74,9 +86,11 @@ const CheckoutPage = () => {
       try {
         const response = await orderApi.getPaymentMethods();
         setPaymentMethods(response.data.methods || []);
-        
+
         // Auto-select COD if available
-        const codMethod = response.data.methods?.find(m => m.method === "COD" && m.available);
+        const codMethod = response.data.methods?.find(
+          (m) => m.method === "COD" && m.available,
+        );
         if (codMethod) {
           setSelectedPaymentMethod("COD");
         }
@@ -91,18 +105,32 @@ const CheckoutPage = () => {
     fetchPaymentMethods();
   }, []);
 
+  // Fetch coin status
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchCoinStatus = async () => {
+      try {
+        const response = await coinApi.getCoinStatus();
+        setCoinStatus(response.data);
+      } catch (err) {
+        console.error("Failed to fetch coin status:", err);
+      }
+    };
+    fetchCoinStatus();
+  }, [isAuthenticated]);
+
   // Calculate totals
   const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
       const price = item.book?.price || 0;
       return sum + price * item.quantity;
     }, 0);
-    
+
     // Free shipping if subtotal > 200,000 VND
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
     const shippingFee = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
-    
+
     const total = subtotal + shippingFee;
 
     return {
@@ -115,26 +143,55 @@ const CheckoutPage = () => {
   }, [cart.items]);
 
   const totals = useMemo(() => {
-    if (!voucherTotals) {
-      return baseTotals;
+    let currentTotals = baseTotals;
+
+    if (voucherTotals) {
+      currentTotals = {
+        ...baseTotals,
+        subtotal: Number(voucherTotals.subtotal || baseTotals.subtotal),
+        discount: Number(voucherTotals.discount || 0),
+        shippingFee: Number(
+          voucherTotals.shippingFee || baseTotals.shippingFee,
+        ),
+        total: Number(voucherTotals.total || baseTotals.total),
+        isFreeShipping:
+          Number(voucherTotals.shippingFee || baseTotals.shippingFee) === 0,
+      };
     }
 
-    return {
-      ...baseTotals,
-      subtotal: Number(voucherTotals.subtotal || baseTotals.subtotal),
-      discount: Number(voucherTotals.discount || 0),
-      shippingFee: Number(voucherTotals.shippingFee || baseTotals.shippingFee),
-      total: Number(voucherTotals.total || baseTotals.total),
-      isFreeShipping: Number(voucherTotals.shippingFee || baseTotals.shippingFee) === 0,
-    };
-  }, [baseTotals, voucherTotals]);
+    // Apply coin discount
+    if (useCoin && coinDiscount > 0) {
+      currentTotals = {
+        ...currentTotals,
+        coinDiscount,
+        total: Math.max(0, currentTotals.total - coinDiscount),
+      };
+    }
+
+    return currentTotals;
+  }, [baseTotals, voucherTotals, useCoin, coinDiscount]);
+
+  // Calculate coin discount when useCoin changes
+  useEffect(() => {
+    if (useCoin && coinStatus) {
+      const orderTotal = voucherTotals?.total || baseTotals.total;
+      const maxCoinsUsable = Math.min(coinStatus.coinBalance, orderTotal);
+      setCoinDiscount(maxCoinsUsable);
+    } else {
+      setCoinDiscount(0);
+    }
+  }, [useCoin, coinStatus, baseTotals.total, voucherTotals]);
 
   // Validate cart
   const cartIsValid = useMemo(() => {
     if (!cart.items || cart.items.length === 0) return false;
     return cart.items.every(
-      (item) => item.book && item.quantity > 0 && item.book.price > 0
+      (item) => item.book && item.quantity > 0 && item.book.price > 0,
     );
+  }, [cart.items]);
+
+  const hasEbookInCart = useMemo(() => {
+    return (cart.items || []).some((item) => item.book?.isEbook);
   }, [cart.items]);
 
   const clearVoucherState = (keepCode = false) => {
@@ -170,7 +227,9 @@ const CheckoutPage = () => {
       setAppliedVoucher(voucher);
       setVoucherTotals(response.data.totals);
       setVoucherCode(voucher?.code || normalizedVoucher.toUpperCase());
-      setVoucherMessage(`Voucher ${voucher?.code || normalizedVoucher.toUpperCase()} applied.`);
+      setVoucherMessage(
+        `Voucher ${voucher?.code || normalizedVoucher.toUpperCase()} applied.`,
+      );
     } catch (err) {
       setAppliedVoucher(null);
       setVoucherTotals(null);
@@ -195,6 +254,34 @@ const CheckoutPage = () => {
     }
   }, [cart.items]);
 
+  useEffect(() => {
+    if (!paymentMethods.length) return;
+
+    if (hasEbookInCart) {
+      const vnpayMethod = paymentMethods.find(
+        (method) => method.method === "VNPAY" && method.available,
+      );
+
+      if (vnpayMethod) {
+        if (selectedPaymentMethod !== "VNPAY") {
+          setSelectedPaymentMethod("VNPAY");
+        }
+      } else {
+        setSelectedPaymentMethod("");
+      }
+      return;
+    }
+
+    if (!selectedPaymentMethod) {
+      const codMethod = paymentMethods.find(
+        (method) => method.method === "COD" && method.available,
+      );
+      if (codMethod) {
+        setSelectedPaymentMethod("COD");
+      }
+    }
+  }, [paymentMethods, hasEbookInCart, selectedPaymentMethod]);
+
   // Fetch eligible vouchers whenever the cart subtotal changes
   useEffect(() => {
     if (!isAuthenticated || baseTotals.subtotal <= 0) {
@@ -216,7 +303,9 @@ const CheckoutPage = () => {
     };
 
     fetchAvailable();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [baseTotals.subtotal, isAuthenticated]);
 
   const handleApplyVoucher = async () => {
@@ -235,6 +324,11 @@ const CheckoutPage = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!acceptedReturnPolicy) {
+      setError("Please confirm return and refund policy before placing order");
+      return;
+    }
+
     if (!selectedPaymentMethod) {
       setError("Please select a payment method");
       return;
@@ -258,6 +352,7 @@ const CheckoutPage = () => {
         paymentMethod: selectedPaymentMethod,
         shippingAddressId: selectedAddressId,
         voucherCode: appliedVoucher?.code || null,
+        useCoin: useCoin,
         notes: notes.trim(),
       };
 
@@ -295,7 +390,7 @@ const CheckoutPage = () => {
       console.error("Failed to create order:", err);
       setError(
         err.response?.data?.message ||
-          "Failed to create order. Please try again."
+          "Failed to create order. Please try again.",
       );
       setIsSubmitting(false);
     }
@@ -332,12 +427,12 @@ const CheckoutPage = () => {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Checkout</h1>
-          <p style={styles.subtitle}>{cart.items.length} item{cart.items.length > 1 ? "s" : ""} in your order</p>
+          <p style={styles.subtitle}>
+            {cart.items.length} item{cart.items.length > 1 ? "s" : ""} in your
+            order
+          </p>
         </div>
-        <button
-          style={styles.backButton}
-          onClick={() => navigate("/cart")}
-        >
+        <button style={styles.backButton} onClick={() => navigate("/cart")}>
           ← Back to Cart
         </button>
       </div>
@@ -391,28 +486,37 @@ const CheckoutPage = () => {
                     key={addr._id}
                     style={{
                       ...styles.addressCard,
-                      ...(selectedAddressId === addr._id ? styles.addressCardSelected : {}),
+                      ...(selectedAddressId === addr._id
+                        ? styles.addressCardSelected
+                        : {}),
                     }}
                     onClick={() => setSelectedAddressId(addr._id)}
                   >
-                    <div style={{
-                      ...styles.addressRadio,
-                      ...(selectedAddressId === addr._id ? styles.addressRadioSelected : {}),
-                    }}>
+                    <div
+                      style={{
+                        ...styles.addressRadio,
+                        ...(selectedAddressId === addr._id
+                          ? styles.addressRadioSelected
+                          : {}),
+                      }}
+                    >
                       {selectedAddressId === addr._id && (
                         <div style={styles.addressRadioInner} />
                       )}
                     </div>
                     <div style={styles.addressInfo}>
                       <div style={styles.addressNameRow}>
-                        <strong style={styles.addressFullName}>{addr.fullName}</strong>
+                        <strong style={styles.addressFullName}>
+                          {addr.fullName}
+                        </strong>
                         <span style={styles.addressPhone}>{addr.phone}</span>
                         {addr.isDefault && (
                           <span style={styles.defaultBadge}>Default</span>
                         )}
                       </div>
                       <p style={styles.addressDetail}>
-                        {addr.description}, {addr.commune}, {addr.district}, {addr.province}
+                        {addr.description}, {addr.commune}, {addr.district},{" "}
+                        {addr.province}
                       </p>
                     </div>
                   </div>
@@ -468,7 +572,9 @@ const CheckoutPage = () => {
 
               {appliedVoucher ? (
                 <p style={styles.voucherAppliedText}>
-                  ✓ {voucherMessage || `Voucher ${appliedVoucher.code} applied successfully`}
+                  ✓{" "}
+                  {voucherMessage ||
+                    `Voucher ${appliedVoucher.code} applied successfully`}
                 </p>
               ) : (
                 <p style={styles.voucherHintText}>
@@ -505,25 +611,36 @@ const CheckoutPage = () => {
               <span style={styles.sectionIcon}>💳</span>
               Payment Method
             </h2>
+            {hasEbookInCart && (
+              <div style={styles.ebookPaymentNotice}>
+                E-book orders require online payment via VNPay.
+              </div>
+            )}
             <div style={styles.paymentMethods}>
               {paymentMethods.map((method) => {
                 const isSelected = selectedPaymentMethod === method.method;
+                const isMethodDisabled =
+                  !method.available ||
+                  (hasEbookInCart && method.method !== "VNPAY");
                 return (
                   <div
                     key={method.method}
                     style={{
                       ...styles.paymentOption,
                       ...(isSelected ? styles.paymentOptionSelected : {}),
-                      ...(method.available ? {} : styles.paymentOptionDisabled),
+                      ...(isMethodDisabled ? styles.paymentOptionDisabled : {}),
                     }}
                     onClick={() =>
-                      method.available && setSelectedPaymentMethod(method.method)
+                      !isMethodDisabled &&
+                      setSelectedPaymentMethod(method.method)
                     }
                   >
-                    <div style={{
-                      ...styles.paymentRadio,
-                      ...(isSelected ? styles.paymentRadioSelected : {}),
-                    }}>
+                    <div
+                      style={{
+                        ...styles.paymentRadio,
+                        ...(isSelected ? styles.paymentRadioSelected : {}),
+                      }}
+                    >
                       {isSelected && (
                         <div style={styles.paymentRadioInner}></div>
                       )}
@@ -534,8 +651,12 @@ const CheckoutPage = () => {
                     <div style={styles.paymentInfo}>
                       <div style={styles.paymentName}>
                         {method.name}
-                        {!method.available && (
-                          <span style={styles.comingSoonBadge}>Coming Soon</span>
+                        {isMethodDisabled && (
+                          <span style={styles.comingSoonBadge}>
+                            {hasEbookInCart && method.method !== "VNPAY"
+                              ? "Not allowed for E-Book"
+                              : "Coming Soon"}
+                          </span>
                         )}
                       </div>
                       <div style={styles.paymentDescription}>
@@ -582,7 +703,10 @@ const CheckoutPage = () => {
                     <span style={styles.orderItemQty}>× {item.quantity}</span>
                   </div>
                   <span style={styles.orderItemPrice}>
-                    {((item.book?.price || 0) * item.quantity).toLocaleString('vi-VN')}₫
+                    {((item.book?.price || 0) * item.quantity).toLocaleString(
+                      "vi-VN",
+                    )}
+                    ₫
                   </span>
                 </div>
               ))}
@@ -593,25 +717,59 @@ const CheckoutPage = () => {
             {/* Price Breakdown */}
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Subtotal</span>
-              <span style={styles.summaryValue}>{totals.subtotal.toLocaleString('vi-VN')}₫</span>
+              <span style={styles.summaryValue}>
+                {totals.subtotal.toLocaleString("vi-VN")}₫
+              </span>
             </div>
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Discount</span>
-              <span style={{ ...styles.summaryValue, color: "#ef4444" }}>-{totals.discount.toLocaleString('vi-VN')}₫</span>
+              <span style={{ ...styles.summaryValue, color: "#ef4444" }}>
+                -{totals.discount.toLocaleString("vi-VN")}₫
+              </span>
             </div>
+
+            {/* Coin Usage Section */}
+            {coinStatus && coinStatus.coinBalance > 0 && (
+              <div style={styles.coinSection}>
+                <label style={styles.coinLabel}>
+                  <input
+                    type="checkbox"
+                    checked={useCoin}
+                    onChange={(e) => setUseCoin(e.target.checked)}
+                    style={styles.coinCheckbox}
+                  />
+                  <span>
+                    Use Coins (Balance:{" "}
+                    {coinStatus.coinBalance.toLocaleString("vi-VN")} coins)
+                  </span>
+                </label>
+                {useCoin && coinDiscount > 0 && (
+                  <div style={styles.summaryRow}>
+                    <span style={styles.summaryLabel}>Coin Discount</span>
+                    <span style={{ ...styles.summaryValue, color: "#f39c12" }}>
+                      -{coinDiscount.toLocaleString("vi-VN")}₫
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Shipping Fee</span>
               <span style={styles.summaryValue}>
                 {totals.isFreeShipping ? (
-                  <span style={{ color: '#16a34a', fontWeight: 600 }}>Free ✓</span>
+                  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                    Free ✓
+                  </span>
                 ) : (
-                  `${totals.shippingFee.toLocaleString('vi-VN')}₫`
+                  `${totals.shippingFee.toLocaleString("vi-VN")}₫`
                 )}
               </span>
             </div>
             {!totals.isFreeShipping && totals.subtotal > 0 && (
               <div style={styles.freeShippingNotice}>
-                Add {(200000 - totals.subtotal).toLocaleString('vi-VN')}₫ more for free shipping
+                Add {(200000 - totals.subtotal).toLocaleString("vi-VN")}₫ more
+                for free shipping
               </div>
             )}
 
@@ -619,19 +777,71 @@ const CheckoutPage = () => {
 
             <div style={styles.summaryTotalRow}>
               <span style={styles.summaryTotalLabel}>Total</span>
-              <span style={styles.summaryTotalValue}>{totals.total.toLocaleString('vi-VN')}₫</span>
+              <span style={styles.summaryTotalValue}>
+                {totals.total.toLocaleString("vi-VN")}₫
+              </span>
+            </div>
+
+            <div style={styles.policyBox}>
+              <h3 style={styles.policyTitle}>Return & Refund Policy</h3>
+              <ul style={styles.policyList}>
+                <li style={styles.policyItem}>
+                  Request must be submitted within 7 days after receiving the
+                  order.
+                </li>
+                <li style={styles.policyItem}>
+                  Only damaged, defective, wrong item, or missing item cases are
+                  eligible.
+                </li>
+                <li style={styles.policyItem}>
+                  Books must remain unused and include original
+                  invoice/packaging for return approval.
+                </li>
+                <li style={styles.policyItem}>
+                  For approved refunds, money is returned to the original
+                  payment method within 3-7 business days.
+                </li>
+              </ul>
+              <label style={styles.policyCheckboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={acceptedReturnPolicy}
+                  onChange={(event) => {
+                    setAcceptedReturnPolicy(event.target.checked);
+                    if (event.target.checked) {
+                      setError("");
+                    }
+                  }}
+                  style={styles.policyCheckbox}
+                  disabled={isSubmitting}
+                />
+                <span>
+                  I have read and agree to the return and refund policy.
+                </span>
+              </label>
             </div>
 
             {/* Place Order Button */}
             <button
               style={{
                 ...styles.placeOrderButton,
-                ...(isSubmitting || !selectedPaymentMethod || !cartIsValid || !selectedAddressId
+                ...(isSubmitting ||
+                !selectedPaymentMethod ||
+                !cartIsValid ||
+                !selectedAddressId ||
+                !acceptedReturnPolicy
                   ? styles.placeOrderButtonDisabled
                   : {}),
               }}
               onClick={handlePlaceOrder}
-              disabled={isSubmitting || !selectedPaymentMethod || !cartIsValid || !selectedAddressId || addresses.length === 0}
+              disabled={
+                isSubmitting ||
+                !selectedPaymentMethod ||
+                !cartIsValid ||
+                !selectedAddressId ||
+                addresses.length === 0 ||
+                !acceptedReturnPolicy
+              }
             >
               {isSubmitting ? "Processing..." : "Place Order"}
             </button>
@@ -958,6 +1168,16 @@ const styles = {
     flexDirection: "column",
     gap: "0.6rem",
   },
+  ebookPaymentNotice: {
+    marginBottom: "0.75rem",
+    padding: "0.65rem 0.8rem",
+    borderRadius: "10px",
+    border: "1px solid #bfdbfe",
+    backgroundColor: "#eff6ff",
+    color: "#1d4ed8",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+  },
   paymentOption: {
     display: "flex",
     alignItems: "center",
@@ -1150,6 +1370,46 @@ const styles = {
     color: "#1e293b",
     letterSpacing: "-0.01em",
   },
+  policyBox: {
+    backgroundColor: "#fff7ed",
+    border: "1px solid #fdba74",
+    borderRadius: "10px",
+    padding: "0.85rem",
+    marginBottom: "0.95rem",
+  },
+  policyTitle: {
+    margin: "0 0 0.45rem",
+    fontSize: "0.88rem",
+    fontWeight: 700,
+    color: "#9a3412",
+  },
+  policyList: {
+    margin: 0,
+    paddingLeft: "1rem",
+  },
+  policyItem: {
+    fontSize: "0.75rem",
+    color: "#7c2d12",
+    marginBottom: "0.25rem",
+    lineHeight: 1.45,
+  },
+  policyCheckboxLabel: {
+    marginTop: "0.5rem",
+    display: "flex",
+    gap: "0.45rem",
+    alignItems: "flex-start",
+    fontSize: "0.78rem",
+    color: "#7c2d12",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  policyCheckbox: {
+    marginTop: "2px",
+    width: "15px",
+    height: "15px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
   placeOrderButton: {
     width: "100%",
     background: "linear-gradient(135deg, #667eea, #764ba2)",
@@ -1174,6 +1434,29 @@ const styles = {
     color: "#94a3b8",
     marginTop: "0.85rem",
     marginBottom: 0,
+  },
+
+  /* ─── Coin Section ─── */
+  coinSection: {
+    backgroundColor: "#fff9e6",
+    border: "1.5px solid #f39c12",
+    borderRadius: "8px",
+    padding: "0.75rem",
+    marginBottom: "0.75rem",
+  },
+  coinLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "0.88rem",
+    color: "#1e293b",
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  coinCheckbox: {
+    width: "16px",
+    height: "16px",
+    cursor: "pointer",
   },
 
   /* ─── Empty / Loading ─── */

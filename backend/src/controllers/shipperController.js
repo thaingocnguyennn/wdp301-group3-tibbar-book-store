@@ -1,4 +1,5 @@
 import shipperService from '../services/shipperService.js';
+import orderService from "../services/orderService.js";
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS } from '../config/constants.js';
 
@@ -6,7 +7,7 @@ class ShipperController {
   async getShipperOrders(req, res, next) {
     try {
       const { page, limit, status } = req.query;
-      const result = await shipperService.getShipperOrders(req.user.userId, {
+      const result = await shipperService.getShipperOrders(req.user._id, {
         page,
         limit,
         status
@@ -27,7 +28,7 @@ class ShipperController {
     try {
       const order = await shipperService.getOrderDetails(
         req.params.orderId,
-        req.user.userId
+        req.user._id
       );
 
       return ApiResponse.success(
@@ -55,7 +56,7 @@ class ShipperController {
 
       const order = await shipperService.updateOrderStatus(
         req.params.orderId,
-        req.user.userId,
+        req.user._id,
         status
       );
 
@@ -72,7 +73,7 @@ class ShipperController {
 
   async getShipperProfile(req, res, next) {
     try {
-      const result = await shipperService.getShipperProfile(req.user.userId);
+      const result = await shipperService.getShipperProfile(req.user._id);
 
       return ApiResponse.success(
         res,
@@ -87,13 +88,87 @@ class ShipperController {
 
   async getShipperDashboard(req, res, next) {
     try {
-      const dashboard = await shipperService.getShipperDashboard(req.user.userId);
+      const dashboard = await shipperService.getShipperDashboard(req.user._id);
 
       return ApiResponse.success(
         res,
         HTTP_STATUS.OK,
         'Shipper dashboard retrieved successfully',
         dashboard
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async respondAssignment(req, res, next) {
+    try {
+      const { action } = req.body;
+
+      const result = await orderService.respondAssignment(
+        req.params.orderId,
+        req.user._id,
+        action
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Respond assignment successfully",
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async uploadProof(req, res, next) {
+    try {
+      if (!req.file) {
+        return ApiResponse.error(
+          res,
+          HTTP_STATUS.BAD_REQUEST,
+          "No image uploaded"
+        );
+      }
+
+      const imageUrl = `/uploads/delivery-proofs/${req.file.filename}`;
+
+      const result = await shipperService.uploadDeliveryProof(
+        req.params.orderId,
+        req.user._id,
+        imageUrl
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Proof uploaded successfully",
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+  async getAssignmentHistory(req, res) {
+    const shipperId = req.user._id;
+
+    const data = await orderService.getAssignmentHistory(shipperId);
+
+    res.json({
+      success: true,
+      data
+    });
+  }
+  async getPerformance(req, res, next) {
+    try {
+      const performance = await orderService.getShipperPerformance(
+        req.user._id
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Shipper performance retrieved successfully",
+        performance
       );
     } catch (error) {
       next(error);

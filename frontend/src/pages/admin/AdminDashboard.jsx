@@ -1,6 +1,35 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { supportApi } from "../../api/supportApi";
 
 const AdminDashboard = () => {
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchUnreadSummary = async () => {
+      try {
+        const response = await supportApi.getAdminUnreadSummary();
+        if (!cancelled) {
+          setUnreadSupportCount(response?.data?.unreadMessages || 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setUnreadSupportCount(0);
+        }
+      }
+    };
+
+    fetchUnreadSummary();
+    const intervalId = setInterval(fetchUnreadSummary, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, []);
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Admin Dashboard</h1>
@@ -33,23 +62,17 @@ const AdminDashboard = () => {
         <Link to="/admin/users" style={styles.card}>
           <div style={styles.icon}>👥</div>
           <h3 style={styles.cardTitle}>Users</h3>
-          <p style={styles.cardDesc}>
-            Manage user accounts and roles
-          </p>
+          <p style={styles.cardDesc}>Manage user accounts and roles</p>
         </Link>
         <Link to="/admin/wishlist" style={styles.card}>
           <div style={styles.icon}>❤️</div>
           <h3 style={styles.cardTitle}>Wishlist Statistics</h3>
-          <p style={styles.cardDesc}>
-            View most wishlisted books
-          </p>
+          <p style={styles.cardDesc}>View most wishlisted books</p>
         </Link>
         <Link to="/admin/shippers" style={styles.card}>
           <div style={styles.icon}>🚚</div>
           <h3 style={styles.cardTitle}>Shippers</h3>
-          <p style={styles.cardDesc}>
-            View shipers in system
-          </p>
+          <p style={styles.cardDesc}>View shipers in system</p>
         </Link>
         <Link to="/admin/revenue" style={styles.card}>
           <div style={styles.icon}>📊</div>
@@ -62,9 +85,7 @@ const AdminDashboard = () => {
         <Link to="/admin/orders" style={styles.card}>
           <div style={styles.icon}>📦</div>
           <h3 style={styles.cardTitle}>Orders</h3>
-          <p style={styles.cardDesc}>
-            View and manage customer orders
-          </p>
+          <p style={styles.cardDesc}>View and manage customer orders</p>
         </Link>
 
         <Link to="/admin/vouchers" style={styles.card}>
@@ -72,6 +93,40 @@ const AdminDashboard = () => {
           <h3 style={styles.cardTitle}>Vouchers</h3>
           <p style={styles.cardDesc}>
             View, create and update voucher campaigns
+          </p>
+        </Link>
+
+        <Link to="/admin/news" style={styles.card}>
+          <div style={styles.icon}>📰</div>
+          <h3 style={styles.cardTitle}>News Management</h3>
+          <p style={styles.cardDesc}>
+            Create and manage news articles shown on homepage
+          </p>
+        </Link>
+
+        <Link to="/admin/request-history" style={styles.card}>
+          <div style={styles.icon}>🕘</div>
+          <h3 style={styles.cardTitle}>Recent Request History</h3>
+          <p style={styles.cardDesc}>
+            Review recent return and refund requests from customers
+          </p>
+        </Link>
+
+        <Link to="/admin/review-replies" style={styles.card}>
+          <div style={styles.icon}>💬</div>
+          <h3 style={styles.cardTitle}>Reply Reviews</h3>
+          <p style={styles.cardDesc}>
+            View customer reviews and reply directly as admin
+          </p>
+        </Link>
+
+        <Link to="/admin/support" style={styles.card}>
+          <div style={styles.icon}>🛟</div>
+          <h3 style={styles.cardTitle}>
+            Support Inbox {unreadSupportCount > 0 && `(${unreadSupportCount})`}
+          </h3>
+          <p style={styles.cardDesc}>
+            Review customer support conversations and reply in real-time
           </p>
         </Link>
       </div>

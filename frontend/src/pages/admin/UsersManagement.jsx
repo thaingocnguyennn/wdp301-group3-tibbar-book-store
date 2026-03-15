@@ -165,6 +165,8 @@ const UsersManagement = () => {
               <th style={styles.th}>Name</th>
               <th style={styles.th}>Role</th>
               <th style={styles.th}>Status</th>
+              <th style={styles.th}>Coin Balance</th>
+              <th style={styles.th}>Total Coins Used</th>
               <th style={styles.th}>Created At</th>
               <th style={styles.th}>Actions</th>
             </tr>
@@ -226,6 +228,16 @@ const UsersManagement = () => {
                     }}
                   >
                     {user.isActive ? 'Active' : 'Locked'}
+                  </span>
+                </td>
+                <td style={styles.td}>
+                  <span style={styles.coinBalanceBadge}>
+                    {Number(user.coinBalance || 0).toLocaleString('vi-VN')}
+                  </span>
+                </td>
+                <td style={styles.td}>
+                  <span style={styles.coinUsedBadge}>
+                    {Number(user.totalCoinsUsed || 0).toLocaleString('vi-VN')}
                   </span>
                 </td>
                 <td style={styles.td}>
@@ -376,6 +388,24 @@ const styles = {
   statusLocked: {
     backgroundColor: '#f8d7da',
     color: '#721c24',
+  },
+  coinBalanceBadge: {
+    display: 'inline-block',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '12px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    backgroundColor: '#fff8e1',
+    color: '#b45309',
+  },
+  coinUsedBadge: {
+    display: 'inline-block',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '12px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
   },
   actionButtons: {
     display: 'flex',

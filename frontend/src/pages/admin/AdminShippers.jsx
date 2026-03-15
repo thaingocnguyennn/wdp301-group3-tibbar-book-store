@@ -31,6 +31,8 @@ const AdminShippers = () => {
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Role</th>
                 <th style={styles.th}>Assigned Orders</th>
+                <th style={styles.th}>Acceptance Rate</th>
+                <th style={styles.th}>Success Rate</th>
                 <th style={styles.th}>Created At</th>
               </tr>
             </thead>
@@ -46,6 +48,14 @@ const AdminShippers = () => {
 
                   <td style={styles.td}>
                     {shipper.assignedOrders}
+                  </td>
+                  
+                  <td style={styles.td}>
+                    {shipper.acceptanceRate ?? 0}%
+                  </td>
+
+                  <td style={styles.td}>
+                    {shipper.successRate ?? 0}%
                   </td>
 
                   <td style={styles.td}>

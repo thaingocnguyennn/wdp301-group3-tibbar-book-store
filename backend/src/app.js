@@ -22,6 +22,11 @@ import orderRoutes from "./routes/orderRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import shipperRoutes from "./routes/shipperRoutes.js";
+import coinRoutes from "./routes/coinRoutes.js";
+import newsRoutes from "./routes/newsRoutes.js";
+import adminNewsRoutes from "./routes/adminNewsRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js";
+import adminSupportRoutes from "./routes/adminSupportRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
@@ -31,9 +36,36 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+const parseAllowedOrigins = () => {
+  const defaults = ["http://localhost:5173"];
+  const configuredOrigins = process.env.CLIENT_URLS || process.env.CLIENT_URL;
+
+  if (!configuredOrigins) {
+    return defaults;
+  }
+
+  return configuredOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const allowedOrigins = parseAllowedOrigins();
+
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  origin: (origin, callback) => {
+    // Allow non-browser clients like Postman that do not send Origin.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
 };
@@ -43,11 +75,17 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+
+// Block direct access to ebook files (must be before static middleware)
+app.use("/uploads/ebooks", (_req, res) => {
+  return res.status(403).json({ message: "Direct access not allowed" });
+});
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Health check
 app.get("/health", (req, res) => {
@@ -76,6 +114,11 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/shipper", shipperRoutes);
+app.use("/api/coins", coinRoutes);
+app.use("/api/news", newsRoutes);
+app.use("/api/admin/news", adminNewsRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/api/admin/support", adminSupportRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

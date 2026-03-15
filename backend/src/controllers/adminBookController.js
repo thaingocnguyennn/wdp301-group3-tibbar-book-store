@@ -22,8 +22,16 @@ class AdminBookController {
     try {
       const payload = { ...req.body };
 
-      if (req.file) {
-        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      // Handle isEbook coercion from string to boolean
+      if (payload.isEbook !== undefined) {
+        payload.isEbook = payload.isEbook === 'true' || payload.isEbook === true;
+      }
+
+      if (req.files?.image?.[0]) {
+        payload.imageUrl = `/uploads/books/${req.files.image[0].filename}`;
+      }
+      if (req.files?.ebook?.[0]) {
+        payload.ebookFile = `/uploads/ebooks/${req.files.ebook[0].filename}`;
       }
 
       const book = await bookService.createBook(payload);
@@ -43,8 +51,16 @@ class AdminBookController {
     try {
       const payload = { ...req.body };
 
-      if (req.file) {
-        payload.imageUrl = `/uploads/books/${req.file.filename}`;
+      // Handle isEbook coercion from string to boolean
+      if (payload.isEbook !== undefined) {
+        payload.isEbook = payload.isEbook === 'true' || payload.isEbook === true;
+      }
+
+      if (req.files?.image?.[0]) {
+        payload.imageUrl = `/uploads/books/${req.files.image[0].filename}`;
+      }
+      if (req.files?.ebook?.[0]) {
+        payload.ebookFile = `/uploads/ebooks/${req.files.ebook[0].filename}`;
       }
 
       const book = await bookService.updateBook(req.params.id, payload);
@@ -69,6 +85,47 @@ class AdminBookController {
         res,
         HTTP_STATUS.OK,
         MESSAGES.VISIBILITY_UPDATED,
+        { book }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+    async updatePreviewPages(req, res, next) {
+      try {
+        const files = Array.isArray(req.files) ? req.files : [];
+
+        const previewPages = files.map((file) => `/uploads/book-previews/${file.filename}`);
+
+        const book = await bookService.updatePreviewPages(req.params.id, previewPages);
+
+        return ApiResponse.success(
+          res,
+          HTTP_STATUS.OK,
+          'Book preview pages updated successfully',
+          { book }
+        );
+      } catch (error) {
+        next(error);
+      }
+    }
+
+  async managePreviewPage(req, res, next) {
+    try {
+      const { operation, pageNumber } = req.body;
+      const previewPageUrl = req.file ? `/uploads/book-previews/${req.file.filename}` : undefined;
+
+      const book = await bookService.managePreviewPage(req.params.id, {
+        operation,
+        pageNumber,
+        previewPageUrl
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        'Book preview page managed successfully',
         { book }
       );
     } catch (error) {

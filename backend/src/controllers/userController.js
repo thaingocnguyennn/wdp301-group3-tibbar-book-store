@@ -1,7 +1,7 @@
 import userService from '../services/userService.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS, MESSAGES } from '../config/constants.js';
-
+import bookService from '../services/bookService.js';
 class UserController {
   async getProfile(req, res, next) {
     try {
@@ -68,7 +68,20 @@ class UserController {
       next(error);
     }
   }
+  async getRecentlyViewed(req, res, next) {
+    try {
+      const books = await bookService.getRecentlyViewed(req.user.userId);
 
+      return ApiResponse.success(
+        res,
+        200,
+        "Recently viewed fetched",
+        { books }
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new UserController();

@@ -30,7 +30,7 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Main order schema
@@ -66,6 +66,10 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    coinsUsed: {
+      type: Number,
+      default: 0,
+    },
     shippingFee: {
       type: Number,
       default: 0,
@@ -93,7 +97,23 @@ const orderSchema = new mongoose.Schema(
       enum: ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"],
       default: "PENDING",
     },
-
+    // 🔥 THÊM ĐOẠN NÀY
+    assignmentStatus: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REJECTED"],
+      default: null,
+    },
+    rejectedShippers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    // Bằng chứng giao hàng (ảnh chụp bằng điện thoại của shipper khi giao hàng thành công)
+    deliveryProof: {
+      imageUrl: String,
+      uploadedAt: Date,
+    },
     // Shipping address snapshot (stored at order time)
     shippingAddress: {
       addressId: { type: String, default: null },
@@ -124,6 +144,40 @@ const orderSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Customer return / refund request
+    returnRequest: {
+      type: {
+        type: String,
+        enum: ["RETURN", "REFUND"],
+        default: null,
+      },
+      reason: {
+        type: String,
+        default: "",
+      },
+      details: {
+        type: String,
+        default: "",
+      },
+      status: {
+        type: String,
+        enum: ["PENDING", "APPROVED", "REJECTED", "COMPLETED"],
+        default: null,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+      adminNote: {
+        type: String,
+        default: "",
+      },
+    },
+
     // Timestamps for payment and delivery
     paidAt: {
       type: Date,
@@ -133,15 +187,40 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // ================= ASSIGNMENT FIELDS =================
+
+    assignmentExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    reassignCount: {
+      type: Number,
+      default: 0,
+    },
+
+    assignmentHistory: {
+      type: [
+        {
+          shipper: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          assignedAt: Date,
+          respondedAt: Date,
+          status: {
+            type: String,
+            enum: ["PENDING", "ACCEPTED", "REJECTED"],
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for efficient querying
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ paymentStatus: 1 });
 

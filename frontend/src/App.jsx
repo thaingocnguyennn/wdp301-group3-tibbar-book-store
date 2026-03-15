@@ -26,13 +26,29 @@ import OrderSuccessPage from "./pages/OrderSuccessPage";
 import PaymentReturnPage from "./pages/PaymentReturnPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import MyVouchersPage from "./pages/MyVouchersPage";
 import AdminWishlist from "./pages/admin/AdminWishlist";
 import AdminShippers from "./pages/admin/AdminShippers";
 import AdminRevenue from "./pages/admin/AdminRevenue";
 import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
+import RecentlyViewedPage from "./pages/RecentlyViewedPage";
+import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
+import EbookReaderPage from "./pages/EbookReaderPage";
+import MyEbooksPage from "./pages/MyEbooksPage";
+import NewsPage from "./pages/NewsPage";
+import NewsManagement from "./pages/admin/NewsManagement";
+import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
+import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
+import SupportChatPage from "./pages/SupportChatPage";
+import AdminSupportPage from "./pages/admin/AdminSupportPage";
 // Protected Route Component - Only for authenticated routes
-const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) => {
+const ProtectedRoute = ({
+  children,
+  adminOnly = false,
+  shipperOnly = false,
+  customerOnly = false,
+}) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
 
   if (loading) {
@@ -53,7 +69,11 @@ const ProtectedRoute = ({ children, adminOnly = false, shipperOnly = false }) =>
     return <Navigate to="/" replace />;
   }
 
-  if (shipperOnly && user?.role !== 'shipper') {
+  if (shipperOnly && user?.role !== "shipper") {
+    return <Navigate to="/" replace />;
+  }
+
+  if (customerOnly && user?.role !== "customer") {
     return <Navigate to="/" replace />;
   }
 
@@ -80,12 +100,12 @@ const RoleBasedHome = () => {
   const { isAuthenticated, user } = useAuth();
 
   // Redirect shippers to their dashboard
-  if (isAuthenticated && user?.role === 'shipper') {
+  if (isAuthenticated && user?.role === "shipper") {
     return <Navigate to="/shipper/dashboard" replace />;
   }
 
   // Redirect admins to admin dashboard
-  if (isAuthenticated && (user?.role === 'admin' || user?.role === 'manager')) {
+  if (isAuthenticated && (user?.role === "admin" || user?.role === "manager")) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
@@ -102,7 +122,16 @@ function AppContent() {
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
-
+        <Route
+          path="/books/:id/read"
+          element={
+            <ProtectedRoute>
+              <EbookReaderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/news/:id" element={<NewsPage />} />
+        <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
         <Route
           path="/login"
@@ -154,8 +183,32 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/my-vouchers"
+          element={
+            <ProtectedRoute>
+              <MyVouchersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute customerOnly>
+              <SupportChatPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route
+          path="/ebooks"
+          element={
+            <ProtectedRoute>
+              <MyEbooksPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Checkout Routes */}
         <Route
@@ -198,7 +251,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/assignment-history" element={<AssignmentHistoryPage />} />
         <Route
           path="/admin/books"
           element={
@@ -234,6 +287,22 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/request-history"
+          element={
+            <ProtectedRoute adminOnly>
+              <RecentRequestHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review-replies"
+          element={
+            <ProtectedRoute adminOnly>
+              <ReviewRepliesManagementPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/admin/vouchers"
@@ -248,7 +317,23 @@ function AppContent() {
           path="/admin/users"
           element={
             <ProtectedRoute adminOnly>
-              <UsersManagement />x
+              <UsersManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/news"
+          element={
+            <ProtectedRoute adminOnly>
+              <NewsManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminSupportPage />
             </ProtectedRoute>
           }
         />
@@ -268,11 +353,13 @@ function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!googleClientId) {
-    console.warn('Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file');
+    console.warn(
+      "Google Client ID not found. Please set VITE_GOOGLE_CLIENT_ID in your .env file",
+    );
   }
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId || ''}>
+    <GoogleOAuthProvider clientId={googleClientId || ""}>
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
