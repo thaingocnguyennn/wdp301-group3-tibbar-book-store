@@ -782,7 +782,13 @@ class OrderService {
       total: order.total,
       paymentMethod: order.paymentMethod,
     });
-
+    // 🔥 AUTO ASSIGN SHIPPER
+    try {
+      console.log("🚚 Auto assigning shipper...");
+      await this.autoAssignShipper(order._id);
+    } catch (err) {
+      console.log("⚠ Auto assign failed:", err.message);
+    }
     return {
       order,
       payment: paymentResult,
@@ -1472,9 +1478,9 @@ class OrderService {
       throw ApiError.notFound("Order not found"); // Trả về lỗi nếu không tìm thấy order
     }
 
-    if (!["PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
+    if (!["PENDING", "PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Order can only be assigned while in PROCESSING or SHIPPED status",
+        "Order can only be assigned while in PENDING or PROCESSING status"
       );
     }
 
@@ -1539,12 +1545,13 @@ class OrderService {
       throw ApiError.badRequest("Order already assigned");
     }
 
-    if (order.orderStatus !== "PROCESSING") {
+    const allowedStatuses = ["PENDING", "PROCESSING"];
+
+    if (!allowedStatuses.includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Auto assign is only available for PROCESSING orders",
+        "Auto assign only works for PENDING or PROCESSING orders"
       );
     }
-
     const { province, district } = order.shippingAddress || {};
 
     if (!province || !district) {
