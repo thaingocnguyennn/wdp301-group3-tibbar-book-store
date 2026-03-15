@@ -1,16 +1,59 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useWishlist } from "../../hooks/useWishlist";
 import { useCart } from "../../hooks/useCart";
+import { orderApi } from "../../api/orderApi";
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const { wishlist } = useWishlist();
   const { cart } = useCart();
+  const [ebookCount, setEbookCount] = useState(0);
   const isShipper = user?.role?.toLowerCase() === "shipper";
   const showCustomerNavLinks = !isAdmin;
   const cartCount = Array.isArray(cart?.items) ? cart.items.length : 0;
+
+  useEffect(() => {
+    if (!isAuthenticated || !showCustomerNavLinks) {
+      setEbookCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchEbookCount = async () => {
+      try {
+        const response = await orderApi.getUserOrders(1, 100);
+        const orders = response?.data?.orders || [];
+        const uniqueEbookIds = new Set();
+
+        orders.forEach((order) => {
+          (order.items || []).forEach((item) => {
+            const book = item?.book;
+            if (book?._id && book?.isEbook) {
+              uniqueEbookIds.add(book._id);
+            }
+          });
+        });
+
+        if (!cancelled) {
+          setEbookCount(uniqueEbookIds.size);
+        }
+      } catch {
+        if (!cancelled) {
+          setEbookCount(0);
+        }
+      }
+    };
+
+    fetchEbookCount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, showCustomerNavLinks]);
 
   const handleLogout = async () => {
     await logout();
@@ -56,7 +99,6 @@ const Navbar = () => {
 
             {isAuthenticated ? (
               <>
-
                 {showCustomerNavLinks && (
                   <Link to="/orders" style={styles.link}>
                     My Orders
@@ -78,6 +120,12 @@ const Navbar = () => {
                 {showCustomerNavLinks && (
                   <Link to="/wishlist" style={styles.link}>
                     Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
+                  </Link>
+                )}
+
+                {showCustomerNavLinks && (
+                  <Link to="/ebooks" style={styles.link}>
+                    E-Books {ebookCount > 0 && `(${ebookCount})`}
                   </Link>
                 )}
 
@@ -118,16 +166,16 @@ const Navbar = () => {
 const styles = {
   nav: {
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    padding: "1rem 0",
+    padding: "0.75rem 0",
     boxShadow: "0 4px 15px rgba(102, 126, 234, 0.3)",
     position: "sticky",
     top: "0",
     zIndex: "1000",
   },
   container: {
-    maxWidth: "1200px",
+    maxWidth: "1320px",
     margin: "0 auto",
-    padding: "0 2rem",
+    padding: "0 1.25rem",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -135,7 +183,7 @@ const styles = {
     flexWrap: "wrap",
   },
   logo: {
-    fontSize: "1.6rem",
+    fontSize: "1.9rem",
     fontWeight: "bold",
     color: "#fff",
     textDecoration: "none",
@@ -178,14 +226,14 @@ const styles = {
     flexShrink: 0,
   },
   button: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
     color: "#fff",
-    border: "2px solid #fff",
-    padding: "0.6rem 1.2rem",
+    border: "1px solid rgba(255, 255, 255, 0.75)",
+    padding: "0.5rem 0.9rem",
     borderRadius: "8px",
     cursor: "pointer",
     textDecoration: "none",
-    fontSize: "1rem",
+    fontSize: "0.9rem",
     fontWeight: "600",
     transition: "all 0.3s ease",
     backdropFilter: "blur(10px)",

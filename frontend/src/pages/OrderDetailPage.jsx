@@ -71,6 +71,9 @@ const RETURN_REQUEST_STATUS_CONFIG = {
   },
 };
 
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -291,6 +294,12 @@ const OrderDetailPage = () => {
     returnRequestExpiresAt &&
     returnRequestExpiresAt.getTime() >= Date.now();
 
+  const getItemImageSrc = (item) => {
+    const imageUrl = item?.book?.imageUrl;
+    if (!imageUrl) return "";
+    return imageUrl.startsWith("http") ? imageUrl : `${serverBaseUrl}${imageUrl}`;
+  };
+
   return (
     <div style={styles.container}>
       {/* Top Navigation */}
@@ -489,7 +498,18 @@ const OrderDetailPage = () => {
               style={styles.tableRow}
             >
               <span style={styles.colProduct}>
-                <span style={styles.productTitle}>{item.title}</span>
+                <span style={styles.productCell}>
+                  {getItemImageSrc(item) ? (
+                    <img
+                      src={getItemImageSrc(item)}
+                      alt={item.title}
+                      style={styles.productThumb}
+                    />
+                  ) : (
+                    <span style={styles.productThumbPlaceholder}>📕</span>
+                  )}
+                  <span style={styles.productTitle}>{item.title}</span>
+                </span>
               </span>
               <span style={styles.colCenter}>
                 <span style={styles.qtyBadge}>{item.quantity}</span>
@@ -1090,6 +1110,35 @@ const styles = {
   },
   colRight: {
     textAlign: "right",
+  },
+  productCell: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    minWidth: 0,
+  },
+  productThumb: {
+    width: "52px",
+    height: "72px",
+    borderRadius: "8px",
+    objectFit: "cover",
+    objectPosition: "center",
+    border: "1px solid #e2e8f0",
+    backgroundColor: "#f8fafc",
+    flexShrink: 0,
+  },
+  productThumbPlaceholder: {
+    width: "52px",
+    height: "72px",
+    borderRadius: "8px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid #e2e8f0",
+    backgroundColor: "#f8fafc",
+    color: "#94a3b8",
+    fontSize: "1.25rem",
+    flexShrink: 0,
   },
   productTitle: {
     fontWeight: 600,

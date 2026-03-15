@@ -618,6 +618,16 @@ class OrderService {
       description: resolvedAddress.description,
     };
 
+    // Validate cart
+    const { cart, validItems } = await this.validateCartForCheckout(userId);
+
+    const hasEbookInCart = validItems.some((item) => item.book?.isEbook);
+    if (hasEbookInCart && paymentMethod !== "VNPAY") {
+      throw ApiError.badRequest(
+        "E-book orders only support online payment via VNPay",
+      );
+    }
+
     // Validate payment method
     const paymentProvider = paymentService.getProvider(paymentMethod);
     const canPay = await paymentProvider.canPay();
@@ -626,9 +636,6 @@ class OrderService {
         `Payment method ${paymentMethod} is not available`,
       );
     }
-
-    // Validate cart
-    const { cart, validItems } = await this.validateCartForCheckout(userId);
 
     // Calculate subtotal first
     const subtotal = validItems.reduce((sum, item) => {
@@ -1019,13 +1026,6 @@ class OrderService {
 
     const paymentMethodToUse =
       paymentMethod || previousOrder.paymentMethod || "COD";
-    const paymentProvider = paymentService.getProvider(paymentMethodToUse);
-    const canPay = await paymentProvider.canPay();
-    if (!canPay) {
-      throw ApiError.badRequest(
-        `Payment method ${paymentMethodToUse} is not available`,
-      );
-    }
 
     const requestedBookIds = previousOrder.items
       .map((item) => item.book?.toString())
@@ -1033,6 +1033,21 @@ class OrderService {
 
     const books = await Book.find({ _id: { $in: requestedBookIds } });
     const booksById = new Map(books.map((book) => [book._id.toString(), book]));
+
+    const hasEbookInOrder = books.some((book) => book.isEbook);
+    if (hasEbookInOrder && paymentMethodToUse !== "VNPAY") {
+      throw ApiError.badRequest(
+        "E-book orders only support online payment via VNPay",
+      );
+    }
+
+    const paymentProvider = paymentService.getProvider(paymentMethodToUse);
+    const canPay = await paymentProvider.canPay();
+    if (!canPay) {
+      throw ApiError.badRequest(
+        `Payment method ${paymentMethodToUse} is not available`,
+      );
+    }
 
     const validationErrors = [];
     const orderItems = [];

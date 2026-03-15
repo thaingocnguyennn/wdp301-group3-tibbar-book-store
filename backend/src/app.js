@@ -73,11 +73,17 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+
+// Block direct access to ebook files (must be before static middleware)
+app.use("/uploads/ebooks", (_req, res) => {
+  return res.status(403).json({ message: "Direct access not allowed" });
+});
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Health check
 app.get("/health", (req, res) => {

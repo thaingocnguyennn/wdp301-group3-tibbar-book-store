@@ -15,6 +15,9 @@ router.get(
   bookController.getPersonalizedBooks,
 );
 router.get("/recently-viewed", authenticate, bookController.getRecentlyViewed);
-router.get("/:id", authenticate, bookController.getBookById);
+// E-book routes must be above /:id to avoid route collision
+router.get("/:id/ebook-access", authenticate, bookController.checkEbookAccess);
+router.get("/:id/ebook", authenticate, bookController.streamEbookFile);
+router.get("/:id", optionalAuthenticate, bookController.getBookById);
 
 export default router;

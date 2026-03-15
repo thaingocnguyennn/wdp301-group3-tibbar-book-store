@@ -15,6 +15,7 @@ const BookCard = ({ book }) => {
       ? book.imageUrl
       : `${serverBaseUrl}${book.imageUrl}`
     : '';
+  const authorName = String(book.author || 'Unknown Author').replace(/^by\s+/i, '');
 
   const isWishlisted = Array.isArray(wishlist)
   ? wishlist.some(b => b._id === book._id)
@@ -75,7 +76,7 @@ const BookCard = ({ book }) => {
 
       <div style={styles.content}>
         <h3 style={styles.title}>{book.title}</h3>
-        <p style={styles.author}>by {book.author}</p>
+        <p style={styles.author}>by {authorName}</p>
 
         {book.category?.name && (
           <span style={styles.category}>{book.category.name}</span>
@@ -101,22 +102,27 @@ const BookCard = ({ book }) => {
 const styles = {
   card: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+    borderRadius: '14px',
+    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     cursor: 'pointer',
-    border: '1px solid #f0f0f0',
+    border: '1px solid #e7eef7',
     display: 'flex',
     flexDirection: 'column',
     height: '100%'
   },
   imageContainer: {
     width: '100%',
-    height: '280px',
+    aspectRatio: '3 / 4',
+    minHeight: '240px',
     overflow: 'hidden',
-    backgroundColor: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-    position: 'relative'
+    background: '#f1f5f9',
+    position: 'relative',
+    borderBottom: '1px solid #e7eef7',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   image: {
     width: '100%',
@@ -130,25 +136,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '5rem',
+    fontSize: '4.2rem',
     color: '#bdc3c7',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
+    background: 'linear-gradient(145deg, #f7f9fc 0%, #ecf2f9 100%)'
   },
   content: {
-    padding: '1.25rem',
+    padding: '1rem 1rem 1.05rem',
     display: 'flex',
     flexDirection: 'column',
     flex: '1'
   },
   title: {
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    marginBottom: '0.5rem'
+    fontSize: '1.06rem',
+    fontWeight: '700',
+    margin: '0 0 0.35rem 0',
+    color: '#0f172a',
+    lineHeight: 1.35,
+    minHeight: '2.8rem',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden'
   },
   author: {
-    color: '#7f8c8d',
-    fontSize: '0.9rem',
-    margin: '0 0 0.75rem 0'
+    color: '#64748b',
+    fontSize: '0.88rem',
+    margin: '0 0 0.65rem 0',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   },
   category: {
     display: 'inline-block',
@@ -157,33 +173,40 @@ const styles = {
     padding: '0.35rem 0.85rem',
     borderRadius: '12px',
     fontSize: '0.75rem',
-    marginBottom: '1rem',
-    fontWeight: '600'
+    marginBottom: '0.85rem',
+    fontWeight: '600',
+    maxWidth: '100%',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   },
   footer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 'auto'
+    marginTop: 'auto',
+    gap: '0.6rem'
   },
   price: {
-    fontSize: '1.35rem',
+    fontSize: '1.28rem',
     fontWeight: '700',
-    color: '#667eea'
+    color: '#4f46e5',
+    whiteSpace: 'nowrap'
   },
   button: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: '#fff',
-    padding: '0.6rem 1.2rem',
+    padding: '0.52rem 0.88rem',
     borderRadius: '8px',
     textDecoration: 'none',
-    fontSize: '0.9rem',
+    fontSize: '0.84rem',
     fontWeight: '600',
     transition: 'all 0.3s ease',
     border: 'none',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+    whiteSpace: 'nowrap',
+    flexShrink: 0
   },
   outOfStock: {
     backgroundColor: '#e74c3c',

@@ -34,6 +34,8 @@ import OrdersManagement from "./pages/admin/OrdersManagement";
 import VouchersManagement from "./pages/admin/VouchersManagement";
 import RecentlyViewedPage from "./pages/RecentlyViewedPage";
 import AssignmentHistoryPage from "./pages/shipper/AssignmentHistoryPage";
+import EbookReaderPage from "./pages/EbookReaderPage";
+import MyEbooksPage from "./pages/MyEbooksPage";
 import NewsPage from "./pages/NewsPage";
 import NewsManagement from "./pages/admin/NewsManagement";
 import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
@@ -113,6 +115,14 @@ function AppContent() {
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
         <Route path="/books/:id" element={<BookDetailPage />} />
+        <Route
+          path="/books/:id/read"
+          element={
+            <ProtectedRoute>
+              <EbookReaderPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/news/:id" element={<NewsPage />} />
         <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
         {/* Auth Routes - Redirect to home if already logged in */}
@@ -176,6 +186,14 @@ function AppContent() {
         />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route
+          path="/ebooks"
+          element={
+            <ProtectedRoute>
+              <MyEbooksPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Checkout Routes */}
         <Route

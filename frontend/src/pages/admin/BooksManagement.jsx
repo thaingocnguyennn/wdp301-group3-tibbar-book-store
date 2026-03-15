@@ -10,6 +10,8 @@ const BooksManagement = () => {
   const [editingBook, setEditingBook] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imageInputKey, setImageInputKey] = useState(0);
+  const [ebookFile, setEbookFile] = useState(null);
+  const [ebookInputKey, setEbookInputKey] = useState(0);
   const [showPreviewForm, setShowPreviewForm] = useState(false);
   const [previewBook, setPreviewBook] = useState(null);
   const [previewFiles, setPreviewFiles] = useState([]);
@@ -31,7 +33,8 @@ const BooksManagement = () => {
     imageUrl: '',
     isbn: '',
     publishedDate: '',
-    visibility: 'public'
+    visibility: 'public',
+    isEbook: false
   });
   const [message, setMessage] = useState('');
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -77,6 +80,10 @@ const BooksManagement = () => {
       payload.append('image', imageFile);
     }
 
+    if (ebookFile) {
+      payload.append('ebook', ebookFile);
+    }
+
     try {
       if (editingBook) {
         await bookApi.updateBook(editingBook._id, payload);
@@ -105,9 +112,11 @@ const BooksManagement = () => {
       imageUrl: book.imageUrl || '',
       isbn: book.isbn || '',
       publishedDate: book.publishedDate ? book.publishedDate.split('T')[0] : '',
-      visibility: book.visibility
+      visibility: book.visibility,
+      isEbook: book.isEbook || false
     });
     setImageFile(null);
+    setEbookFile(null);
     setShowForm(true);
   };
 
@@ -144,12 +153,15 @@ const BooksManagement = () => {
       imageUrl: '',
       isbn: '',
       publishedDate: '',
-      visibility: 'public'
+      visibility: 'public',
+      isEbook: false
     });
     setEditingBook(null);
     setShowForm(false);
     setImageFile(null);
     setImageInputKey((prev) => prev + 1);
+    setEbookFile(null);
+    setEbookInputKey((prev) => prev + 1);
   };
 
   const openPreviewForm = (book) => {
@@ -437,13 +449,42 @@ const BooksManagement = () => {
             />
           </div>
 
-          <input
-            key={imageInputKey}
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-            style={styles.input}
-          />
+          <div style={styles.fileUploadRow}>
+            <label style={styles.fileLabel}>Book Cover Image</label>
+            <input
+              key={imageInputKey}
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              style={styles.input}
+            />
+          </div>
+
+          <div style={styles.ebookRow}>
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={formData.isEbook}
+                onChange={(e) => setFormData({ ...formData, isEbook: e.target.checked })}
+                style={{ marginRight: '0.5rem' }}
+              />
+              📱 This is an E-Book
+            </label>
+          </div>
+
+          {formData.isEbook && (
+            <div style={styles.ebookUploadRow}>
+              <label style={styles.ebookLabel}>E-Book PDF File{!editingBook ? ' *' : ' (leave blank to keep existing)'}:</label>
+              <input
+                key={ebookInputKey}
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setEbookFile(e.target.files?.[0] || null)}
+                style={styles.input}
+                required={!editingBook && formData.isEbook && !ebookFile}
+              />
+            </div>
+          )}
 
           <div style={styles.formRow}>
             <input
@@ -615,6 +656,7 @@ const BooksManagement = () => {
           <div style={styles.th}>Title</div>
           <div style={styles.th}>Author</div>
           <div style={styles.th}>Category</div>
+          <div style={{ ...styles.th, ...styles.formatTh }}>Format</div>
           <div style={styles.th}>Price</div>
           <div style={styles.th}>Stock</div>
           <div style={styles.th}>Visibility</div>
@@ -628,9 +670,18 @@ const BooksManagement = () => {
         ) : (
           books.map(book => (
             <div key={book._id} style={styles.tableRow}>
-              <div style={styles.td}>{book.title}</div>
+              <div style={styles.td}>
+                {book.title}
+              </div>
               <div style={styles.td}>{book.author}</div>
               <div style={styles.td}>{book.category?.name || 'N/A'}</div>
+              <div style={{ ...styles.td, ...styles.formatTd }}>
+                {book.isEbook ? (
+                  <span style={styles.ebookBadge}>📱 E-Book</span>
+                ) : (
+                  <span style={styles.physicalBadge}>📘 Physical</span>
+                )}
+              </div>
               <div style={styles.td}>{book.price.toLocaleString('vi-VN')}₫</div>
               <div style={styles.td}>{book.stock}</div>
               <div style={styles.td}>
@@ -691,17 +742,28 @@ const styles = {
   submitButton: { backgroundColor: '#3498db', color: '#fff', padding: '0.75rem 2rem', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   cancelButton: { backgroundColor: '#95a5a6', color: '#fff', padding: '0.75rem 2rem', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   table: { backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-  tableHeader: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 0.8fr 0.8fr 1fr 2.2fr', backgroundColor: '#34495e', color: '#fff', padding: '1rem' },
+  tableHeader: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 0.8fr 0.8fr 1fr 1.5fr', backgroundColor: '#34495e', color: '#fff', padding: '1rem' },
   th: { fontWeight: 'bold', fontSize: '0.9rem' },
-  tableRow: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 0.8fr 0.8fr 1fr 2.2fr', padding: '1rem', borderBottom: '1px solid #ecf0f1' },
+  tableRow: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 0.8fr 0.8fr 1fr 1.5fr', padding: '1rem', borderBottom: '1px solid #ecf0f1' },
   td: { fontSize: '0.9rem', display: 'flex', alignItems: 'center' },
+  formatTh: { textAlign: 'left' },
+  formatTd: { justifyContent: 'flex-start' },
   publicBadge: { backgroundColor: '#27ae60', color: '#fff', padding: '0.25rem 0.75rem', border: 'none', borderRadius: '12px', fontSize: '0.8rem', cursor: 'pointer' },
   hiddenBadge: { backgroundColor: '#e74c3c', color: '#fff', padding: '0.25rem 0.75rem', border: 'none', borderRadius: '12px', fontSize: '0.8rem', cursor: 'pointer' },
   editBtn: { backgroundColor: '#3498db', color: '#fff', padding: '0.4rem 0.8rem', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '0.5rem', fontSize: '0.85rem' },
   previewBtn: { backgroundColor: '#f39c12', color: '#fff', padding: '0.4rem 0.8rem', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '0.5rem', fontSize: '0.85rem' },
   deleteBtn: { backgroundColor: '#e74c3c', color: '#fff', padding: '0.4rem 0.8rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' },
   loading: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' },
-  empty: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' }
+  empty: { textAlign: 'center', padding: '2rem', color: '#7f8c8d' },
+  ebookRow: { marginBottom: '1rem' },
+  ebookUploadRow: { marginBottom: '1rem' },
+  checkboxLabel: { display: 'flex', alignItems: 'center', fontSize: '1rem', cursor: 'pointer', color: '#2c3e50' },
+  ebookLabel: { display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#555' },
+  ebookBadge: { backgroundColor: '#8b5cf6', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '600', minWidth: '92px', textAlign: 'center', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' },
+  physicalBadge: { backgroundColor: '#64748b', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '600', minWidth: '92px', textAlign: 'center', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' },
+  fileUploadRow: { marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' },
+  fileLabel: { fontSize: '0.85rem', fontWeight: '600', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.3px' },
+  fileHint: { fontSize: '0.8rem', color: '#7f8c8d', fontStyle: 'italic' }
 };
 
 export default BooksManagement;

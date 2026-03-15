@@ -526,13 +526,51 @@ class BookService {
     const book = await Book.findOne({
       _id: bookId,
       visibility: BOOK_VISIBILITY.PUBLIC,
-    }).populate("category", "name description");
+    })
+      .populate("category", "name description")
+      .select("-ebookFile");
 
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
 
     return book;
+  }
+
+  async checkEbookAccess(userId, bookId) {
+    const book = await Book.findById(bookId).select('isEbook').lean();
+    if (!book) throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    if (!book.isEbook) return { hasAccess: false, paymentStatus: null };
+
+    const paidOrder = await Order.findOne({
+      user: userId,
+      'items.book': bookId,
+      paymentStatus: 'PAID',
+    }).lean();
+
+    if (paidOrder) return { hasAccess: true, paymentStatus: 'PAID' };
+
+    const anyOrder = await Order.findOne({
+      user: userId,
+      'items.book': bookId,
+    })
+      .select('paymentStatus')
+      .lean();
+
+    return { hasAccess: false, paymentStatus: anyOrder?.paymentStatus || null };
+  }
+
+  async getEbookFilePath(userId, bookId) {
+    const book = await Book.findById(bookId).select('isEbook ebookFile').lean();
+    if (!book) throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    if (!book.isEbook || !book.ebookFile) throw ApiError.notFound('E-book not available');
+
+    const access = await this.checkEbookAccess(userId, bookId);
+    if (!access.hasAccess) {
+      throw ApiError.forbidden('Please complete payment to read this e-book.');
+    }
+
+    return book.ebookFile; // e.g. '/uploads/ebooks/xxx.pdf'
   }
 
   async getAllBooksAdmin(filters = {}) {

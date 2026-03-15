@@ -190,6 +190,10 @@ const CheckoutPage = () => {
     );
   }, [cart.items]);
 
+  const hasEbookInCart = useMemo(() => {
+    return (cart.items || []).some((item) => item.book?.isEbook);
+  }, [cart.items]);
+
   const clearVoucherState = (keepCode = false) => {
     setAppliedVoucher(null);
     setVoucherTotals(null);
@@ -249,6 +253,34 @@ const CheckoutPage = () => {
       applyVoucherByCode(voucherCode, { silent: true });
     }
   }, [cart.items]);
+
+  useEffect(() => {
+    if (!paymentMethods.length) return;
+
+    if (hasEbookInCart) {
+      const vnpayMethod = paymentMethods.find(
+        (method) => method.method === "VNPAY" && method.available,
+      );
+
+      if (vnpayMethod) {
+        if (selectedPaymentMethod !== "VNPAY") {
+          setSelectedPaymentMethod("VNPAY");
+        }
+      } else {
+        setSelectedPaymentMethod("");
+      }
+      return;
+    }
+
+    if (!selectedPaymentMethod) {
+      const codMethod = paymentMethods.find(
+        (method) => method.method === "COD" && method.available,
+      );
+      if (codMethod) {
+        setSelectedPaymentMethod("COD");
+      }
+    }
+  }, [paymentMethods, hasEbookInCart, selectedPaymentMethod]);
 
   // Fetch eligible vouchers whenever the cart subtotal changes
   useEffect(() => {
@@ -579,19 +611,27 @@ const CheckoutPage = () => {
               <span style={styles.sectionIcon}>💳</span>
               Payment Method
             </h2>
+            {hasEbookInCart && (
+              <div style={styles.ebookPaymentNotice}>
+                E-book orders require online payment via VNPay.
+              </div>
+            )}
             <div style={styles.paymentMethods}>
               {paymentMethods.map((method) => {
                 const isSelected = selectedPaymentMethod === method.method;
+                const isMethodDisabled =
+                  !method.available ||
+                  (hasEbookInCart && method.method !== "VNPAY");
                 return (
                   <div
                     key={method.method}
                     style={{
                       ...styles.paymentOption,
                       ...(isSelected ? styles.paymentOptionSelected : {}),
-                      ...(method.available ? {} : styles.paymentOptionDisabled),
+                      ...(isMethodDisabled ? styles.paymentOptionDisabled : {}),
                     }}
                     onClick={() =>
-                      method.available &&
+                      !isMethodDisabled &&
                       setSelectedPaymentMethod(method.method)
                     }
                   >
@@ -611,9 +651,11 @@ const CheckoutPage = () => {
                     <div style={styles.paymentInfo}>
                       <div style={styles.paymentName}>
                         {method.name}
-                        {!method.available && (
+                        {isMethodDisabled && (
                           <span style={styles.comingSoonBadge}>
-                            Coming Soon
+                            {hasEbookInCart && method.method !== "VNPAY"
+                              ? "Not allowed for E-Book"
+                              : "Coming Soon"}
                           </span>
                         )}
                       </div>
@@ -1125,6 +1167,16 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "0.6rem",
+  },
+  ebookPaymentNotice: {
+    marginBottom: "0.75rem",
+    padding: "0.65rem 0.8rem",
+    borderRadius: "10px",
+    border: "1px solid #bfdbfe",
+    backgroundColor: "#eff6ff",
+    color: "#1d4ed8",
+    fontSize: "0.85rem",
+    fontWeight: 600,
   },
   paymentOption: {
     display: "flex",

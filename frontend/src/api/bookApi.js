@@ -32,6 +32,11 @@ export const bookApi = {
     return response.data;
   },
 
+  checkEbookAccess: async (bookId) => {
+    const response = await axiosInstance.get(`/books/${bookId}/ebook-access`);
+    return response.data;
+  },
+
   // Admin endpoints
   getAllBooksAdmin: async (params) => {
     const response = await axiosInstance.get("/admin/books", { params });

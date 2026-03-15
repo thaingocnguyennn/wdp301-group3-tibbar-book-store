@@ -14,6 +14,7 @@ const BookDetailPage = () => {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [ebookAccess, setEbookAccess] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewSummary, setReviewSummary] = useState({
     averageRating: 0,
@@ -35,6 +36,7 @@ const BookDetailPage = () => {
   const [newReviewImages, setNewReviewImages] = useState([]);
   const [newReviewImagePreviews, setNewReviewImagePreviews] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [ebookActionMessage, setEbookActionMessage] = useState("");
   const [reviewDeleting, setReviewDeleting] = useState(false);
   const [reactionSubmittingId, setReactionSubmittingId] = useState("");
   const [replyInputs, setReplyInputs] = useState({});
@@ -87,12 +89,46 @@ const BookDetailPage = () => {
     try {
       setLoading(true);
       const response = await bookApi.getBookById(id);
-      setBook(response.data.book);
+      const fetchedBook = response.data.book;
+      setBook(fetchedBook);
+      // After fetching book, check ebook access if applicable
+      if (fetchedBook?.isEbook && isAuthenticated) {
+        fetchEbookAccess(id);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Book not found");
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchEbookAccess = async (bookId) => {
+    try {
+      const response = await bookApi.checkEbookAccess(bookId);
+      setEbookAccess(response.data);
+      return response.data;
+    } catch {
+      const fallbackAccess = { hasAccess: false, paymentStatus: null };
+      setEbookAccess(fallbackAccess);
+      return fallbackAccess;
+    }
+  };
+
+  const handleReadEbook = async () => {
+    if (!isAuthenticated) {
+      setEbookActionMessage("⚠️ Please login to read this e-book.");
+      return;
+    }
+
+    const access = ebookAccess ?? (await fetchEbookAccess(id));
+
+    if (access?.hasAccess) {
+      setEbookActionMessage("");
+      navigate(`/books/${id}/read`);
+      return;
+    }
+
+    setEbookActionMessage("⚠️ Please complete payment to read this e-book.");
   };
 
   const fetchReviews = async (page = 1, rating = "") => {
@@ -471,6 +507,23 @@ const BookDetailPage = () => {
               Preview Book
             </button>
           </div>
+
+          {book.isEbook && (
+            <div style={styles.ebookSection}>
+              <div style={styles.ebookSectionHeader}>
+                <span style={styles.ebookBadge}>📱 E-Book Available</span>
+              </div>
+              {ebookAccess === null && isAuthenticated && (
+                <p style={styles.ebookChecking}>Checking access...</p>
+              )}
+              <button onClick={handleReadEbook} style={styles.readNowBtn}>
+                📖 Read Now
+              </button>
+              {ebookActionMessage && (
+                <div style={styles.paymentLockNotice}>{ebookActionMessage}</div>
+              )}
+            </div>
+          )}
 
           <div style={styles.divider}></div>
 
@@ -902,21 +955,29 @@ const styles = {
   },
   imageSection: {
     position: "relative",
+    width: "100%",
+    height: "360px",
+    background: "#f1f5f9",
+    borderRadius: "12px",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   image: {
     width: "100%",
-    height: "auto",
+    height: "100%",
+    objectFit: "cover",
     borderRadius: "12px",
-    boxShadow: "0 8px 24px rgba(102, 126, 234, 0.2)",
     transition: "transform 0.3s ease",
   },
   placeholder: {
     width: "100%",
-    aspectRatio: "3/4",
+    height: "100%",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
     borderRadius: "12px",
     fontSize: "6rem",
     color: "#bdc3c7",
@@ -1482,6 +1543,58 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.3s ease",
     boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+  },
+  ebookSection: {
+    border: "2px solid #27ae60",
+    borderRadius: "10px",
+    padding: "1rem 1.25rem",
+    backgroundColor: "#f0fff4",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.75rem",
+  },
+  ebookSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+  },
+  ebookBadge: {
+    backgroundColor: "#27ae60",
+    color: "#fff",
+    padding: "0.35rem 0.9rem",
+    borderRadius: "20px",
+    fontSize: "0.85rem",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.3)",
+  },
+  ebookChecking: {
+    color: "#1f8f4f",
+    fontSize: "0.9rem",
+    margin: 0,
+    fontStyle: "italic",
+  },
+  readNowBtn: {
+    backgroundColor: "#16213e",
+    color: "#fff",
+    border: "1px solid #0f3460",
+    borderRadius: "4px",
+    padding: "0.55rem 1rem",
+    fontSize: "0.92rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 2px 8px rgba(15, 52, 96, 0.25)",
+    transition: "all 0.2s ease",
+    alignSelf: "flex-start",
+    letterSpacing: "0.2px",
+  },
+  paymentLockNotice: {
+    backgroundColor: "#fff7ed",
+    border: "1px solid #fed7aa",
+    borderRadius: "8px",
+    padding: "0.75rem 1rem",
+    color: "#c2410c",
+    fontSize: "0.9rem",
+    fontWeight: "500",
   },
 };
 

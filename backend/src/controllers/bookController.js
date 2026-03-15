@@ -1,6 +1,13 @@
 import bookService from "../services/bookService.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS, MESSAGES } from "../config/constants.js";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.resolve(__dirname, "../../uploads");
 
 class BookController {
   async getPublicBooks(req, res, next) {
@@ -114,6 +121,46 @@ class BookController {
         "Personalized books fetched",
         result,
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkEbookAccess(req, res, next) {
+    try {
+      const result = await bookService.checkEbookAccess(req.user._id, req.params.id);
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book access checked",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async streamEbookFile(req, res, next) {
+    try {
+      const ebookRelPath = await bookService.getEbookFilePath(req.user._id, req.params.id);
+
+      // Validate the path is within the expected directory to prevent path traversal
+      if (!ebookRelPath.startsWith("/uploads/ebooks/")) {
+        return next(new Error("Invalid e-book path"));
+      }
+
+      const absolutePath = path.join(
+        uploadsRoot,
+        ebookRelPath.replace(/^\/uploads/, ""),
+      );
+
+      if (!fs.existsSync(absolutePath)) {
+        return res.status(404).json({ message: "E-book file not found on server" });
+      }
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "inline");
+      fs.createReadStream(absolutePath).pipe(res);
     } catch (error) {
       next(error);
     }

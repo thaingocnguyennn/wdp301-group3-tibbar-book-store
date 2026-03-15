@@ -66,6 +66,14 @@ const bookSchema = new mongoose.Schema({
     type: String,
     enum: Object.values(BOOK_VISIBILITY),
     default: BOOK_VISIBILITY.PUBLIC
+  },
+  isEbook: {
+    type: Boolean,
+    default: false
+  },
+  ebookFile: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true
