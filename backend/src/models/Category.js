@@ -23,7 +23,6 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-categorySchema.index({ name: 1 });
 categorySchema.index({ isDeleted: 1 });
 
 // Query helper to exclude deleted categories by default
