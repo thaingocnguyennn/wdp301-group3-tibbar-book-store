@@ -327,7 +327,7 @@ const ShipperHomePage = () => {
               </div>
             )}
           {/* Status Update */}
-          {selectedOrder?.orderStatus === "PROCESSING" &&
+          {selectedOrder?.orderStatus === "SHIPPED" &&
             selectedOrder?.assignmentStatus === "PENDING" && (
               <div style={styles.card}>
                 <h4 style={styles.cardTitle}>Assignment Response</h4>
@@ -385,19 +385,8 @@ const ShipperHomePage = () => {
                   style={styles.select}
                 >
                   <option value="">Select Status</option>
-                  <option
-                    value="DELIVERED"
-                    disabled={!selectedOrder?.deliveryProof?.imageUrl} // ✅ CHẶN TỪ ĐẦU
-                  >
-                    Delivered
-                  </option>
-
-                  <option
-                    value="CANCELLED"
-                    disabled={!!selectedOrder?.deliveryProof?.imageUrl} // ✅ NGƯỢC LẠI
-                  >
-                    Cancelled
-                  </option>
+                  <option value="DELIVERED">Delivered</option>
+                  <option value="CANCELLED">Cancelled</option>
                 </select>
               </div>
               <button

@@ -180,38 +180,24 @@ class ShipperService {
         cancelledOrders
       },
       recentOrders,
-      performance
+      performance 
     };
   }
   async uploadDeliveryProof(orderId, shipperId, imageUrl) {
     const order = await Order.findById(orderId);
 
-    // 1. Check order tồn tại
     if (!order) {
       throw new ApiError(404, "Order not found");
     }
 
-    // 2. Check đúng shipper
     if (order.shipper?.toString() !== shipperId.toString()) {
       throw new ApiError(403, "Not your order");
     }
 
-    // 3. Chỉ cho phép khi đã SHIPPED
     if (order.orderStatus !== "SHIPPED") {
       throw new ApiError(400, "Only shipped orders can upload proof");
     }
 
-    // 🔥 4. (QUAN TRỌNG) phải accept đơn trước
-    if (order.assignmentStatus !== "ACCEPTED") {
-      throw new ApiError(400, "You must accept the order before uploading proof");
-    }
-
-    // 🔥 5. Không cho upload lại (tránh overwrite)
-    if (order.deliveryProof?.imageUrl) {
-      throw new ApiError(400, "Delivery proof already uploaded");
-    }
-
-    // 6. Lưu proof
     order.deliveryProof = {
       imageUrl,
       uploadedAt: new Date()

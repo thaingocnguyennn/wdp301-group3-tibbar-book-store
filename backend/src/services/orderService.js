@@ -1517,7 +1517,9 @@ class OrderService {
     order.shipper = shipperId;
     order.assignedAt = new Date();
 
-    order.orderStatus = "PROCESSING";
+    if (order.orderStatus === "PROCESSING") {
+      order.orderStatus = "PROCESSING";
+    }
 
     order.assignmentStatus = "PENDING";
     // ===== ADD ASSIGNMENT HISTORY =====
@@ -1547,44 +1549,44 @@ class OrderService {
   }
   // Tự động gán shipper cho đơn hàng dựa trên địa chỉ giao hàng và khu vực phục vụ của shipper
 
-  async autoAssignShipper(orderId) { // Lấy orderId từ tham số hàm
-    const order = await Order.findById(orderId);// Tìm order trong database
+  async autoAssignShipper(orderId) {
+    const order = await Order.findById(orderId);
 
-    if (!order) { // Kiểm tra nếu không tìm thấy order
+    if (!order) {
       throw ApiError.notFound("Order not found");
     }
 
-    if (order.shipper) { // Kiểm tra nếu đơn hàng đã có shipper được gán
+    if (order.shipper) {
       throw ApiError.badRequest("Order already assigned");
     }
 
-    const allowedStatuses = ["PENDING", "PROCESSING"]; // Chỉ tự động gán shipper nếu đơn hàng đang ở trạng thái PENDING hoặc PROCESSING
+    const allowedStatuses = ["PENDING", "PROCESSING"];
 
-    if (!allowedStatuses.includes(order.orderStatus)) { // Kiểm tra nếu trạng thái đơn hàng không hợp lệ để gán shipper
+    if (!allowedStatuses.includes(order.orderStatus)) {
       throw ApiError.badRequest(
         "Auto assign only works for PENDING or PROCESSING orders"
       );
     }
-    const { province, district } = order.shippingAddress || {}; // Lấy thông tin tỉnh và huyện từ địa chỉ giao hàng của đơn hàng
+    const { province, district } = order.shippingAddress || {};
 
-    if (!province || !district) { // Kiểm tra nếu thông tin địa chỉ giao hàng không đầy đủ
+    if (!province || !district) {
       throw ApiError.badRequest("Shipping address incomplete");
     }
 
     console.log("🔍 Looking for shipper:", province, district);
-    // Tìm shipper có khu vực phục vụ trùng với địa chỉ giao hàng của đơn hàng, đang hoạt động, chưa đạt giới hạn đơn hàng tối đa và chưa bị từ chối bởi đơn hàng này
+
     const shipper = await User.findOne({
       role: ROLES.SHIPPER,
       isActive: true,
       currentOrders: { $lt: MAX_ORDERS },
-      _id: { $nin: order.rejectedShippers || [] },// Kiểm tra shipper không nằm trong danh sách đã bị từ chối bởi đơn hàng này
-      addresses: { // Kiểm tra shipper có khu vực phục vụ trùng với địa chỉ giao hàng của đơn hàng
-        $elemMatch: { // Kiểm tra trong mảng addresses của shipper có phần tử nào có province và district trùng với địa chỉ giao hàng của đơn hàng
+      _id: { $nin: order.rejectedShippers || [] },
+      addresses: {
+        $elemMatch: {
           province: province.trim(),
           district: district.trim(),
         },
       },
-    }).sort({ currentOrders: 1 });// Sắp xếp để ưu tiên gán cho shipper có số đơn hàng hiện tại ít nhất
+    }).sort({ currentOrders: 1 });
 
     // ❌ Nếu không có shipper → KHÔNG throw
     if (!shipper) {
@@ -1597,7 +1599,7 @@ class OrderService {
     // ✅ Assign shipper
     order.shipper = shipper._id;
     order.assignedAt = new Date();
-    order.orderStatus = "PROCESSING";
+    order.orderStatus = "SHIPPED";
     order.assignmentStatus = "PENDING";
     if (!order.assignmentHistory) {
       order.assignmentHistory = [];
@@ -1638,8 +1640,6 @@ class OrderService {
     // ================= ACCEPT =================
     if (action === "ACCEPT") {
       order.assignmentStatus = "ACCEPTED";
-      // 🔥 FIX ở đây
-      order.orderStatus = "SHIPPED";
       const lastAssignment =
         order.assignmentHistory[order.assignmentHistory.length - 1];
 
@@ -1708,8 +1708,7 @@ class OrderService {
         console.log("⚠ All shippers rejected. Resetting order...");
 
         order.shipper = null;
-        // ✅ FIX: quay lại trạng thái chờ
-        order.orderStatus = "PENDING";
+        order.orderStatus = "SHIPPED";
         order.assignmentStatus = null;
         order.assignedAt = null;
 
@@ -1722,8 +1721,7 @@ class OrderService {
 
       order.shipper = nextShipper._id;
       order.assignmentStatus = "PENDING";
-      // ✅ FIX: vẫn là PROCESSING (đang xử lý)
-      order.orderStatus = "PROCESSING";
+      order.orderStatus = "SHIPPED";
       order.assignedAt = new Date();
       // ===== PUSH NEW HISTORY =====
       if (!order.assignmentHistory) {
