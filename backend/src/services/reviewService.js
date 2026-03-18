@@ -386,7 +386,7 @@ class ReviewService {
   async ensureUserPurchasedBook(userId, bookId) {
     const purchasedOrder = await Order.findOne({
       user: userId,
-      orderStatus: { $ne: "CANCELLED" },
+      orderStatus: "DELIVERED",
       "items.book": bookId,
     }).lean();
 

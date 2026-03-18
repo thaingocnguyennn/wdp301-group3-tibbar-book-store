@@ -1517,9 +1517,7 @@ class OrderService {
     order.shipper = shipperId;
     order.assignedAt = new Date();
 
-    if (order.orderStatus === "PROCESSING") {
-      order.orderStatus = "PROCESSING";
-    }
+    order.orderStatus = "PROCESSING";
 
     order.assignmentStatus = "PENDING";
     // ===== ADD ASSIGNMENT HISTORY =====
@@ -1599,7 +1597,7 @@ class OrderService {
     // ✅ Assign shipper
     order.shipper = shipper._id;
     order.assignedAt = new Date();
-    order.orderStatus = "SHIPPED";
+    order.orderStatus = "PROCESSING";
     order.assignmentStatus = "PENDING";
     if (!order.assignmentHistory) {
       order.assignmentHistory = [];
@@ -1640,6 +1638,8 @@ class OrderService {
     // ================= ACCEPT =================
     if (action === "ACCEPT") {
       order.assignmentStatus = "ACCEPTED";
+      // 🔥 FIX ở đây
+      order.orderStatus = "SHIPPED";
       const lastAssignment =
         order.assignmentHistory[order.assignmentHistory.length - 1];
 
@@ -1708,7 +1708,8 @@ class OrderService {
         console.log("⚠ All shippers rejected. Resetting order...");
 
         order.shipper = null;
-        order.orderStatus = "SHIPPED";
+        // ✅ FIX: quay lại trạng thái chờ
+        order.orderStatus = "PENDING";
         order.assignmentStatus = null;
         order.assignedAt = null;
 
@@ -1721,7 +1722,8 @@ class OrderService {
 
       order.shipper = nextShipper._id;
       order.assignmentStatus = "PENDING";
-      order.orderStatus = "SHIPPED";
+      // ✅ FIX: vẫn là PROCESSING (đang xử lý)
+      order.orderStatus = "PROCESSING";
       order.assignedAt = new Date();
       // ===== PUSH NEW HISTORY =====
       if (!order.assignmentHistory) {
