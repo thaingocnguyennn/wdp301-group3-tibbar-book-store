@@ -246,7 +246,8 @@ const HomePage = () => {
         <div style={styles.sectionHeader}>
           <h2 style={styles.sectionTitle}>✨ Recommended For You</h2>
           <div style={styles.titleUnderline}></div>
-          {recommendationMeta.strategy === "behavior-based" && (
+          {(recommendationMeta.strategy === "multi-signal-personalization" ||
+            recommendationMeta.strategy === "direct-interaction-priority") && (
             <p style={styles.sectionHint}>
               Personalized from your browsing and purchase history.
             </p>
@@ -272,7 +273,8 @@ const HomePage = () => {
                 <BookCard key={book._id} book={book} />
               ))}
             </div>
-            {recommendationMeta.strategy === "fallback-newest" && (
+            {(recommendationMeta.strategy === "fallback-newest" ||
+              recommendationMeta.strategy === "fallback-newest-relaxed") && (
               <p style={styles.sectionHint}>
                 Showing newest books while we learn your preferences.
               </p>

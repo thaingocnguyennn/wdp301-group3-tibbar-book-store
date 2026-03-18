@@ -194,7 +194,9 @@ class BookService {
     const [user, recentOrders, cart, wishlist] = await Promise.all([
       User.findById(userId).select("recentlyViewed addresses updatedAt").lean(),
       Order.find({ user: userId, orderStatus: { $ne: "CANCELLED" } })
-        .select("items.book items.quantity items.price orderStatus createdAt")
+        .select(
+          "items.book items.quantity items.price orderStatus paymentStatus createdAt paidAt",
+        )
         .sort({ createdAt: -1 })
         .limit(40)
         .lean(),
@@ -215,6 +217,39 @@ class BookService {
       : [];
 
     const purchasedBookCounter = new Map();
+    const interactionMap = new Map();
+    const nowMs = Date.now();
+
+    const upsertInteraction = (bookId, eventAt, source, scoreBoost = 0) => {
+      if (!bookId) return;
+      const key = String(bookId);
+      const timeMs = new Date(eventAt || nowMs).getTime();
+      const current = interactionMap.get(key) || {
+        latestInteractionAt: timeMs,
+        interactionScore: 0,
+        sources: new Set(),
+      };
+
+      current.latestInteractionAt = Math.max(current.latestInteractionAt, timeMs);
+      current.interactionScore += Number(scoreBoost) || 0;
+      current.sources.add(source);
+
+      interactionMap.set(key, current);
+    };
+
+    recentlyViewedIds.forEach((bookId, index) => {
+      // Keep the original order from recentlyViewed: index 0 is the newest.
+      upsertInteraction(bookId, nowMs - index * 1000, "viewed", 12 - index);
+    });
+
+    cartBookIds.forEach((bookId) => {
+      upsertInteraction(bookId, cart?.updatedAt || nowMs, "cart", 14);
+    });
+
+    wishlistBookIds.forEach((bookId) => {
+      upsertInteraction(bookId, wishlist?.updatedAt || nowMs, "wishlist", 16);
+    });
+
     for (const order of recentOrders) {
       for (const item of order.items || []) {
         if (!item.book) continue;
@@ -224,6 +259,17 @@ class BookService {
         purchasedBookCounter.set(
           key,
           (purchasedBookCounter.get(key) || 0) + quantity * multiplier,
+        );
+
+        const baseOrderTime =
+          order.paymentStatus === "PAID" && order.paidAt
+            ? order.paidAt
+            : order.createdAt || nowMs;
+        upsertInteraction(
+          key,
+          baseOrderTime,
+          order.paymentStatus === "PAID" ? "paid" : "ordered",
+          order.paymentStatus === "PAID" ? 22 + quantity : 18 + quantity,
         );
       }
     }
@@ -260,9 +306,28 @@ class BookService {
           _id: { $in: signalBookIds },
           visibility: BOOK_VISIBILITY.PUBLIC,
         })
-          .select("category author price")
+          .populate("category", "name")
+          .select("title author description price category createdAt")
           .lean()
       : [];
+
+    // If all signal books are unavailable (e.g. hidden/deleted), keep section usable.
+    if (!signalBooks.length && !searchTerms.length) {
+      return newestFallback("fallback-newest-relaxed", {
+        hasRecentlyViewed: recentlyViewedIds.length > 0,
+        hasSearchHistory: false,
+        hasCartHistory: cartBookIds.length > 0,
+        hasPurchaseHistory: purchasedBookIds.length > 0,
+        hasWishlist: wishlistBookIds.length > 0,
+        hasCategoryInterest: false,
+        hasFavoriteBrand: false,
+        hasPricePreference: false,
+        hasSimilarUsers: false,
+        language: options.language || null,
+        platform: options.platform || null,
+        location: options.location || null,
+      });
+    }
 
     const categoryScores = new Map();
     const authorScores = new Map();
@@ -270,7 +335,8 @@ class BookService {
 
     for (const book of signalBooks) {
       const bookId = book._id.toString();
-      const categoryId = book.category?.toString();
+      const categoryId =
+        book.category?._id?.toString?.() || book.category?.toString?.();
       const normalizedAuthor = (book.author || "").trim().toLowerCase();
 
       let totalWeight = 0;
@@ -300,6 +366,33 @@ class BookService {
         }
       }
     }
+
+    const interactedBooksSorted = signalBooks
+      .map((book) => {
+        const interaction = interactionMap.get(book._id.toString());
+        if (!interaction) return null;
+
+        return {
+          ...book,
+          __latestInteractionAt: interaction.latestInteractionAt,
+          __interactionScore: interaction.interactionScore,
+          __interactionSources: [...interaction.sources],
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (b.__latestInteractionAt !== a.__latestInteractionAt) {
+          return b.__latestInteractionAt - a.__latestInteractionAt;
+        }
+        if (b.__interactionScore !== a.__interactionScore) {
+          return b.__interactionScore - a.__interactionScore;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      })
+      .map(
+        ({ __latestInteractionAt, __interactionScore, __interactionSources, ...book }) =>
+          book,
+      );
 
     const preferredCategoryIds = [...categoryScores.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -501,15 +594,59 @@ class BookService {
       scoredCandidates.push(...fallbackBooks);
     }
 
+    const interactedIds = new Set(
+      interactedBooksSorted.map((book) => book._id.toString()),
+    );
+
+    const mergedBooks = [
+      ...interactedBooksSorted,
+      ...scoredCandidates.filter((book) => !interactedIds.has(book._id.toString())),
+    ].slice(0, actualLimit);
+
+    // With small catalogs, strict exclusions can empty the whole result set.
+    if (!mergedBooks.length) {
+      const relaxedFallback = await Book.find({
+        visibility: BOOK_VISIBILITY.PUBLIC,
+      })
+        .populate("category", "name")
+        .sort({ createdAt: -1 })
+        .limit(actualLimit)
+        .lean();
+
+      return {
+        books: relaxedFallback,
+        strategy: "fallback-newest-relaxed",
+        signals: {
+          hasRecentlyViewed: recentlyViewedIds.length > 0,
+          hasSearchHistory: searchTerms.length > 0,
+          hasCartHistory: cartBookIds.length > 0,
+          hasPurchaseHistory: purchasedBookIds.length > 0,
+          hasWishlist: wishlistBookIds.length > 0,
+          hasCategoryInterest: preferredCategoryIds.length > 0,
+          hasFavoriteBrand: preferredAuthors.length > 0,
+          hasPricePreference: observedPrices.length > 0,
+          hasSimilarUsers: similarUserBookScores.size > 0,
+          language: options.language || null,
+          platform: options.platform || null,
+          location: options.location || null,
+          lastAccessAt: user?.updatedAt || null,
+        },
+      };
+    }
+
     return {
-      books: scoredCandidates.slice(0, actualLimit),
-      strategy: "multi-signal-personalization",
+      books: mergedBooks,
+      strategy:
+        interactedBooksSorted.length > 0
+          ? "direct-interaction-priority"
+          : "multi-signal-personalization",
       signals: {
         hasRecentlyViewed: recentlyViewedIds.length > 0,
         hasSearchHistory: searchTerms.length > 0,
         hasCartHistory: cartBookIds.length > 0,
         hasPurchaseHistory: purchasedBookIds.length > 0,
         hasWishlist: wishlistBookIds.length > 0,
+        hasDirectInteractions: interactedBooksSorted.length > 0,
         hasCategoryInterest: preferredCategoryIds.length > 0,
         hasFavoriteBrand: preferredAuthors.length > 0,
         hasPricePreference: observedPrices.length > 0,
