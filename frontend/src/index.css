@@ -1,0 +1,133 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* Hover effects for interactive elements */
+a[style*="color: #ecf0f1"]:hover,
+a[style*="color: #fff"]:hover {
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fade in up animation for slider */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Bounce animation for slider icon */
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* ─── Order card hover effects ─── */
+.order-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+  border-color: #e0e7ff !important;
+}
+
+/* ─── Pagination button hover ─── */
+.pagination-btn {
+  transition: all 0.2s ease !important;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25) !important;
+}
+
+/* ─── Payment return page progress bar animation ─── */
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(250%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ─── Checkout / Order button hover overrides ─── */
+.checkout-primary-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.35) !important;
+}
+
+.checkout-secondary-btn:hover {
+  background-color: #f8fafc !important;
+  border-color: #667eea !important;
+}

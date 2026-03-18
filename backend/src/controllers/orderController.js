@@ -1,0 +1,294 @@
+import orderService from "../services/orderService.js";
+import ApiResponse from "../utils/ApiResponse.js";
+import { HTTP_STATUS } from "../config/constants.js";
+
+class OrderController {
+  // Create new order (checkout)
+  async createOrder(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const {
+        paymentMethod,
+        shippingAddressId,
+        voucherId,
+        voucherCode,
+        useCoin,
+        notes,
+      } = req.body;
+      const ipAddress =
+        req.headers["x-forwarded-for"] ||
+        req.connection.remoteAddress ||
+        "127.0.0.1";
+
+      console.log("🛒 [OrderController] Create order request:", {
+        userId,
+        userEmail: req.user.email,
+        paymentMethod,
+        useCoin,
+        timestamp: new Date().toISOString(),
+      });
+
+      const result = await orderService.createOrder(userId, {
+        paymentMethod,
+        shippingAddressId,
+        voucherId,
+        voucherCode,
+        useCoin,
+        notes,
+        ipAddress,
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Order created successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async validateVoucher(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const { voucherCode } = req.body;
+
+      const result = await orderService.validateVoucherForCheckout(
+        userId,
+        voucherCode,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Voucher validated successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get user's orders
+  async getUserOrders(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+
+      const result = await orderService.getUserOrders(userId, page, limit);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Orders retrieved successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get single order by ID
+  async getOrderById(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+
+      const order = await orderService.getOrderById(orderId, userId);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Order retrieved successfully",
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get order by order number
+  async getOrderByNumber(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderNumber = req.params.orderNumber;
+
+      const order = await orderService.getOrderByNumber(orderNumber, userId);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Order retrieved successfully",
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Confirm payment (for VNPay return URL callback)
+  async confirmPayment(req, res, next) {
+    try {
+      const callbackParams = req.query;
+
+      const result = await orderService.confirmPayment(callbackParams);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Payment confirmed successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Cancel order
+  async cancelOrder(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+
+      const order = await orderService.cancelOrder(orderId, userId);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Order cancelled successfully",
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Reorder from a previous order
+  async reorderOrder(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const { paymentMethod, notes } = req.body;
+      const ipAddress =
+        req.headers["x-forwarded-for"] ||
+        req.connection.remoteAddress ||
+        "127.0.0.1";
+
+      const result = await orderService.reorderOrder(orderId, userId, {
+        paymentMethod,
+        notes,
+        ipAddress,
+      });
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Order reordered successfully",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Download or print invoice for delivered order
+  async downloadInvoice(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const shouldDownload = String(req.query.download || "true") === "true";
+
+      const { html, fileName } = await orderService.getInvoiceHtml(
+        orderId,
+        userId,
+      );
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `${shouldDownload ? "attachment" : "inline"}; filename=\"${fileName}\"`,
+      );
+
+      return res.status(HTTP_STATUS.OK).send(html);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Submit return / refund request
+  async submitReturnRefundRequest(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const { type, reason, details } = req.body;
+
+      const order = await orderService.submitReturnRefundRequest(
+        orderId,
+        userId,
+        {
+          type,
+          reason,
+          details,
+        },
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Return/refund request submitted successfully",
+        { order },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get available payment methods
+  async getPaymentMethods(req, res, next) {
+    try {
+      const methods = await orderService.getAvailablePaymentMethods();
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Payment methods retrieved successfully",
+        { methods },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  getRevenue = async (req, res, next) => {
+    try {
+      const { range } = req.query;
+      const data = await orderService.getRevenue(range);
+
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  assignShipper = async (req, res, next) => {
+    try {
+      const { shipperId } = req.body; // Lấy shipperId từ body thay vì params
+      const orderId = req.params.id; // Lấy orderId từ params
+
+      const order = await orderService.assignShipper(orderId, shipperId); // Gọi service để gán shipper cho đơn hàng
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Shipper assigned successfully",
+        { order },
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+export default new OrderController();
