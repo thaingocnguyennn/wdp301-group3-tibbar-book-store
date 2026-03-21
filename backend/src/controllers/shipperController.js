@@ -174,6 +174,23 @@ class ShipperController {
       next(error);
     }
   }
+  async toggleOnlineStatus(req, res, next) {
+    try {
+      console.log("USER:", req.user); // 👈 thêm dòng này
+
+      const result = await shipperService.toggleOnlineStatus(req.user._id);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Toggle online status successfully",
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export default new ShipperController();

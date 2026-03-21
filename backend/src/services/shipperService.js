@@ -2,7 +2,7 @@ import Order from '../models/Order.js';
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import orderService from "./orderService.js";
-
+import { ROLES } from "../config/constants.js";
 class ShipperService {
   // Get all orders assigned to a shipper with pagination
   async getShipperOrders(shipperId, filters = {}) {
@@ -217,7 +217,28 @@ class ShipperService {
 
     return order;
   }
+  // Toggle shipper online/offline status
+  async toggleOnlineStatus(userId) {
+    const shipper = await User.findById(userId);
 
+    if (!shipper) {
+      throw new ApiError(404, "Shipper not found");
+    }
+
+    if (shipper.role !== ROLES.SHIPPER) {
+      throw new ApiError(403, "User is not a shipper");
+    }
+
+    // toggle
+    shipper.isOnline = !shipper.isOnline;
+    await shipper.save();
+
+    return {
+      isOnline: shipper.isOnline,
+    };
+  }
 }
+
+
 
 export default new ShipperService();

@@ -111,7 +111,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
     //Thư viện sách đã xem gần đây...
     //Thư viện sách đã xem gần đây, lưu trữ ID của sách để dễ dàng truy xuất thông tin khi cần thiết
     recentlyViewed: {
