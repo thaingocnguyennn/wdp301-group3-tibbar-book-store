@@ -1510,6 +1510,24 @@ class OrderService {
     if (!matchAddress) {
       throw ApiError.badRequest("Shipper does not serve this area");
     }
+    // ================== THÊM Ở ĐÂY ==================
+
+    // 🔥 1. CHECK ONLINE
+    if (!shipper.isOnline) {
+      throw ApiError.badRequest("Shipper is offline");
+    }
+
+    // 🔥 2. CHECK ĐÃ REJECT ĐƠN NÀY CHƯA
+    const rejected = order.assignmentHistory?.some(
+      (h) =>
+        h.shipper.toString() === shipperId.toString() &&
+        h.status === "REJECTED"
+    );
+
+    if (rejected) {
+      throw ApiError.badRequest("This shipper already rejected this order");
+    }
+
     if (order.shipper) {
       throw ApiError.badRequest("Order already assigned to a shipper");
     }
@@ -1576,6 +1594,7 @@ class OrderService {
     const shipper = await User.findOne({
       role: ROLES.SHIPPER,
       isActive: true,
+      isOnline: true,
       currentOrders: { $lt: MAX_ORDERS },
       _id: { $nin: order.rejectedShippers || [] },
       addresses: {

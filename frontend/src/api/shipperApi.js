@@ -51,7 +51,11 @@ export const shipperApi = {
   },
   // Get assignment history
   getAssignmentHistory: async () => {
-  const response = await axiosInstance.get("/shipper/assignment-history");
-  return response.data;
-},
+    const response = await axiosInstance.get("/shipper/assignment-history");
+    return response.data;
+  },
+  toggleOnline: async () => {
+    const response = await axiosInstance.patch('/shipper/toggle-online');
+    return response.data;
+  },
 };
