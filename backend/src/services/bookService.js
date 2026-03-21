@@ -4,7 +4,7 @@ import Cart from "../models/Cart.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, PAGINATION, BOOK_VISIBILITY } from "../config/constants.js";
 import User from "../models/User.js";
-
+import Order from "../models/Order.js";
 class BookService {
   async getPublicBooks(filters = {}) {
     const {
