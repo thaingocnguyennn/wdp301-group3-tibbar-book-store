@@ -10,7 +10,8 @@ import paymentService from "./paymentService.js";
 import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
 
-const MAX_ORDERS = 20;
+const MAX_ORDERS = 20;//
+const ASSIGNMENT_TIMEOUT = 30000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
 const ADMIN_STATUS_TRANSITIONS = {
   PENDING: ["PROCESSING"],
@@ -1552,7 +1553,10 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+    // ⏰ START TIMEOUT
+    this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
+
 
     return order;
   }
@@ -1633,6 +1637,8 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+    // ⏰ START TIMEOUT
+    this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
 
     console.log("✅ Assigned to shipper:", shipper.email);
@@ -1706,7 +1712,6 @@ class OrderService {
       await User.findByIdAndUpdate(shipperId, {
         $inc: { currentOrders: -1 },
       });
-
       const { province, district } = order.shippingAddress;
 
       // 3️⃣ Tìm shipper KHÔNG nằm trong rejectedShippers
@@ -1765,10 +1770,12 @@ class OrderService {
         $inc: { currentOrders: 1 },
       });
 
+      // ⏰ START TIMEOUT cho shipper mới
+      this.handleAssignmentTimeout(order._id, nextShipper._id);
+
       return order;
     }
-
-    throw ApiError.badRequest("Invalid action");
+    Error.badRequest("Invalid action");
   }
   // Lấy hiệu suất làm việc của shipper dựa trên lịch sử phân công (tỷ lệ chấp nhận, từ chối, giao thành công)
   async getShipperPerformance(shipperId) {
@@ -1858,6 +1865,25 @@ class OrderService {
     return {
       orders,
     };
+  }
+  // 
+  async handleAssignmentTimeout(orderId, shipperId) {
+    setTimeout(async () => {
+      try {
+        const order = await Order.findById(orderId);
+
+        if (!order) return;
+
+        // ❗ Nếu shipper đã accept rồi → bỏ qua
+        if (order.assignmentStatus !== "PENDING") return;
+
+        console.log("⏰ Assignment timeout → auto reject");
+
+        await this.respondAssignment(orderId, shipperId, "REJECT");
+      } catch (err) {
+        console.error("Timeout error:", err.message);
+      }
+    }, ASSIGNMENT_TIMEOUT);
   }
 }
 

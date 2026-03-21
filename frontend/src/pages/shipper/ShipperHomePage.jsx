@@ -25,15 +25,15 @@ const ShipperHomePage = () => {
   }, [filterStatus, currentPage]);
 
   const fetchProfile = async () => {
-  try {
-    const res = await shipperApi.getProfile();
+    try {
+      const res = await shipperApi.getProfile();
 
-    // 🔥 SET isOnline từ DB
-    setIsOnline(res.data.profile.isOnline);
-  } catch (err) {
-    console.error("Failed to load profile");
-  }
-};
+      // 🔥 SET isOnline từ DB
+      setIsOnline(res.data.profile.isOnline);
+    } catch (err) {
+      console.error("Failed to load profile");
+    }
+  };
 
   const fetchDashboard = async () => {
     try {
