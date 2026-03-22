@@ -59,5 +59,8 @@ router.patch(
   "/toggle-online",
   shipperController.toggleOnlineStatus
 );
-
+// Get shipper earnings and statistics
+router.get('/earnings', (req, res, next) =>
+  shipperController.getShipperEarnings(req, res, next)
+);
 export default router;

@@ -42,6 +42,7 @@ import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 import SupportChatPage from "./pages/SupportChatPage";
 import AdminSupportPage from "./pages/admin/AdminSupportPage";
+import ShipperEarningsPage from "./pages/shipper/ShipperEarningsPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -260,7 +261,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/shipper/earnings" element={<ShipperEarningsPage />} />
         <Route
           path="/admin/categories"
           element={

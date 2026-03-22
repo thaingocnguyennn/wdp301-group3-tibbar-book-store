@@ -97,6 +97,10 @@ class ShipperService {
 
       if (newStatus === 'DELIVERED' && !order.deliveredAt) {
         order.deliveredAt = new Date();
+
+        // ⭐ Thưởng shipper
+        const reward = 10000;
+        await User.findByIdAndUpdate(shipperId, { $inc: { earnings: reward } });
       }
     }
 
@@ -235,6 +239,32 @@ class ShipperService {
 
     return {
       isOnline: shipper.isOnline,
+    };
+  }
+  // Get shipper earnings and statistics
+  async getShipperEarnings(shipperId) {
+    const shipper = await User.findById(shipperId);
+
+    if (!shipper) throw new ApiError(404, "Shipper not found");
+    if (shipper.role !== ROLES.SHIPPER)
+      throw new ApiError(403, "User is not a shipper");
+
+    const deliveredOrdersCount = await Order.countDocuments({
+      shipper: shipperId,
+      orderStatus: "DELIVERED",
+    });
+    const totalCancelled = await Order.countDocuments({
+      shipper: shipperId,
+      orderStatus: "CANCELLED",
+    });
+
+    // Thưởng 10.000 VND/đơn
+    const earnings = deliveredOrdersCount * 10000;
+
+    return {
+      earnings,
+      totalDelivered: deliveredOrdersCount,
+      totalCancelled,
     };
   }
 }
