@@ -2,7 +2,7 @@ import shipperService from '../services/shipperService.js';
 import orderService from "../services/orderService.js";
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS } from '../config/constants.js';
-
+import ShipperService from '../services/shipperService.js';
 class ShipperController {
   async getShipperOrders(req, res, next) {
     try {
@@ -174,6 +174,7 @@ class ShipperController {
       next(error);
     }
   }
+  // Toggle online/offline status
   async toggleOnlineStatus(req, res, next) {
     try {
       console.log("USER:", req.user); // 👈 thêm dòng này
@@ -190,7 +191,16 @@ class ShipperController {
       next(error);
     }
   }
-
+  // Get shipper earnings and statistics
+  async getShipperEarnings(req, res, next) {
+    try {
+      const shipperId = req.user._id; // lấy từ auth middleware
+      const data = await ShipperService.getShipperEarnings(shipperId);
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export default new ShipperController();

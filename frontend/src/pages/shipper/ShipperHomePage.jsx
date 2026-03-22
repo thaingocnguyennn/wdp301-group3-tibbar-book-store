@@ -229,6 +229,22 @@ const ShipperHomePage = () => {
               <div style={styles.statLabel}>Acceptance Rate</div>
             </div>
           </div>
+          {/* ==== NÚT XEM EARNINGS ==== */}
+          <button
+            onClick={() => window.location.href = "/shipper/earnings"} // đơn giản
+            style={{
+              marginTop: "1rem",
+              backgroundColor: "#f39c12",
+              color: "#fff",
+              padding: "0.75rem 1.5rem",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            💰 View Earnings
+          </button>
         </div>
 
       )}

@@ -58,4 +58,9 @@ export const shipperApi = {
     const response = await axiosInstance.patch('/shipper/toggle-online');
     return response.data;
   },
+  // Get shipper earnings
+  getEarnings: async () => {
+    const response = await axiosInstance.get('/shipper/earnings');
+    return response.data;
+  },
 };
