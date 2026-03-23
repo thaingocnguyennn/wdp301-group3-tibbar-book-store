@@ -157,6 +157,38 @@ class SupportService {
       unreadMessages: unreadMessagesResult[0]?.total || 0,
     };
   }
+
+  async markAdminMessagesAsRead(conversationId) {
+    await Promise.all([
+      SupportMessage.updateMany(
+        {
+          conversation: conversationId,
+          senderRole: "admin",
+          isReadByCustomer: false,
+        },
+        { $set: { isReadByCustomer: true } },
+      ),
+      SupportConversation.findByIdAndUpdate(conversationId, {
+        $set: { unreadForCustomer: 0 },
+      }),
+    ]);
+  }
+
+  async markCustomerMessagesAsRead(conversationId) {
+    await Promise.all([
+      SupportMessage.updateMany(
+        {
+          conversation: conversationId,
+          senderRole: "customer",
+          isReadByAdmin: false,
+        },
+        { $set: { isReadByAdmin: true } },
+      ),
+      SupportConversation.findByIdAndUpdate(conversationId, {
+        $set: { unreadForAdmin: 0 },
+      }),
+    ]);
+  }
 }
 
 export default new SupportService();
