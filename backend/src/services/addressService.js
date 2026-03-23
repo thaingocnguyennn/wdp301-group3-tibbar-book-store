@@ -1,6 +1,6 @@
 import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
-
+import axios from "axios";
 class AddressService {
   // Get all addresses for a user
   async getUserAddresses(userId) {
@@ -29,7 +29,31 @@ class AddressService {
     if (user.addresses.length === 0) {
       addressData.isDefault = true;
     }
+    // 🔥 GHÉP ĐỊA CHỈ
+    const fullAddress = `${addressData.description}, ${addressData.commune}, ${addressData.district}, ${addressData.province}`;
 
+    try {
+      const res = await axios.get(
+        "https://maps.googleapis.com/maps/api/geocode/json",
+        {
+          params: {
+            address: fullAddress,
+            key: process.env.GOOGLE_MAPS_API_KEY,
+          },
+        }
+      );
+
+      if (res.data.results.length > 0) {
+        const location = res.data.results[0].geometry.location;
+
+        addressData.latitude = location.lat;
+        addressData.longitude = location.lng;
+      } else {
+        console.log("⚠ Không tìm thấy tọa độ cho địa chỉ");
+      }
+    } catch (err) {
+      console.error("❌ Lỗi gọi Google API:", err.message);
+    }
     user.addresses.push(addressData);
     await user.save();
 

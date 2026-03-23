@@ -81,6 +81,10 @@ export const orderApi = {
     });
     return response.data;
   },
+  getShipperFeedbacks: async () => {
+    const response = await axiosInstance.get("/orders/admin/feedbacks");
+    return response.data;
+  },
 };
 
 export const adminOrderApi = {
@@ -122,4 +126,5 @@ export const adminOrderApi = {
     );
     return response.data;
   },
+
 };

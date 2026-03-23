@@ -63,4 +63,20 @@ export const shipperApi = {
     const response = await axiosInstance.get('/shipper/earnings');
     return response.data;
   },
+  getRoute: async () => {
+    const response = await axiosInstance.get('/shipper/route');
+    return response.data;
+  },
+  // ⭐ Rate shipper
+  rateShipper: async (orderId, payload) => {
+    const response = await axiosInstance.post(
+      `/orders/${orderId}/feedback`, // ✅ đúng route backend
+      payload
+    );
+    return response.data;
+  },
+  getAllFeedbacks: async () => {
+    const response = await axiosInstance.get("/orders/admin/feedbacks");
+    return response.data;
+  },
 };

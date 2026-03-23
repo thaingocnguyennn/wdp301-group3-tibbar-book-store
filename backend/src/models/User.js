@@ -34,6 +34,16 @@ const addressSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // 🔥 THÊM 2 FIELD NÀY
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
+    },
+
     isDefault: {
       type: Boolean,
       default: false,

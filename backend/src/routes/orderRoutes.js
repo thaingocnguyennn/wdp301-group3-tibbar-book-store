@@ -53,5 +53,15 @@ router.patch(
   authorize(ROLES.ADMIN),
   orderController.assignShipper,
 );
-
+// Shipper updates order status
+router.post(
+  "/:orderId/feedback",
+  authenticate,
+  orderController.submitFeedback
+);
+router.get(
+  "/admin/feedbacks",
+  authorize(ROLES.ADMIN),
+  orderController.getAllShipperFeedbacks
+);
 export default router;
