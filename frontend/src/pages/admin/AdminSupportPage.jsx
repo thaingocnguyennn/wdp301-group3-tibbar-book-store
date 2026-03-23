@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSocket from "../../hooks/useSocket";
 import { supportApi } from "../../api/supportApi";
-
-const POLL_INTERVAL_MS = 5000;
 
 const AdminSupportPage = () => {
   const [conversations, setConversations] = useState([]);
@@ -13,17 +12,17 @@ const AdminSupportPage = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const messageListRef = useRef(null);
+  const { socket, isConnected } = useSocket();
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item._id === selectedConversationId) || null,
     [conversations, selectedConversationId],
   );
 
-  const fetchConversations = async ({ silent = false } = {}) => {
+  // Load initial conversations
+  const loadConversations = async () => {
     try {
-      if (!silent) {
-        setLoadingConversations(true);
-      }
+      setLoadingConversations(true);
       const response = await supportApi.getAdminConversations();
       const data = response?.data?.conversations || [];
       setConversations(data);
@@ -31,59 +30,127 @@ const AdminSupportPage = () => {
       if (!selectedConversationId && data.length > 0) {
         setSelectedConversationId(data[0]._id);
       }
+      setError("");
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load conversations");
     } finally {
-      if (!silent) {
-        setLoadingConversations(false);
-      }
+      setLoadingConversations(false);
     }
   };
 
-  const fetchMessages = async (conversationId, { silent = false } = {}) => {
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
-
-    try {
-      if (!silent) {
-        setLoadingMessages(true);
-      }
-      const response = await supportApi.getAdminConversationMessages(conversationId);
-      setMessages(response?.data?.messages || []);
-      setError("");
-      await fetchConversations({ silent: true });
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load messages");
-    } finally {
-      if (!silent) {
-        setLoadingMessages(false);
-      }
-    }
-  };
-
+  // Load initial data on mount
   useEffect(() => {
-    fetchConversations();
+    loadConversations();
   }, []);
 
   useEffect(() => {
-    if (selectedConversationId) {
-      fetchMessages(selectedConversationId);
-    }
-  }, [selectedConversationId]);
+    if (!socket || !isConnected) return;
+    socket.emit("admin:join");
+  }, [socket, isConnected]);
 
   useEffect(() => {
-    const intervalId = setInterval(async () => {
-      await fetchConversations({ silent: true });
-      if (selectedConversationId) {
-        await fetchMessages(selectedConversationId, { silent: true });
-      }
-    }, POLL_INTERVAL_MS);
+    if (!socket || !selectedConversationId || !isConnected) return;
+    socket.emit("admin:view-conversation", { conversationId: selectedConversationId });
 
-    return () => clearInterval(intervalId);
+    // Optimistically clear unread badge for the opened conversation.
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv._id === selectedConversationId
+          ? { ...conv, unreadForAdmin: 0 }
+          : conv
+      ),
+    );
+  }, [socket, selectedConversationId, isConnected]);
+
+  // Set up socket event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    // Handle new messages
+    const handleNewMessage = (data) => {
+      // Update message list if it's for current conversation
+      if (data.conversationId === selectedConversationId) {
+        setMessages((prev) => {
+          if (prev.some((item) => item._id === data.message?._id)) {
+            return prev;
+          }
+          return [...prev, data.message];
+        });
+      }
+
+      // Update conversations list (last message preview)
+      setConversations((prev) =>
+        prev.map((conv) => {
+          if (conv._id === data.conversationId) {
+            return {
+              ...conv,
+              lastMessagePreview: data.message.content.slice(0, 300),
+              lastMessageAt: data.message.createdAt,
+              unreadForAdmin:
+                data.senderRole === "customer"
+                  ? (data.conversationId === selectedConversationId
+                    ? 0
+                    : (conv.unreadForAdmin || 0) + 1)
+                  : conv.unreadForAdmin,
+            };
+          }
+          return conv;
+        })
+      );
+    };
+
+    // Handle admin joined
+    const handleAdminJoined = () => {
+      setError("");
+    };
+
+    // Handle errors
+    const handleError = (data) => {
+      setError(data?.message || "An error occurred");
+    };
+
+    socket.on("message:new", handleNewMessage);
+    socket.on("admin:joined", handleAdminJoined);
+    socket.on("error", handleError);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+      socket.off("admin:joined", handleAdminJoined);
+      socket.off("error", handleError);
+    };
+  }, [selectedConversationId, socket]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!selectedConversationId) {
+        setMessages([]);
+        return;
+      }
+
+      try {
+        setLoadingMessages(true);
+        const response = await supportApi.getAdminConversationMessages(selectedConversationId);
+        setMessages(response?.data?.messages || []);
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv._id === selectedConversationId
+              ? { ...conv, unreadForAdmin: 0 }
+              : conv
+          ),
+        );
+        setError("");
+      } catch (err) {
+        setError(err?.response?.data?.message || "Failed to load messages");
+      } finally {
+        setLoadingMessages(false);
+      }
+    };
+
+    loadMessages();
   }, [selectedConversationId]);
 
+  // Auto-scroll to latest message
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
@@ -92,17 +159,20 @@ const AdminSupportPage = () => {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!selectedConversationId || !draft.trim() || sending) {
+    if (!selectedConversationId || !draft.trim() || sending || !socket || !isConnected) {
       return;
     }
 
     try {
       setSending(true);
-      await supportApi.sendAdminMessage(selectedConversationId, draft.trim());
+      socket.emit("admin:send-message", {
+        conversationId: selectedConversationId,
+        content: draft.trim(),
+      });
       setDraft("");
-      await fetchMessages(selectedConversationId, { silent: true });
+      setError("");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to send message");
+      setError(err?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -301,7 +371,7 @@ const styles = {
     border: "1px solid #dbe4ef",
     display: "flex",
     flexDirection: "column",
-    minHeight: "680px",
+    overflow: "hidden",
   },
   chatHeader: {
     borderBottom: "1px solid #e8eef6",
@@ -316,7 +386,7 @@ const styles = {
     fontSize: "0.88rem",
   },
   messages: {
-    flex: 1,
+    height: "420px",
     padding: "1rem",
     backgroundColor: "#f6f9fc",
     overflowY: "auto",

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSocket from "../hooks/useSocket";
 import { supportApi } from "../api/supportApi";
-
-const POLL_INTERVAL_MS = 5000;
 
 const SupportChatPage = () => {
   const [messages, setMessages] = useState([]);
@@ -11,37 +10,71 @@ const SupportChatPage = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const listRef = useRef(null);
+  const { socket, isConnected } = useSocket();
 
-  const fetchConversation = async ({ silent = false } = {}) => {
+  // Load initial conversation data via REST API
+  const loadInitialConversation = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      setLoading(true);
       const response = await supportApi.getMyConversation();
-      setConversationId(response?.data?.conversation?._id || null);
+      const convId = response?.data?.conversation?._id;
+      setConversationId(convId);
       setMessages(response?.data?.messages || []);
       setError("");
+
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load support chat");
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
+  // Load initial data on mount
   useEffect(() => {
-    fetchConversation();
+    loadInitialConversation();
   }, []);
 
+  // Set up socket event listeners
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchConversation({ silent: true });
-    }, POLL_INTERVAL_MS);
+    if (!socket) return;
 
-    return () => clearInterval(intervalId);
-  }, []);
+    const handleNewMessage = (data) => {
+      setMessages((prev) => {
+        if (prev.some((item) => item._id === data.message?._id)) {
+          return prev;
+        }
+        return [...prev, data.message];
+      });
+    };
 
+    const handleCustomerJoined = () => {
+      setError("");
+    };
+
+    const handleError = (data) => {
+      setError(data?.message || "An error occurred");
+    };
+
+    socket.on("message:new", handleNewMessage);
+    socket.on("customer:joined", handleCustomerJoined);
+    socket.on("error", handleError);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+      socket.off("customer:joined", handleCustomerJoined);
+      socket.off("error", handleError);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket || !conversationId || !isConnected) {
+      return;
+    }
+
+    socket.emit("customer:join", { conversationId });
+  }, [socket, conversationId, isConnected]);
+
+  // Auto-scroll to latest message
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -52,17 +85,20 @@ const SupportChatPage = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!canSend || sending) {
+    if (!canSend || sending || !conversationId || !socket || !isConnected) {
       return;
     }
 
     try {
       setSending(true);
-      await supportApi.sendMyMessage(draft.trim());
+      socket.emit("customer:send-message", {
+        conversationId,
+        content: draft.trim(),
+      });
       setDraft("");
-      await fetchConversation({ silent: true });
+      setError("");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to send message");
+      setError(err?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
