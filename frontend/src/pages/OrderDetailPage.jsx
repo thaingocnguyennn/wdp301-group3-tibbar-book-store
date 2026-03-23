@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
+import { shipperApi } from "../api/shipperApi";
 
 const ORDER_STEPS = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"];
 const ORDER_STATUS_CONFIG = {
@@ -77,7 +78,8 @@ const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -125,7 +127,24 @@ const OrderDetailPage = () => {
       setIsCancelling(false);
     }
   };
+  const handleSubmitRating = async () => {
+    try {
+      const res = await shipperApi.rateShipper(order._id, {
+        rating: rating,
+        comment,
+      });
 
+      console.log("SUCCESS:", res);
+
+      fetchOrderDetail();
+    } catch (err) {
+      console.log("FULL ERROR:", err);
+      console.log("DATA:", err.response?.data);
+      console.log("STATUS:", err.response?.status);
+
+      alert(err.response?.data?.message || "Failed to rate");
+    }
+  };
   const setActionState = (key, value) => {
     setActionLoading((prev) => ({ ...prev, [key]: value }));
   };
@@ -550,6 +569,58 @@ const OrderDetailPage = () => {
               {new Date(order.deliveryProof.uploadedAt).toLocaleString("vi-VN")}
             </p>
           </div>
+        </div>
+      )}
+      {/* ⭐ Shipper Rating */}
+      {order.orderStatus === "DELIVERED" && (
+        <div style={styles.sectionCard}>
+          <h3 style={styles.sectionTitle}>
+            <span style={styles.sectionIcon}>⭐</span>
+            Rate Shipper
+          </h3>
+
+          {order.rating?.stars ? (
+            <div>
+              <p>
+                You rated: <strong>{order.rating.stars} ⭐</strong>
+              </p>
+              {order.rating.comment && (
+                <p>Comment: {order.rating.comment}</p>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    style={{
+                      fontSize: "1.5rem",
+                      cursor: "pointer",
+                      color: star <= rating ? "#f59e0b" : "#cbd5e1",
+                    }}
+                    onClick={() => setRating(star)}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+
+              <textarea
+                placeholder="Leave a comment..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                style={styles.formTextarea}
+              />
+
+              <button
+                style={styles.primaryActionButton}
+                onClick={handleSubmitRating}
+              >
+                Submit Rating
+              </button>
+            </div>
+          )}
         </div>
       )}
       {/* Summary */}

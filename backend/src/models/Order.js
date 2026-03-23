@@ -123,6 +123,9 @@ const orderSchema = new mongoose.Schema(
       district: { type: String, default: "" },
       commune: { type: String, default: "" },
       description: { type: String, default: "" },
+      // 🔥 THÊM 2 FIELD NÀY
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
     },
 
     // Voucher (placeholder for future module)
@@ -212,6 +215,27 @@ const orderSchema = new mongoose.Schema(
         },
       ],
       default: [],
+    },
+    // Customer feedback after delivery
+    feedback: {
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null,
+      },
+      comment: {
+        type: String,
+        default: "",
+      },
+      shipper: {   // 🔥 THÊM DÒNG NÀY
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      createdAt: {
+        type: Date,
+        default: null,
+      },
     },
   },
   {

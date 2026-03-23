@@ -1,8 +1,8 @@
-import shipperService from '../services/shipperService.js';
+import shipperService from "../services/shipperService.js";
 import orderService from "../services/orderService.js";
 import ApiResponse from '../utils/ApiResponse.js';
 import { HTTP_STATUS } from '../config/constants.js';
-import ShipperService from '../services/shipperService.js';
+
 class ShipperController {
   async getShipperOrders(req, res, next) {
     try {
@@ -195,8 +195,27 @@ class ShipperController {
   async getShipperEarnings(req, res, next) {
     try {
       const shipperId = req.user._id; // lấy từ auth middleware
-      const data = await ShipperService.getShipperEarnings(shipperId);
+      const data = await shipperService.getShipperEarnings(shipperId);
       res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+  // Get route and ETA for shipper
+  // Get route and ETA for shipper
+  async getRoute(req, res, next) {
+    try {
+      const shipperId = req.user._id;
+
+      // Gọi service mới viết
+      const routeData = await shipperService.getRoute(shipperId);
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Shipper route retrieved successfully",
+        routeData
+      );
     } catch (err) {
       next(err);
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { shipperApi } from '../../api/shipperApi';
-
+import { useNavigate } from "react-router-dom";
 const ShipperHomePage = () => {
   const [dashboard, setDashboard] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -13,7 +13,7 @@ const ShipperHomePage = () => {
   const [newStatus, setNewStatus] = useState('');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-
+  const navigate = useNavigate(); // 👈 phải có dòng này
   useEffect(() => {
     fetchDashboard();
     fetchOrders();
@@ -230,21 +230,43 @@ const ShipperHomePage = () => {
             </div>
           </div>
           {/* ==== NÚT XEM EARNINGS ==== */}
-          <button
-            onClick={() => window.location.href = "/shipper/earnings"} // đơn giản
-            style={{
-              marginTop: "1rem",
-              backgroundColor: "#f39c12",
-              color: "#fff",
-              padding: "0.75rem 1.5rem",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer"
-            }}
-          >
-            💰 View Earnings
-          </button>
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+            <button
+              onClick={() => window.location.href = "/shipper/earnings"}
+              style={{
+                backgroundColor: "#f39c12",
+                color: "#fff",
+                padding: "0.75rem 1.5rem",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              💰 View Earnings
+            </button>
+
+            <button
+              onClick={() => {
+                if (orders.length > 0) {
+                  navigate(`/shipper/route/${orders[0]._id}`); // 👈 dùng navigate
+                } else {
+                  alert("No orders to view route");
+                }
+              }}
+              style={{
+                backgroundColor: "#f39c12",
+                color: "#fff",
+                padding: "0.75rem 1.5rem",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              🗺 View Route
+            </button>
+          </div>
         </div>
 
       )}

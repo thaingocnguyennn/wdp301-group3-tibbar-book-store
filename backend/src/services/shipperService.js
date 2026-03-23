@@ -9,6 +9,7 @@ class ShipperService {
     const { page = 1, limit = 10, status = null } = filters;
     const skip = (page - 1) * limit;
 
+
     const query = { shipper: shipperId };
 
     // Filter by order status if provided
@@ -267,7 +268,110 @@ class ShipperService {
       totalCancelled,
     };
   }
+  async getRoute(shipperId) {
+    const AVERAGE_SPEED_KMH = 40; // km/h
+
+    // Lấy đơn đã accept
+    const orders = await Order.find({
+      shipper: shipperId,
+      orderStatus: { $in: ["PROCESSING", "SHIPPED"] },
+      assignmentStatus: "ACCEPTED",
+    }).lean();
+
+    if (!orders.length) return { route: [], totalDistanceKm: 0 };
+
+    // Lấy danh sách điểm (lat/lng)
+    const points = orders
+      .map(order => {
+        const { latitude, longitude } = order.shippingAddress || {};
+
+        // 🔥 BỎ THROW → CHỈ SKIP
+        if (!latitude || !longitude) return null;
+
+        return {
+          orderId: order._id,
+          lat: latitude,
+          lng: longitude,
+          address: order.shippingAddress.description || "",
+        };
+      })
+      .filter(Boolean); // loại null
+    if (points.length === 0) {
+      return {
+        route: [],
+        totalDistanceKm: 0,
+      };
+    }
+    // Tạo ma trận khoảng cách
+    const origins = points.map(p => `${p.lat},${p.lng}`).join("|");
+    const destinations = origins;
+    const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+
+    const response = await axios.get(
+      `https://maps.googleapis.com/maps/api/distancematrix/json`,
+      {
+        params: {
+          origins,
+          destinations,
+          key: GOOGLE_API_KEY,
+          mode: "driving",
+        },
+      }
+    );
+
+    if (response.data.status !== "OK") {
+      throw new ApiError(500, "Failed to get distance matrix from Google");
+    }
+
+    const distanceMatrix = response.data.rows.map(row =>
+      row.elements.map(el => el.distance.value / 1000) // km
+    );
+
+    // Sắp xếp thứ tự đơn hàng theo Nearest Neighbor
+    const visited = new Set();
+    const route = [];
+    let currentIndex = 0;
+    visited.add(currentIndex);
+    route.push(points[currentIndex]);
+
+    while (visited.size < points.length) {
+      let nearestIndex = null;
+      let nearestDistance = Infinity;
+
+      for (let i = 0; i < points.length; i++) {
+        if (visited.has(i)) continue;
+        if (distanceMatrix[currentIndex][i] < nearestDistance) {
+          nearestDistance = distanceMatrix[currentIndex][i];
+          nearestIndex = i;
+        }
+      }
+
+      visited.add(nearestIndex);
+      route.push(points[nearestIndex]);
+      currentIndex = nearestIndex;
+    }
+
+    // Tính ETA
+    let cumulativeTimeMin = 0;
+    const routeWithETA = route.map((point, index) => {
+      if (index === 0) {
+        point.etaMinutes = cumulativeTimeMin;
+      } else {
+        const distance = distanceMatrix[index - 1][index]; // km
+        const time = (distance / AVERAGE_SPEED_KMH) * 60; // phút
+        cumulativeTimeMin += time;
+        point.etaMinutes = cumulativeTimeMin;
+      }
+      return point;
+    });
+
+    return {
+      route: routeWithETA,
+      totalDistanceKm: distanceMatrix.flat().reduce((a, b) => a + b, 0),
+    };
+  }
 }
+
 
 
 

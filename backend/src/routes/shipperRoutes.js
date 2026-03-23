@@ -63,4 +63,6 @@ router.patch(
 router.get('/earnings', (req, res, next) =>
   shipperController.getShipperEarnings(req, res, next)
 );
+// Get shipper's route & ETA
+router.get("/route", shipperController.getRoute);
 export default router;

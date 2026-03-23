@@ -1023,8 +1023,16 @@ class OrderService {
       district: selectedAddress.district,
       commune: selectedAddress.commune,
       description: selectedAddress.description,
-    };
+      // 🔥 THÊM 2 DÒNG NÀY
+      latitude: resolvedAddress.latitude,
+      longitude: resolvedAddress.longitude,
 
+    };
+    if (!resolvedAddress.latitude || !resolvedAddress.longitude) {
+      throw ApiError.badRequest(
+        "Address is missing coordinates. Please update your address."
+      );
+    }
     const paymentMethodToUse =
       paymentMethod || previousOrder.paymentMethod || "COD";
 
@@ -1884,6 +1892,56 @@ class OrderService {
         console.error("Timeout error:", err.message);
       }
     }, ASSIGNMENT_TIMEOUT);
+  }
+  // Customer submit feedback/rating for an order
+  async submitFeedback(orderId, userId, rating, comment) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    // 🔒 chỉ customer của đơn mới được đánh giá
+    if (order.user.toString() !== userId.toString()) {
+      throw new ApiError(403, "Not your order");
+    }
+
+    // 🔒 chỉ được đánh giá khi đã giao xong
+    if (order.orderStatus !== "DELIVERED") {
+      throw new ApiError(400, "You can only rate after delivery");
+    }
+
+    // 🔒 không cho đánh giá lại
+    if (order.feedback?.rating) {
+      throw new ApiError(400, "You already rated this order");
+    }
+
+    order.feedback = {
+      rating,
+      comment,
+      shipper: order.shipper, // 🔥 FIX CHÍNH
+      createdAt: new Date(),
+    };
+    await order.save();
+
+    return order.feedback;
+  }
+  // Admin: get all feedbacks with shipper and customer info
+  async getAllShipperFeedbacks() {
+    const orders = await Order.find({
+      "feedback.rating": { $exists: true },
+      shipper: { $ne: null },
+    })
+      .populate("user", "firstName lastName")
+      .populate("shipper", "firstName lastName");
+
+    return orders.map((o) => ({
+      orderNumber: o.orderNumber,
+      customer: `${o.user?.firstName} ${o.user?.lastName}`,
+      shipper: `${o.shipper?.firstName} ${o.shipper?.lastName}`,
+      rating: o.feedback.rating,
+      comment: o.feedback.comment,
+    }));
   }
 }
 
