@@ -64,4 +64,9 @@ router.get(
   authorize(ROLES.ADMIN),
   orderController.getAllShipperFeedbacks
 );
+router.get(
+  "/admin/shipper-stats",
+  authorize(ROLES.ADMIN),
+  orderController.getShipperRatingStats
+);
 export default router;
