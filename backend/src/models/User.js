@@ -34,6 +34,16 @@ const addressSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // 🔥 THÊM 2 FIELD NÀY
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
+    },
+
     isDefault: {
       type: Boolean,
       default: false,
@@ -111,7 +121,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    earnings: {
+      type: Number,
+      default: 0, // tổng thu nhập hiện tại
+    },
     //Thư viện sách đã xem gần đây...
     //Thư viện sách đã xem gần đây, lưu trữ ID của sách để dễ dàng truy xuất thông tin khi cần thiết
     recentlyViewed: {

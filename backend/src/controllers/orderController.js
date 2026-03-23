@@ -289,6 +289,52 @@ class OrderController {
       next(err);
     }
   };
+  async submitFeedback(req, res, next) {
+    try {
+      const { rating, comment } = req.body;
+
+      const feedback = await orderService.submitFeedback(
+        req.params.orderId,
+        req.user._id,
+        rating,
+        comment
+      );
+
+      res.json({
+        success: true,
+        message: "Feedback submitted",
+        data: feedback,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Shipper feedbacks
+  async getAllShipperFeedbacks(req, res, next) {
+    try {
+      const data = await orderService.getAllShipperFeedbacks();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async getShipperRatingStats(req, res, next) {
+    try {
+      const data = await orderService.getShipperRatingStats();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export default new OrderController();
