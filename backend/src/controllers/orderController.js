@@ -310,10 +310,22 @@ class OrderController {
     }
   }
 
- // Shipper feedbacks
+  // Shipper feedbacks
   async getAllShipperFeedbacks(req, res, next) {
     try {
       const data = await orderService.getAllShipperFeedbacks();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async getShipperRatingStats(req, res, next) {
+    try {
+      const data = await orderService.getShipperRatingStats();
 
       res.json({
         success: true,

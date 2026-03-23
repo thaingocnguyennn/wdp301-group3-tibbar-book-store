@@ -1943,6 +1943,48 @@ class OrderService {
       comment: o.feedback.comment,
     }));
   }
+  async getShipperRatingStats() {
+    const stats = await Order.aggregate([
+      {
+        $match: {
+          "feedback.rating": { $exists: true },
+          shipper: { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$shipper",
+          avgRating: { $avg: "$feedback.rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "shipper",
+        },
+      },
+      { $unwind: "$shipper" },
+      {
+        $project: {
+          _id: 0,
+          shipperId: "$shipper._id",
+          name: {
+            $concat: ["$shipper.firstName", " ", "$shipper.lastName"],
+          },
+          avgRating: { $round: ["$avgRating", 1] },
+          totalReviews: 1,
+        },
+      },
+      {
+        $sort: { avgRating: -1 },
+      },
+    ]);
+
+    return stats;
+  }
 }
 
 export default new OrderService();

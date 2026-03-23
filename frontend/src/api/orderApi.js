@@ -85,6 +85,10 @@ export const orderApi = {
     const response = await axiosInstance.get("/orders/admin/feedbacks");
     return response.data;
   },
+  getShipperStats: async () => {
+    const res = await axiosInstance.get("/orders/admin/shipper-stats");
+    return res.data;
+  },
 };
 
 export const adminOrderApi = {
