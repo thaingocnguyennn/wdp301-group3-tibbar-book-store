@@ -11,6 +11,22 @@ export const supportApi = {
     return response.data;
   },
 
+  sendMyImage: async (file, content = "") => {
+    const formData = new FormData();
+    formData.append("image", file);
+    if (content) {
+      formData.append("content", content);
+    }
+
+    const response = await axiosInstance.post("/support/messages/image", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data;
+  },
+
   getAdminConversations: async () => {
     const response = await axiosInstance.get("/admin/support/conversations");
     return response.data;
@@ -28,6 +44,26 @@ export const supportApi = {
       `/admin/support/conversations/${conversationId}/messages`,
       { content },
     );
+    return response.data;
+  },
+
+  sendAdminImage: async (conversationId, file, content = "") => {
+    const formData = new FormData();
+    formData.append("image", file);
+    if (content) {
+      formData.append("content", content);
+    }
+
+    const response = await axiosInstance.post(
+      `/admin/support/conversations/${conversationId}/messages/image`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
     return response.data;
   },
 

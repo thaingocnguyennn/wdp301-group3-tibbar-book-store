@@ -2,16 +2,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSocket from "../../hooks/useSocket";
 import { supportApi } from "../../api/supportApi";
 
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+
+const resolveImageUrl = (path) => {
+  if (!path) return "";
+  return path.startsWith("http") ? path : `${serverBaseUrl}${path}`;
+};
+
+const getMessagePreview = (message) => {
+  if (message?.content?.trim()) return message.content;
+  if (message?.imageUrl) return "[Image]";
+  return "";
+};
+
 const AdminSupportPage = () => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const messageListRef = useRef(null);
+  const imageInputRef = useRef(null);
   const { socket, isConnected } = useSocket();
 
   const selectedConversation = useMemo(
@@ -84,7 +101,7 @@ const AdminSupportPage = () => {
           if (conv._id === data.conversationId) {
             return {
               ...conv,
-              lastMessagePreview: data.message.content.slice(0, 300),
+              lastMessagePreview: getMessagePreview(data.message).slice(0, 300),
               lastMessageAt: data.message.createdAt,
               unreadForAdmin:
                 data.senderRole === "customer"
@@ -157,22 +174,81 @@ const AdminSupportPage = () => {
     }
   }, [messages]);
 
+  const canSend = useMemo(
+    () => draft.trim().length > 0 || Boolean(selectedImage),
+    [draft, selectedImage],
+  );
+
+  const resetImageInput = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImage(null);
+    setImagePreviewUrl("");
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+  }, [imagePreviewUrl]);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      resetImageInput();
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Only image files are allowed");
+      resetImageInput();
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image size must be 8MB or less");
+      resetImageInput();
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImage(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setError("");
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!selectedConversationId || !draft.trim() || sending || !socket || !isConnected) {
+    if (!selectedConversationId || !canSend || sending) {
+      return;
+    }
+
+    if (!selectedImage && (!socket || !isConnected)) {
       return;
     }
 
     try {
       setSending(true);
-      socket.emit("admin:send-message", {
-        conversationId: selectedConversationId,
-        content: draft.trim(),
-      });
+      if (selectedImage) {
+        await supportApi.sendAdminImage(selectedConversationId, selectedImage, draft.trim());
+      } else {
+        socket.emit("admin:send-message", {
+          conversationId: selectedConversationId,
+          content: draft.trim(),
+        });
+      }
       setDraft("");
+      resetImageInput();
       setError("");
     } catch (err) {
-      setError(err?.message || "Failed to send message");
+      setError(err?.response?.data?.message || err?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -259,7 +335,21 @@ const AdminSupportPage = () => {
                           }}
                         >
                           <div style={styles.messageRole}>{isAdmin ? "Admin" : "Customer"}</div>
-                          <div>{message.content}</div>
+                          {message.imageUrl && (
+                            <a
+                              href={resolveImageUrl(message.imageUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={styles.imageLink}
+                            >
+                              <img
+                                src={resolveImageUrl(message.imageUrl)}
+                                alt="Support attachment"
+                                style={styles.messageImage}
+                              />
+                            </a>
+                          )}
+                          {message.content?.trim() && <div>{message.content}</div>}
                           <div style={styles.messageTime}>{new Date(message.createdAt).toLocaleString()}</div>
                         </div>
                       </div>
@@ -269,15 +359,34 @@ const AdminSupportPage = () => {
               </div>
 
               <form onSubmit={handleSend} style={styles.form}>
+                <label style={styles.attachButton}>
+                  Attach Image
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={styles.hiddenInput}
+                    disabled={sending}
+                  />
+                </label>
                 <textarea
                   rows={3}
                   style={styles.textarea}
-                  placeholder="Type your reply..."
+                  placeholder={selectedImage ? "Add an optional caption..." : "Type your reply..."}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   disabled={sending}
                 />
-                <button type="submit" style={styles.sendButton} disabled={!draft.trim() || sending}>
+                {imagePreviewUrl && (
+                  <div style={styles.previewBox}>
+                    <img src={imagePreviewUrl} alt="Selected upload" style={styles.previewImage} />
+                    <button type="button" onClick={resetImageInput} style={styles.removeImageButton}>
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <button type="submit" style={styles.sendButton} disabled={!canSend || sending}>
                   {sending ? "Sending..." : "Reply"}
                 </button>
               </form>
@@ -406,6 +515,18 @@ const styles = {
     padding: "0.65rem 0.75rem",
     wordBreak: "break-word",
   },
+  imageLink: {
+    display: "inline-block",
+    marginBottom: "0.45rem",
+  },
+  messageImage: {
+    display: "block",
+    maxWidth: "220px",
+    maxHeight: "220px",
+    borderRadius: "8px",
+    border: "1px solid rgba(0, 0, 0, 0.08)",
+    objectFit: "cover",
+  },
   adminBubble: {
     backgroundColor: "#2f6fed",
     color: "#fff",
@@ -428,9 +549,21 @@ const styles = {
   form: {
     borderTop: "1px solid #e8eef6",
     padding: "0.9rem",
-    display: "flex",
-    gap: "0.7rem",
-    alignItems: "flex-end",
+    display: "grid",
+    gap: "0.6rem",
+  },
+  attachButton: {
+    width: "fit-content",
+    border: "1px solid #cdd8e6",
+    borderRadius: "8px",
+    padding: "0.4rem 0.7rem",
+    fontWeight: 600,
+    color: "#324b64",
+    cursor: "pointer",
+    backgroundColor: "#f8fbff",
+  },
+  hiddenInput: {
+    display: "none",
   },
   textarea: {
     flex: 1,
@@ -440,7 +573,32 @@ const styles = {
     padding: "0.7rem",
     fontFamily: "inherit",
   },
+  previewBox: {
+    width: "fit-content",
+    border: "1px solid #dce4ee",
+    borderRadius: "10px",
+    padding: "0.5rem",
+    backgroundColor: "#f8fbff",
+  },
+  previewImage: {
+    display: "block",
+    width: "120px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "8px",
+    marginBottom: "0.45rem",
+  },
+  removeImageButton: {
+    border: "none",
+    borderRadius: "8px",
+    backgroundColor: "#ffe9e9",
+    color: "#a83a3a",
+    cursor: "pointer",
+    padding: "0.3rem 0.55rem",
+    fontWeight: 700,
+  },
   sendButton: {
+    width: "fit-content",
     border: "none",
     backgroundColor: "#2f6fed",
     color: "#fff",
