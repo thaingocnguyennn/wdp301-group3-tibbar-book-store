@@ -9,9 +9,9 @@ import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
 import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
-
+import notificationService from "./notificationService.js";
 const MAX_ORDERS = 20;//
-const ASSIGNMENT_TIMEOUT = 30000; // 30s
+const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
 const ADMIN_STATUS_TRANSITIONS = {
   PENDING: ["PROCESSING"],
@@ -1561,6 +1561,8 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+    // ✅ CHỈ GIỮ LẠI DATABASE NOTIFICATION
+    await notificationService.notifyNewOrder(shipper._id, order._id);
     // ⏰ START TIMEOUT
     this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
@@ -1645,6 +1647,10 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+
+    // ✅ CHỈ LƯU NOTI DB
+    await notificationService.notifyNewOrder(shipper._id, order._id);
+
     // ⏰ START TIMEOUT
     this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");

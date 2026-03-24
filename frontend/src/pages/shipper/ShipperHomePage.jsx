@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { shipperApi } from '../../api/shipperApi';
 import { useNavigate } from "react-router-dom";
+import { useNotifications } from "../../hooks/useNotifications";
 const ShipperHomePage = () => {
   const [dashboard, setDashboard] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -13,11 +14,12 @@ const ShipperHomePage = () => {
   const [newStatus, setNewStatus] = useState('');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const navigate = useNavigate(); // 👈 phải có dòng này
+  const { notifications } = useNotifications();
   useEffect(() => {
     fetchDashboard();
-    fetchOrders();
-    fetchProfile(); // 👈 THÊM DÒNG NÀY
+    fetchProfile();
   }, []);
 
   useEffect(() => {
@@ -58,6 +60,7 @@ const ShipperHomePage = () => {
       setError('Failed to load orders');
     } finally {
       setLoading(false);
+      setIsFirstLoad(false);
     }
   };
 
@@ -229,6 +232,19 @@ const ShipperHomePage = () => {
               <div style={styles.statLabel}>Acceptance Rate</div>
             </div>
           </div>
+          <button onClick={() => navigate("/shipper/notifications")}
+            style={{
+              backgroundColor: "#3498db",
+              color: "#fff",
+              padding: "0.75rem 1.5rem",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            🔔 Notifications ({notifications.filter(n => !n.isRead).length})
+          </button>
           {/* ==== NÚT XEM EARNINGS ==== */}
           <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
             <button
