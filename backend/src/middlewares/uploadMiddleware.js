@@ -13,6 +13,7 @@ const ebooksUploadsDir = path.join(uploadsRoot, "ebooks");
 const previewUploadsDir = path.join(uploadsRoot, "book-previews");
 const newsUploadsDir = path.join(uploadsRoot, "news");
 const reviewUploadsDir = path.join(uploadsRoot, "reviews");
+const supportUploadsDir = path.join(uploadsRoot, "support");
 
 [
   sliderUploadsDir,
@@ -21,6 +22,7 @@ const reviewUploadsDir = path.join(uploadsRoot, "reviews");
   previewUploadsDir,
   newsUploadsDir,
   reviewUploadsDir,
+  supportUploadsDir,
 ].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -91,6 +93,7 @@ const deliveryUploadsDir = path.join(uploadsRoot, "delivery-proofs");
   newsUploadsDir,
   reviewUploadsDir,
   deliveryUploadsDir,
+  supportUploadsDir,
 ].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -124,6 +127,12 @@ export const reviewUpload = multer({
   storage: createStorage(reviewUploadsDir),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
+});
+
+export const supportChatUpload = multer({
+  storage: createStorage(supportUploadsDir),
+  fileFilter,
+  limits: { fileSize: 8 * 1024 * 1024 },
 });
 
 // Middleware upload cho bằng chứng giao hàng của shipper

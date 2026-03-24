@@ -3,12 +3,23 @@ import SupportConversation from "../models/SupportConversation.js";
 import SupportMessage from "../models/SupportMessage.js";
 
 class SupportService {
-  sanitizeMessage(content) {
-    const sanitized = (content || "").trim();
-    if (!sanitized) {
-      throw ApiError.badRequest("Message content is required");
+  sanitizeMessageInput(input) {
+    const content = typeof input?.content === "string"
+      ? input.content.trim()
+      : (typeof input === "string" ? input.trim() : "");
+    const imageUrl = typeof input?.imageUrl === "string"
+      ? input.imageUrl.trim()
+      : "";
+
+    if (!content && !imageUrl) {
+      throw ApiError.badRequest("Message content or image is required");
     }
-    return sanitized;
+
+    return {
+      content,
+      imageUrl,
+      preview: content || "[Image]",
+    };
   }
 
   async ensureCustomerConversation(customerId) {
@@ -50,14 +61,15 @@ class SupportService {
   }
 
   async sendCustomerMessage(customerId, content) {
-    const sanitizedContent = this.sanitizeMessage(content);
+    const messageInput = this.sanitizeMessageInput(content);
     const conversation = await this.ensureCustomerConversation(customerId);
 
     const message = await SupportMessage.create({
       conversation: conversation._id,
       sender: customerId,
       senderRole: "customer",
-      content: sanitizedContent,
+      content: messageInput.content,
+      imageUrl: messageInput.imageUrl,
       isReadByAdmin: false,
       isReadByCustomer: true,
     });
@@ -65,7 +77,7 @@ class SupportService {
     await SupportConversation.findByIdAndUpdate(conversation._id, {
       $set: {
         lastMessageAt: new Date(),
-        lastMessagePreview: sanitizedContent.slice(0, 300),
+        lastMessagePreview: messageInput.preview.slice(0, 300),
       },
       $inc: { unreadForAdmin: 1 },
     });
@@ -117,7 +129,7 @@ class SupportService {
   }
 
   async sendAdminMessage(adminId, conversationId, content) {
-    const sanitizedContent = this.sanitizeMessage(content);
+    const messageInput = this.sanitizeMessageInput(content);
 
     const conversation = await SupportConversation.findById(conversationId);
     if (!conversation) {
@@ -128,7 +140,8 @@ class SupportService {
       conversation: conversationId,
       sender: adminId,
       senderRole: "admin",
-      content: sanitizedContent,
+      content: messageInput.content,
+      imageUrl: messageInput.imageUrl,
       isReadByAdmin: true,
       isReadByCustomer: false,
     });
@@ -136,7 +149,7 @@ class SupportService {
     await SupportConversation.findByIdAndUpdate(conversationId, {
       $set: {
         lastMessageAt: new Date(),
-        lastMessagePreview: sanitizedContent.slice(0, 300),
+        lastMessagePreview: messageInput.preview.slice(0, 300),
       },
       $inc: { unreadForCustomer: 1 },
     });
