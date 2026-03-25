@@ -90,6 +90,12 @@ bookSchema.virtual('inStock').get(function() {
   return this.stock > 0;
 });
 
+// Virtual for low stock warning (customer/admin UI có thể dùng trực tiếp)
+bookSchema.virtual('isLowStock').get(function() {
+  const threshold = Number(process.env.LOW_STOCK_THRESHOLD || 5);
+  return this.stock <= threshold;
+});
+
 // Query helper for public books
 bookSchema.query.publicOnly = function() {
   return this.where({ visibility: BOOK_VISIBILITY.PUBLIC });

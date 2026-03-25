@@ -4,6 +4,7 @@ import { bookApi } from "../api/bookApi";
 import { reviewApi } from "../api/reviewApi";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
+import BookFeaturePanel from '../components/books/BookFeaturePanel';
 
 const BookDetailPage = () => {
   const { id } = useParams();
