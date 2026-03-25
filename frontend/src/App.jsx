@@ -47,6 +47,7 @@ import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
 import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
 import NotificationPage from "./pages/shipper/NotificationPage";
 import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
+import ChatbotWidget from "./components/chatbot/ChatbotWidget";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -360,6 +361,7 @@ function AppContent() {
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ChatbotWidget />
       <Footer />
     </div>
   );

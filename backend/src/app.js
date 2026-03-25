@@ -33,6 +33,7 @@ import { HTTP_STATUS } from "./config/constants.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import bookFeatureRoutes from "./routes/bookFeatureRoutes.js";
 import adminInventoryRoutes from "./routes/adminInventory.routes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -124,6 +125,7 @@ app.use("/api/admin/support", adminSupportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/book-features", bookFeatureRoutes);
 app.use("/api/admin/inventory", adminInventoryRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {
