@@ -46,6 +46,7 @@ import ShipperEarningsPage from "./pages/shipper/ShipperEarningsPage";
 import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
 import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
 import NotificationPage from "./pages/shipper/NotificationPage";
+import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -347,6 +348,14 @@ function AppContent() {
         <Route path="/admin/wishlist" element={<AdminWishlist />} />
         <Route path="/admin/shippers" element={<AdminShippers />} />
         <Route path="/admin/revenue" element={<AdminRevenue />} />
+        <Route
+          path="/admin/inventory"
+          element={
+            <ProtectedRoute adminOnly>
+              <InventoryManagementPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
