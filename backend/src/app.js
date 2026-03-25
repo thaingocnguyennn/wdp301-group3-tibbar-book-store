@@ -35,6 +35,7 @@ import bookFeatureRoutes from "./routes/bookFeatureRoutes.js";
 import adminInventoryRoutes from "./routes/adminInventory.routes.js";
 import flashSaleRoutes from "./routes/flashSaleRoutes.js";
 import adminFlashSaleRoutes from "./routes/adminFlashSaleRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -128,6 +129,7 @@ app.use("/api/book-features", bookFeatureRoutes);
 app.use("/api/admin/inventory", adminInventoryRoutes);
 app.use("/api/flash-sale", flashSaleRoutes);
 app.use("/api/admin/flash-sale", adminFlashSaleRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {
