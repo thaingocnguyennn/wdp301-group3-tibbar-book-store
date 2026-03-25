@@ -149,6 +149,7 @@ class OrderService {
   }
 
   getReturnRequestWindowInfo(order) {
+    // Chỉ cho phép tạo yêu cầu trong N ngày sau khi giao thành công.
     if (!order?.deliveredAt) {
       return {
         allowed: false,
@@ -176,6 +177,7 @@ class OrderService {
   }
 
   buildInvoiceHtml(order) {
+    // Sinh HTML tĩnh để trình duyệt có thể tải hoặc in trực tiếp.
     const rowsHtml = order.items
       .map((item) => {
         return `
@@ -987,6 +989,7 @@ class OrderService {
       ipAddress = "127.0.0.1",
     } = options;
 
+    // 1) Tải đơn cũ và kiểm tra quyền sở hữu.
     const previousOrder = await Order.findById(orderId).lean();
     if (!previousOrder) {
       throw ApiError.notFound("Order not found");
@@ -1001,6 +1004,7 @@ class OrderService {
       throw ApiError.notFound("User not found");
     }
 
+    // 2) Ưu tiên địa chỉ giao hàng cũ, fallback sang địa chỉ mặc định hiện tại.
     const previousAddressId = previousOrder.shippingAddress?.addressId;
     const preferredAddress = previousAddressId
       ? user.addresses.id(previousAddressId)
@@ -1036,6 +1040,7 @@ class OrderService {
     const paymentMethodToUse =
       paymentMethod || previousOrder.paymentMethod || "COD";
 
+    // 3) Validate lại catalog hiện tại: sách còn tồn tại và đủ tồn kho.
     const requestedBookIds = previousOrder.items
       .map((item) => item.book?.toString())
       .filter(Boolean);
@@ -1044,6 +1049,7 @@ class OrderService {
     const booksById = new Map(books.map((book) => [book._id.toString(), book]));
 
     const hasEbookInOrder = books.some((book) => book.isEbook);
+    // Quy tắc nghiệp vụ: đơn có ebook bắt buộc thanh toán online qua VNPay.
     if (hasEbookInOrder && paymentMethodToUse !== "VNPAY") {
       throw ApiError.badRequest(
         "E-book orders only support online payment via VNPay",
@@ -1090,6 +1096,7 @@ class OrderService {
     }
 
     if (validationErrors.length > 0) {
+      // Trả về toàn bộ lỗi validation để FE hiển thị đầy đủ cho user.
       throw ApiError.badRequest("Reorder cannot be completed", {
         errors: validationErrors,
       });
@@ -1105,6 +1112,7 @@ class OrderService {
       orderItems,
       total,
     );
+    // Chặn double-click / submit lặp gây tạo đơn giống nhau trong thời gian ngắn.
     if (duplicateOrder) {
       throw ApiError.conflict(
         `A similar order was just created (${duplicateOrder.orderNumber}). Please refresh and check your order history.`,
@@ -1116,6 +1124,7 @@ class OrderService {
     let paymentResult = null;
 
     try {
+      // 4) Reserve stock trước khi tạo payment + order để tránh oversell.
       stockReservations = await this.reserveStockForOrderItems(orderItems);
 
       paymentResult = await paymentProvider.createPayment({
@@ -1148,6 +1157,7 @@ class OrderService {
         payment: paymentResult,
       };
     } catch (error) {
+      // Nếu có lỗi ở bất kỳ bước nào thì rollback để dữ liệu nhất quán.
       await this.rollbackOrderCreation({
         order,
         userId,
@@ -1171,6 +1181,7 @@ class OrderService {
     }
 
     if (order.orderStatus !== "DELIVERED") {
+      // Chỉ xuất hóa đơn cho đơn đã giao hoàn tất.
       throw ApiError.badRequest(
         "Invoice is available only for delivered orders",
       );
@@ -1216,6 +1227,7 @@ class OrderService {
       );
     }
 
+    // Kiểm tra còn trong hạn N ngày kể từ deliveredAt.
     const windowInfo = this.getReturnRequestWindowInfo(order);
     if (!windowInfo.allowed) {
       throw ApiError.badRequest(
@@ -1230,6 +1242,7 @@ class OrderService {
     }
 
     order.returnRequest = {
+      // Trạng thái khởi tạo luôn là PENDING, chờ admin xử lý.
       type: normalizedType,
       reason: normalizedReason,
       details: normalizedDetails,

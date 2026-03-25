@@ -169,7 +169,7 @@ const OrderDetailPage = () => {
       const response = await orderApi.reorderOrder(order._id, {
         paymentMethod: order.paymentMethod,
       });
-
+      // lay du lieu tra ve
       const reorderedOrder = response.data?.order;
       const payment = response.data?.payment;
 
