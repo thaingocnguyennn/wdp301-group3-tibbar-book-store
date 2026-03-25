@@ -30,7 +30,10 @@ import adminSupportRoutes from "./routes/adminSupportRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
-
+import notificationRoutes from "./routes/notificationRoutes.js";
+import bookFeatureRoutes from "./routes/bookFeatureRoutes.js";
+import adminInventoryRoutes from "./routes/adminInventory.routes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -119,6 +122,10 @@ app.use("/api/news", newsRoutes);
 app.use("/api/admin/news", adminNewsRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/book-features", bookFeatureRoutes);
+app.use("/api/admin/inventory", adminInventoryRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

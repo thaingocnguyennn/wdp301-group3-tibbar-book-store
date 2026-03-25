@@ -168,6 +168,7 @@ class OrderController {
   // Reorder from a previous order
   async reorderOrder(req, res, next) {
     try {
+      // userId lấy từ JWT sau middleware authenticate.
       const userId = req.user._id;
       const orderId = req.params.id;
       const { paymentMethod, notes } = req.body;
@@ -177,6 +178,7 @@ class OrderController {
         "127.0.0.1";
 
       const result = await orderService.reorderOrder(orderId, userId, {
+        // Cho phép user override phương thức thanh toán của đơn cũ.
         paymentMethod,
         notes,
         ipAddress,
@@ -198,6 +200,7 @@ class OrderController {
     try {
       const userId = req.user._id;
       const orderId = req.params.id;
+      // true: tải file, false: mở inline để in.
       const shouldDownload = String(req.query.download || "true") === "true";
 
       const { html, fileName } = await orderService.getInvoiceHtml(
@@ -208,6 +211,7 @@ class OrderController {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
+        // attachment => download, inline => render trực tiếp trên trình duyệt.
         `${shouldDownload ? "attachment" : "inline"}; filename=\"${fileName}\"`,
       );
 
@@ -222,6 +226,7 @@ class OrderController {
     try {
       const userId = req.user._id;
       const orderId = req.params.id;
+      // type: RETURN | REFUND, reason bắt buộc, details tùy chọn.
       const { type, reason, details } = req.body;
 
       const order = await orderService.submitReturnRefundRequest(
@@ -289,6 +294,52 @@ class OrderController {
       next(err);
     }
   };
+  async submitFeedback(req, res, next) {
+    try {
+      const { rating, comment } = req.body;
+
+      const feedback = await orderService.submitFeedback(
+        req.params.orderId,
+        req.user._id,
+        rating,
+        comment
+      );
+
+      res.json({
+        success: true,
+        message: "Feedback submitted",
+        data: feedback,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Shipper feedbacks
+  async getAllShipperFeedbacks(req, res, next) {
+    try {
+      const data = await orderService.getAllShipperFeedbacks();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async getShipperRatingStats(req, res, next) {
+    try {
+      const data = await orderService.getShipperRatingStats();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export default new OrderController();

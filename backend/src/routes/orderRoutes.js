@@ -27,13 +27,13 @@ router.get("/", orderController.getUserOrders);
 // Get order by order number
 router.get("/number/:orderNumber", orderController.getOrderByNumber);
 
-// Reorder from previous order
+// Đặt lại đơn hàng từ đơn cũ
 router.post("/:id/reorder", orderController.reorderOrder);
 
-// Download or print invoice
+// Tải hoặc in hóa đơn của đơn đã giao
 router.get("/:id/invoice", orderController.downloadInvoice);
 
-// Submit return / refund request
+// Gửi yêu cầu trả hàng / hoàn tiền
 router.post("/:id/return-refund", orderController.submitReturnRefundRequest);
 
 // Get single order by ID
@@ -53,5 +53,20 @@ router.patch(
   authorize(ROLES.ADMIN),
   orderController.assignShipper,
 );
-
+// Shipper updates order status
+router.post(
+  "/:orderId/feedback",
+  authenticate,
+  orderController.submitFeedback
+);
+router.get(
+  "/admin/feedbacks",
+  authorize(ROLES.ADMIN),
+  orderController.getAllShipperFeedbacks
+);
+router.get(
+  "/admin/shipper-stats",
+  authorize(ROLES.ADMIN),
+  orderController.getShipperRatingStats
+);
 export default router;

@@ -1,12 +1,11 @@
 import Book from "../models/Book.js";
 import Category from "../models/Category.js";
-import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
-import Wishlist from "../models/Wishlist.js";
+// FIX: getBestSellingBooks uses Order.aggregate, so Order model must be imported.
+import Order from "../models/Order.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, PAGINATION, BOOK_VISIBILITY } from "../config/constants.js";
 import User from "../models/User.js";
-
 class BookService {
   async getPublicBooks(filters = {}) {
     const {
@@ -147,276 +146,138 @@ class BookService {
   }
 
   async getPersonalizedBooks(userId, options = {}) {
-    const actualLimit = Math.min(
-      Number(options.limit) || 8,
-      PAGINATION.MAX_LIMIT,
-    );
-    const searchTerms = Array.isArray(options.searchTerms)
-      ? options.searchTerms
-          .filter(Boolean)
-          .map((term) => String(term).trim().toLowerCase())
-      : [];
+    const actualLimit = Math.min(Number(options.limit) || 8, PAGINATION.MAX_LIMIT);
 
-    const newestFallback = async (
-      strategy = "fallback-newest",
-      signals = {},
-    ) => {
+    const normalizeAuthor = (value = "") => String(value).trim();
+    const dedupeAuthorsCaseInsensitive = (authors = []) => {
+      const seen = new Set();
+      const uniqueAuthors = [];
+
+      for (const rawAuthor of authors) {
+        const author = normalizeAuthor(rawAuthor);
+        if (!author) continue;
+
+        const authorKey = author.toLowerCase();
+        if (!seen.has(authorKey)) {
+          seen.add(authorKey);
+          uniqueAuthors.push(author);
+        }
+      }
+
+      return uniqueAuthors;
+    };
+
+    const dedupeIds = (values = []) => [
+      ...new Set(
+        values
+          .map((value) => value?._id?.toString?.() || value?.toString?.())
+          .filter(Boolean),
+      ),
+    ];
+
+    const newestFallback = async (strategy = "fallback-newest", signals = {}) => {
       const books = await Book.find({ visibility: BOOK_VISIBILITY.PUBLIC })
         .populate("category", "name")
         .sort({ createdAt: -1 })
         .limit(actualLimit)
         .lean();
 
-      return {
-        books,
-        strategy,
-        signals,
-      };
+      return { books, strategy, signals };
     };
 
+    // Guest users: Recommend For You behaves like Newest.
     if (!userId) {
       return newestFallback("fallback-newest", {
         hasRecentlyViewed: false,
-        hasSearchHistory: searchTerms.length > 0,
         hasCartHistory: false,
         hasPurchaseHistory: false,
         hasWishlist: false,
+        hasAuthorInterest: false,
         hasCategoryInterest: false,
-        hasFavoriteBrand: false,
-        hasPricePreference: false,
-        hasSimilarUsers: false,
         language: options.language || null,
         platform: options.platform || null,
         location: options.location || null,
       });
     }
 
-    const [user, recentOrders, cart, wishlist] = await Promise.all([
-      User.findById(userId).select("recentlyViewed addresses updatedAt").lean(),
-      Order.find({ user: userId, orderStatus: { $ne: "CANCELLED" } })
-        .select("items.book items.quantity items.price orderStatus createdAt")
-        .sort({ createdAt: -1 })
-        .limit(40)
+    const [user, cart] = await Promise.all([
+      User.findById(userId)
+        .select("updatedAt")
         .lean(),
-      Cart.findOne({ user: userId })
-        .select("items.book items.quantity updatedAt")
-        .lean(),
-      Wishlist.findOne({ user: userId }).select("books updatedAt").lean(),
+      Cart.findOne({ user: userId }).select("items.book updatedAt").lean(),
     ]);
 
-    const recentlyViewedIds = Array.isArray(user?.recentlyViewed)
-      ? user.recentlyViewed.map((id) => id.toString())
-      : [];
     const cartBookIds = Array.isArray(cart?.items)
       ? cart.items.map((item) => item.book?.toString()).filter(Boolean)
       : [];
-    const wishlistBookIds = Array.isArray(wishlist?.books)
-      ? wishlist.books.map((id) => id.toString())
-      : [];
 
-    const purchasedBookCounter = new Map();
-    for (const order of recentOrders) {
-      for (const item of order.items || []) {
-        if (!item.book) continue;
-        const key = item.book.toString();
-        const multiplier = order.orderStatus === "DELIVERED" ? 1.3 : 1;
-        const quantity = Number(item.quantity) || 1;
-        purchasedBookCounter.set(
-          key,
-          (purchasedBookCounter.get(key) || 0) + quantity * multiplier,
-        );
-      }
-    }
-
-    const purchasedBookIds = [...purchasedBookCounter.keys()];
-    const signalBookIds = [
-      ...new Set([
-        ...recentlyViewedIds,
-        ...cartBookIds,
-        ...wishlistBookIds,
-        ...purchasedBookIds,
-      ]),
-    ];
-
-    if (!signalBookIds.length && !searchTerms.length) {
+    // Logged-in users without cart history: fallback to newest.
+    if (!cartBookIds.length) {
       return newestFallback("fallback-newest", {
         hasRecentlyViewed: false,
-        hasSearchHistory: false,
         hasCartHistory: false,
         hasPurchaseHistory: false,
         hasWishlist: false,
+        hasAuthorInterest: false,
         hasCategoryInterest: false,
-        hasFavoriteBrand: false,
-        hasPricePreference: false,
-        hasSimilarUsers: false,
         language: options.language || null,
         platform: options.platform || null,
         location: options.location || null,
+        lastAccessAt: user?.updatedAt || null,
       });
     }
 
-    const signalBooks = signalBookIds.length
-      ? await Book.find({
-          _id: { $in: signalBookIds },
-          visibility: BOOK_VISIBILITY.PUBLIC,
-        })
-          .select("category author price")
-          .lean()
-      : [];
+    const cartBooks = await Book.find({
+      _id: { $in: cartBookIds },
+      visibility: BOOK_VISIBILITY.PUBLIC,
+    })
+      .select("author category")
+      .lean();
 
-    const categoryScores = new Map();
-    const authorScores = new Map();
-    const observedPrices = [];
+    const escapeRegex = (value) =>
+      String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    for (const book of signalBooks) {
-      const bookId = book._id.toString();
-      const categoryId = book.category?.toString();
-      const normalizedAuthor = (book.author || "").trim().toLowerCase();
+    const preferredAuthors = dedupeAuthorsCaseInsensitive([
+      ...cartBooks.map((book) => book.author),
+    ]);
 
-      let totalWeight = 0;
-      if (recentlyViewedIds.includes(bookId)) totalWeight += 5;
-      if (cartBookIds.includes(bookId)) totalWeight += 6;
-      if (wishlistBookIds.includes(bookId)) totalWeight += 7;
-      totalWeight += (purchasedBookCounter.get(bookId) || 0) * 4;
+    const preferredCategoryIds = dedupeIds([
+      ...cartBooks.map((book) => book.category),
+    ]);
 
-      if (categoryId && totalWeight > 0) {
-        categoryScores.set(
-          categoryId,
-          (categoryScores.get(categoryId) || 0) + totalWeight,
-        );
-      }
-
-      if (normalizedAuthor && totalWeight > 0) {
-        authorScores.set(
-          normalizedAuthor,
-          (authorScores.get(normalizedAuthor) || 0) + totalWeight,
-        );
-      }
-
-      if (book.price && totalWeight > 0) {
-        const copies = Math.max(1, Math.round(totalWeight / 4));
-        for (let i = 0; i < copies; i += 1) {
-          observedPrices.push(Number(book.price));
-        }
-      }
+    if (!preferredAuthors.length && !preferredCategoryIds.length) {
+      return newestFallback("fallback-newest-relaxed", {
+        hasRecentlyViewed: false,
+        hasCartHistory: cartBookIds.length > 0,
+        hasPurchaseHistory: false,
+        hasWishlist: false,
+        hasAuthorInterest: false,
+        hasCategoryInterest: false,
+        language: options.language || null,
+        platform: options.platform || null,
+        location: options.location || null,
+        lastAccessAt: user?.updatedAt || null,
+      });
     }
-
-    const preferredCategoryIds = [...categoryScores.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([categoryId]) => categoryId);
-
-    const preferredAuthors = [...authorScores.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([author]) => author);
-
-    const preferredPriceMin = observedPrices.length
-      ? Math.max(0, Math.min(...observedPrices) * 0.8)
-      : null;
-    const preferredPriceMax = observedPrices.length
-      ? Math.max(...observedPrices) * 1.2
-      : null;
-
-    const similarUserBookScores = new Map();
-    if (preferredCategoryIds.length) {
-      const topCategories = preferredCategoryIds.slice(0, 3);
-
-      const similarUsers = await Order.aggregate([
-        { $match: { orderStatus: "DELIVERED", user: { $ne: user._id } } },
-        { $unwind: "$items" },
-        {
-          $lookup: {
-            from: "books",
-            localField: "items.book",
-            foreignField: "_id",
-            as: "book",
-          },
-        },
-        { $unwind: "$book" },
-        {
-          $match: {
-            "book.visibility": BOOK_VISIBILITY.PUBLIC,
-            "book.category": { $in: topCategories },
-          },
-        },
-        {
-          $group: {
-            _id: "$user",
-            overlapScore: { $sum: "$items.quantity" },
-          },
-        },
-        { $sort: { overlapScore: -1 } },
-        { $limit: 10 },
-      ]);
-
-      const similarUserIds = similarUsers
-        .map((item) => item._id)
-        .filter(Boolean);
-
-      if (similarUserIds.length) {
-        const similarUserOrders = await Order.aggregate([
-          {
-            $match: { orderStatus: "DELIVERED", user: { $in: similarUserIds } },
-          },
-          { $unwind: "$items" },
-          {
-            $group: {
-              _id: "$items.book",
-              score: { $sum: "$items.quantity" },
-            },
-          },
-          { $sort: { score: -1 } },
-          { $limit: 120 },
-        ]);
-
-        for (const item of similarUserOrders) {
-          if (!item?._id) continue;
-          similarUserBookScores.set(
-            item._id.toString(),
-            Number(item.score) || 0,
-          );
-        }
-      }
-    }
-
-    const excludeIds = [...new Set(signalBookIds)];
 
     const matchConditions = [];
-    if (preferredCategoryIds.length) {
-      matchConditions.push({ category: { $in: preferredCategoryIds } });
-    }
 
     if (preferredAuthors.length) {
       const authorRegex = preferredAuthors.map(
-        (author) =>
-          new RegExp(`^${author.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+        (author) => new RegExp(`^${escapeRegex(author)}$`, "i"),
       );
       matchConditions.push({ author: { $in: authorRegex } });
     }
 
-    if (preferredPriceMin !== null && preferredPriceMax !== null) {
-      matchConditions.push({
-        price: { $gte: preferredPriceMin, $lte: preferredPriceMax },
-      });
-    }
-
-    if (searchTerms.length) {
-      for (const term of searchTerms.slice(0, 5)) {
-        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        matchConditions.push({ title: { $regex: escaped, $options: "i" } });
-        matchConditions.push({ author: { $regex: escaped, $options: "i" } });
-        matchConditions.push({
-          description: { $regex: escaped, $options: "i" },
-        });
-      }
+    if (preferredCategoryIds.length) {
+      matchConditions.push({ category: { $in: preferredCategoryIds } });
     }
 
     let candidates = [];
     if (matchConditions.length) {
       candidates = await Book.find({
         visibility: BOOK_VISIBILITY.PUBLIC,
-        _id: { $nin: excludeIds },
+        _id: { $nin: cartBookIds },
         $or: matchConditions,
       })
         .populate("category", "name")
@@ -425,73 +286,52 @@ class BookService {
         .lean();
     }
 
+    const authorMatchSet = new Set(preferredAuthors.map((author) => author.toLowerCase()));
+    const categoryMatchSet = new Set(preferredCategoryIds.map((id) => id.toString()));
+
     const scoredCandidates = candidates
       .map((book) => {
-        const bookId = book._id.toString();
-        const categoryId = book.category?._id?.toString();
-        const normalizedAuthor = (book.author || "").trim().toLowerCase();
+        const normalizedAuthor = String(book.author || "").trim().toLowerCase();
+        const categoryId = book.category?._id?.toString?.() || book.category?.toString?.();
+        const matchesAuthor = authorMatchSet.has(normalizedAuthor);
+        const matchesCategory = categoryMatchSet.has(String(categoryId || ""));
 
-        const categoryScore = categoryId
-          ? (categoryScores.get(categoryId) || 0) * 3
-          : 0;
-        const authorScore = normalizedAuthor
-          ? (authorScores.get(normalizedAuthor) || 0) * 2
-          : 0;
+        let score = 0;
+        if (matchesAuthor) score += 8;
+        if (matchesCategory) score += 6;
 
-        let priceScore = 0;
-        if (preferredPriceMin !== null && preferredPriceMax !== null) {
-          if (
-            book.price >= preferredPriceMin &&
-            book.price <= preferredPriceMax
-          ) {
-            priceScore = 8;
-          } else {
-            const midpoint = (preferredPriceMin + preferredPriceMax) / 2;
-            const distance = Math.abs(book.price - midpoint);
-            priceScore = Math.max(0, 6 - distance / 50000);
-          }
-        }
+        // Match priority for ordering inside Recommend For You:
+        // 2 = same author + same category, 1 = one of them, 0 = none.
+        const matchLevel = matchesAuthor && matchesCategory ? 2 : matchesAuthor || matchesCategory ? 1 : 0;
 
-        let searchScore = 0;
-        if (searchTerms.length) {
-          const fullText =
-            `${book.title || ""} ${book.author || ""} ${book.description || ""}`.toLowerCase();
-          searchScore = searchTerms.reduce(
-            (sum, term) => (fullText.includes(term) ? sum + 4 : sum),
-            0,
-          );
-        }
-
-        const similarUserScore = (similarUserBookScores.get(bookId) || 0) * 2;
         const freshnessScore = Math.max(
           0,
-          5 -
+          4 -
             (Date.now() - new Date(book.createdAt).getTime()) /
               (1000 * 60 * 60 * 24 * 30),
         );
 
         return {
           ...book,
-          __score:
-            categoryScore +
-            authorScore +
-            priceScore +
-            searchScore +
-            similarUserScore +
-            freshnessScore,
+          __matchLevel: matchLevel,
+          __score: score + freshnessScore,
         };
       })
       .sort((a, b) => {
+        if (b.__matchLevel !== a.__matchLevel) return b.__matchLevel - a.__matchLevel;
         if (b.__score !== a.__score) return b.__score - a.__score;
         return new Date(b.createdAt) - new Date(a.createdAt);
       })
-      .map(({ __score, ...book }) => book);
+      .map(({ __matchLevel, __score, ...book }) => book)
+      .slice(0, actualLimit);
 
-    if (scoredCandidates.length < actualLimit) {
-      const candidateIds = scoredCandidates.map((book) => book._id);
+    if (scoredCandidates.length > 0 && scoredCandidates.length < actualLimit) {
+      const candidateIds = scoredCandidates.map((book) => book._id?.toString());
       const fallbackBooks = await Book.find({
         visibility: BOOK_VISIBILITY.PUBLIC,
-        _id: { $nin: [...excludeIds, ...candidateIds] },
+        _id: {
+          $nin: [...cartBookIds, ...candidateIds].filter(Boolean),
+        },
       })
         .populate("category", "name")
         .sort({ createdAt: -1 })
@@ -501,19 +341,31 @@ class BookService {
       scoredCandidates.push(...fallbackBooks);
     }
 
-    return {
-      books: scoredCandidates.slice(0, actualLimit),
-      strategy: "multi-signal-personalization",
-      signals: {
-        hasRecentlyViewed: recentlyViewedIds.length > 0,
-        hasSearchHistory: searchTerms.length > 0,
+    if (!scoredCandidates.length) {
+      return newestFallback("fallback-newest-relaxed", {
+        hasRecentlyViewed: false,
         hasCartHistory: cartBookIds.length > 0,
-        hasPurchaseHistory: purchasedBookIds.length > 0,
-        hasWishlist: wishlistBookIds.length > 0,
+        hasPurchaseHistory: false,
+        hasWishlist: false,
+        hasAuthorInterest: preferredAuthors.length > 0,
         hasCategoryInterest: preferredCategoryIds.length > 0,
-        hasFavoriteBrand: preferredAuthors.length > 0,
-        hasPricePreference: observedPrices.length > 0,
-        hasSimilarUsers: similarUserBookScores.size > 0,
+        language: options.language || null,
+        platform: options.platform || null,
+        location: options.location || null,
+        lastAccessAt: user?.updatedAt || null,
+      });
+    }
+
+    return {
+      books: scoredCandidates,
+      strategy: "cart-author-category",
+      signals: {
+        hasRecentlyViewed: false,
+        hasCartHistory: cartBookIds.length > 0,
+        hasPurchaseHistory: false,
+        hasWishlist: false,
+        hasAuthorInterest: preferredAuthors.length > 0,
+        hasCategoryInterest: preferredCategoryIds.length > 0,
         language: options.language || null,
         platform: options.platform || null,
         location: options.location || null,

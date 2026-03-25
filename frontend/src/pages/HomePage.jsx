@@ -6,8 +6,10 @@ import { sliderApi } from "../api/sliderApi";
 import { newsApi } from "../api/newsApi";
 import BookCard from "../components/books/BookCard";
 import Slider from "../components/common/Slider";
+import { useAuth } from "../hooks/useAuth";
 
 const HomePage = () => {
+  const { isAuthenticated } = useAuth();
   const [books, setBooks] = useState([]);
   const [bestSellingBooks, setBestSellingBooks] = useState([]);
   const [personalizedBooks, setPersonalizedBooks] = useState([]);
@@ -42,8 +44,11 @@ const HomePage = () => {
     fetchSliders();
     fetchHomepageNews();
     fetchBestSellingBooks();
-    fetchPersonalizedBooks();
   }, []);
+
+  useEffect(() => {
+    fetchPersonalizedBooks();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchBooks();
@@ -87,9 +92,20 @@ const HomePage = () => {
     try {
       setPersonalizedLoading(true);
       const response = await bookApi.getPersonalizedBooks(8);
-      setPersonalizedBooks(response?.data?.books || []);
+      const personalizedList = response?.data?.books || [];
+
+      if (personalizedList.length > 0) {
+        setPersonalizedBooks(personalizedList);
+      } else {
+        // UI safety net: keep section populated if personalized API returns empty.
+        const newestResponse = await bookApi.getNewestBooks(8);
+        setPersonalizedBooks(newestResponse?.data?.books || []);
+      }
+
       setRecommendationMeta({
-        strategy: response?.data?.strategy || null,
+        strategy:
+          response?.data?.strategy ||
+          (personalizedList.length === 0 ? "fallback-newest-relaxed" : null),
         signals: response?.data?.signals || {
           hasRecentlyViewed: false,
           hasPurchaseHistory: false,
@@ -246,9 +262,12 @@ const HomePage = () => {
         <div style={styles.sectionHeader}>
           <h2 style={styles.sectionTitle}>✨ Recommended For You</h2>
           <div style={styles.titleUnderline}></div>
-          {recommendationMeta.strategy === "behavior-based" && (
+          {(recommendationMeta.strategy === "multi-signal-personalization" ||
+            recommendationMeta.strategy === "direct-interaction-priority" ||
+            recommendationMeta.strategy === "interaction-author-category" ||
+            recommendationMeta.strategy === "cart-author-category") && (
             <p style={styles.sectionHint}>
-              Personalized from your browsing and purchase history.
+              Personalized from your recent interactions (viewed, cart, wishlist, orders).
             </p>
           )}
         </div>
@@ -272,7 +291,8 @@ const HomePage = () => {
                 <BookCard key={book._id} book={book} />
               ))}
             </div>
-            {recommendationMeta.strategy === "fallback-newest" && (
+            {(recommendationMeta.strategy === "fallback-newest" ||
+              recommendationMeta.strategy === "fallback-newest-relaxed") && (
               <p style={styles.sectionHint}>
                 Showing newest books while we learn your preferences.
               </p>

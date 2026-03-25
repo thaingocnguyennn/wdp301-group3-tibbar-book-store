@@ -42,6 +42,12 @@ import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 import SupportChatPage from "./pages/SupportChatPage";
 import AdminSupportPage from "./pages/admin/AdminSupportPage";
+import ShipperEarningsPage from "./pages/shipper/ShipperEarningsPage";
+import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
+import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
+import NotificationPage from "./pages/shipper/NotificationPage";
+import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
+import ChatbotWidget from "./components/chatbot/ChatbotWidget";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -260,7 +266,10 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/shipper/earnings" element={<ShipperEarningsPage />} />
+        <Route path="/shipper/route/:orderId" element={<ShipperRoutePage />} />
+        <Route path="/admin/shipper-feedbacks" element={<ShipperFeedbackPage />} />
+        <Route path="/shipper/notifications" element={<NotificationPage />} />
         <Route
           path="/admin/categories"
           element={
@@ -340,10 +349,19 @@ function AppContent() {
         <Route path="/admin/wishlist" element={<AdminWishlist />} />
         <Route path="/admin/shippers" element={<AdminShippers />} />
         <Route path="/admin/revenue" element={<AdminRevenue />} />
+        <Route
+          path="/admin/inventory"
+          element={
+            <ProtectedRoute adminOnly>
+              <InventoryManagementPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ChatbotWidget />
       <Footer />
     </div>
   );

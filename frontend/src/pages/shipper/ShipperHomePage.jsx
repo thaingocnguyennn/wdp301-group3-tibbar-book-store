@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { shipperApi } from '../../api/shipperApi';
-
+import { useNavigate } from "react-router-dom";
+import { useNotifications } from "../../hooks/useNotifications";
 const ShipperHomePage = () => {
   const [dashboard, setDashboard] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -13,14 +14,28 @@ const ShipperHomePage = () => {
   const [newStatus, setNewStatus] = useState('');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const navigate = useNavigate(); // 👈 phải có dòng này
+  const { notifications } = useNotifications();
   useEffect(() => {
     fetchDashboard();
-    fetchOrders();
+    fetchProfile();
   }, []);
 
   useEffect(() => {
     fetchOrders();
   }, [filterStatus, currentPage]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await shipperApi.getProfile();
+
+      // 🔥 SET isOnline từ DB
+      setIsOnline(res.data.profile.isOnline);
+    } catch (err) {
+      console.error("Failed to load profile");
+    }
+  };
 
   const fetchDashboard = async () => {
     try {
@@ -45,6 +60,7 @@ const ShipperHomePage = () => {
       setError('Failed to load orders');
     } finally {
       setLoading(false);
+      setIsFirstLoad(false);
     }
   };
 
@@ -156,6 +172,22 @@ const ShipperHomePage = () => {
     return colors[status] || '#95a5a6';
   };
 
+  // Mới thêm state này để quản lý trạng thái online/offline
+  const [isOnline, setIsOnline] = useState(false);
+  const handleToggleOnline = async () => {
+    try {
+      const res = await shipperApi.toggleOnline();
+
+      // ✅ ĐÚNG
+      setIsOnline(res.data.isOnline);
+
+      setMessage(`You are now ${res.data.isOnline ? "Online 🟢" : "Offline 🔴"}`);
+      setError(""); // 👈 clear error
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || "Failed to toggle status");
+    }
+  };
   return (
     <div style={styles.container}>
       {/* Dashboard Summary */}
@@ -200,9 +232,88 @@ const ShipperHomePage = () => {
               <div style={styles.statLabel}>Acceptance Rate</div>
             </div>
           </div>
-        </div>
-      )}
+          <button onClick={() => navigate("/shipper/notifications")}
+            style={{
+              backgroundColor: "#3498db",
+              color: "#fff",
+              padding: "0.75rem 1.5rem",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            🔔 Notifications ({notifications.filter(n => !n.isRead).length})
+          </button>
+          {/* ==== NÚT XEM EARNINGS ==== */}
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+            <button
+              onClick={() => window.location.href = "/shipper/earnings"}
+              style={{
+                backgroundColor: "#f39c12",
+                color: "#fff",
+                padding: "0.75rem 1.5rem",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              💰 View Earnings
+            </button>
 
+            <button
+              onClick={() => {
+                if (orders.length > 0) {
+                  navigate(`/shipper/route/${orders[0]._id}`); // 👈 dùng navigate
+                } else {
+                  alert("No orders to view route");
+                }
+              }}
+              style={{
+                backgroundColor: "#f39c12",
+                color: "#fff",
+                padding: "0.75rem 1.5rem",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              🗺 View Route
+            </button>
+          </div>
+        </div>
+
+      )}
+      <div style={{
+        marginBottom: "1.5rem",
+        display: "flex",
+        alignItems: "center",
+        gap: "1rem"
+      }}>
+        <button
+          onClick={handleToggleOnline}
+          style={{
+            backgroundColor: isOnline ? "#e74c3c" : "#2ecc71",
+            color: "#fff",
+            padding: "0.6rem 1.2rem",
+            border: "none",
+            borderRadius: "6px",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          {isOnline ? "Go Offline" : "Go Online"}
+        </button>
+
+        <span style={{
+          fontWeight: "bold",
+          color: isOnline ? "#2ecc71" : "#e74c3c"
+        }}>
+          {isOnline ? "🟢 Online" : "🔴 Offline"}
+        </span>
+      </div>
       {/* Messages */}
       {message && <div style={styles.success}>{message}</div>}
       {error && <div style={styles.error}>{error}</div>}
@@ -327,7 +438,7 @@ const ShipperHomePage = () => {
               </div>
             )}
           {/* Status Update */}
-          {selectedOrder?.orderStatus === "SHIPPED" &&
+          {selectedOrder?.orderStatus === "PROCESSING" &&
             selectedOrder?.assignmentStatus === "PENDING" && (
               <div style={styles.card}>
                 <h4 style={styles.cardTitle}>Assignment Response</h4>
@@ -385,8 +496,19 @@ const ShipperHomePage = () => {
                   style={styles.select}
                 >
                   <option value="">Select Status</option>
-                  <option value="DELIVERED">Delivered</option>
-                  <option value="CANCELLED">Cancelled</option>
+                  <option
+                    value="DELIVERED"
+                    disabled={!selectedOrder?.deliveryProof?.imageUrl} // ✅ CHẶN TỪ ĐẦU
+                  >
+                    Delivered
+                  </option>
+
+                  <option
+                    value="CANCELLED"
+                    disabled={!!selectedOrder?.deliveryProof?.imageUrl} // ✅ NGƯỢC LẠI
+                  >
+                    Cancelled
+                  </option>
                 </select>
               </div>
               <button

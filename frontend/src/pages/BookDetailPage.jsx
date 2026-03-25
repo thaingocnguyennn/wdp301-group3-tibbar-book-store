@@ -4,6 +4,7 @@ import { bookApi } from "../api/bookApi";
 import { reviewApi } from "../api/reviewApi";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
+import BookFeaturePanel from '../components/books/BookFeaturePanel';
 
 const BookDetailPage = () => {
   const { id } = useParams();
@@ -389,6 +390,42 @@ const BookDetailPage = () => {
     setPreviewPageIndex((prev) => Math.max(prev - 1, 0));
   };
 
+  const readCompareIds = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("compareBookIds") || "[]");
+      return Array.isArray(raw) ? raw.filter((x) => /^[a-f\d]{24}$/i.test(String(x))) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [compareIds, setCompareIds] = useState(readCompareIds);
+  const currentBookId = String(book?._id || "");
+  const isInCompare = compareIds.includes(currentBookId);
+
+  useEffect(() => {
+    const syncCompare = () => setCompareIds(readCompareIds());
+    window.addEventListener("storage", syncCompare);
+    window.addEventListener("compare-updated", syncCompare);
+    return () => {
+      window.removeEventListener("storage", syncCompare);
+      window.removeEventListener("compare-updated", syncCompare);
+    };
+  }, []);
+
+  const handleToggleCompare = () => {
+    if (!currentBookId) return;
+    const next = isInCompare
+      ? compareIds.filter((id) => id !== currentBookId)
+      : compareIds.length >= 4
+        ? compareIds
+        : [...compareIds, currentBookId];
+
+    localStorage.setItem("compareBookIds", JSON.stringify(next));
+    setCompareIds(next);
+    window.dispatchEvent(new Event("compare-updated"));
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -412,166 +449,155 @@ const BookDetailPage = () => {
   }
 
   return (
-    <div style={styles.container}>
-      <div ref={bookInfoRef} tabIndex={-1} style={styles.content}>
-        <div style={styles.imageSection}>
-          {imageSrc ? (
-            <img src={imageSrc} alt={book.title} style={styles.image} />
-          ) : (
-            <div style={styles.placeholder}>📖</div>
-          )}
-          <div style={styles.stockBadge}>
-            {book.stock > 0 ? (
-              <span style={styles.inStockBadge}>✓ In Stock</span>
+    <>
+      <div style={styles.container}>
+        <div ref={bookInfoRef} tabIndex={-1} style={styles.content}>
+          <div style={styles.imageSection}>
+            {imageSrc ? (
+              <img src={imageSrc} alt={book.title} style={styles.image} />
             ) : (
-              <span style={styles.outOfStockBadge}>✗ Out of Stock</span>
+              <div style={styles.placeholder}>📖</div>
             )}
-          </div>
-        </div>
-
-        <div style={styles.detailsSection}>
-          <div style={styles.headerInfo}>
-            <h1 style={styles.title}>{book.title}</h1>
-            <p style={styles.author}>
-              by <strong>{book.author}</strong>
-            </p>
-          </div>
-
-          {book.category && (
-            <div style={styles.categoryBadge}>📚 {book.category.name}</div>
-          )}
-
-          <div style={styles.priceSection}>
-            <span style={styles.price}>
-              {book.price.toLocaleString("vi-VN")}₫
-            </span>
-            <p style={styles.priceNote}>
-              Free shipping on orders over 200,000₫
-            </p>
-          </div>
-
-          <div style={styles.divider}></div>
-
-          {book.description && (
-            <div style={styles.descriptionSection}>
-              <h3 style={styles.sectionTitle}>📖 Description</h3>
-              <p style={styles.description}>{book.description}</p>
+            <div style={styles.stockBadge}>
+              {book.stock > 0 ? (
+                <span style={styles.inStockBadge}>✓ In Stock</span>
+              ) : (
+                <span style={styles.outOfStockBadge}>✗ Out of Stock</span>
+              )}
             </div>
-          )}
+          </div>
 
-          <div style={styles.divider}></div>
+          <div style={styles.detailsSection}>
+            <div style={styles.headerInfo}>
+              <h1 style={styles.title}>{book.title}</h1>
+              <p style={styles.author}>
+                by <strong>{book.author}</strong>
+              </p>
+            </div>
 
-          <div style={styles.infoGrid}>
-            {book.isbn && (
+            {book.category && (
+              <div style={styles.categoryBadge}>📚 {book.category.name}</div>
+            )}
+
+            <div style={styles.priceSection}>
+              <span style={styles.price}>
+                {book.price.toLocaleString("vi-VN")}₫
+              </span>
+              <p style={styles.priceNote}>
+                Free shipping on orders over 200,000₫
+              </p>
+            </div>
+
+            <div style={styles.divider}></div>
+
+            {book.description && (
+              <div style={styles.descriptionSection}>
+                <h3 style={styles.sectionTitle}>📖 Description</h3>
+                <p style={styles.description}>{book.description}</p>
+              </div>
+            )}
+
+            <div style={styles.divider}></div>
+
+            <div style={styles.infoGrid}>
+              {book.isbn && (
+                <div style={styles.infoItem}>
+                  <span style={styles.infoLabel}>ISBN</span>
+                  <span style={styles.infoValue}>{book.isbn}</span>
+                </div>
+              )}
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>ISBN</span>
-                <span style={styles.infoValue}>{book.isbn}</span>
+                <span style={styles.infoLabel}>Stock</span>
+                <span style={styles.infoValue}>
+                  {book.stock > 0 ? `${book.stock} available` : "Out of stock"}
+                </span>
+              </div>
+            </div>
+
+            <div style={styles.divider}></div>
+
+            <div style={styles.actions}>
+              <button
+                disabled={book.stock === 0}
+                onClick={handleAddToCart}
+                style={{
+                  ...styles.addToCart,
+                  ...(book.stock === 0 && styles.disabled),
+                }}
+              >
+                {book.stock > 0 ? "🛒 Add to Cart" : "✗ Out of Stock"}
+              </button>
+              <button
+                onClick={() => navigate("/")}
+                style={styles.continueShopping}
+              >
+                ← Continue Shopping
+              </button>
+              <button
+                type="button"
+                onClick={openPreviewReader}
+                disabled={previewPages.length === 0}
+                style={{
+                  ...styles.previewButton,
+                  ...(previewPages.length === 0 && styles.disabled),
+                }}
+              >
+                Preview Book
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleCompare}
+                style={{
+                  ...styles.compareToggleBtn,
+                  ...(isInCompare ? styles.compareToggleBtnActive : {}),
+                }}
+              >
+                {isInCompare ? "− Bỏ so sánh" : "+ Thêm so sánh"} ({compareIds.length}/4)
+              </button>
+            </div>
+
+            {book.isEbook && (
+              <div style={styles.ebookSection}>
+                <div style={styles.ebookSectionHeader}>
+                  <span style={styles.ebookBadge}>📱 E-Book Available</span>
+                </div>
+                {ebookAccess === null && isAuthenticated && (
+                  <p style={styles.ebookChecking}>Checking access...</p>
+                )}
+                <button onClick={handleReadEbook} style={styles.readNowBtn}>
+                  📖 Read Now
+                </button>
+                {ebookActionMessage && (
+                  <div style={styles.paymentLockNotice}>{ebookActionMessage}</div>
+                )}
               </div>
             )}
-            <div style={styles.infoItem}>
-              <span style={styles.infoLabel}>Stock</span>
-              <span style={styles.infoValue}>
-                {book.stock > 0 ? `${book.stock} available` : "Out of stock"}
-              </span>
-            </div>
-          </div>
 
-          <div style={styles.divider}></div>
+            <div style={styles.divider}></div>
 
-          <div style={styles.actions}>
-            <button
-              disabled={book.stock === 0}
-              onClick={handleAddToCart}
-              style={{
-                ...styles.addToCart,
-                ...(book.stock === 0 && styles.disabled),
-              }}
-            >
-              {book.stock > 0 ? "🛒 Add to Cart" : "✗ Out of Stock"}
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              style={styles.continueShopping}
-            >
-              ← Continue Shopping
-            </button>
-            <button
-              type="button"
-              onClick={openPreviewReader}
-              disabled={previewPages.length === 0}
-              style={{
-                ...styles.previewButton,
-                ...(previewPages.length === 0 && styles.disabled),
-              }}
-            >
-              Preview Book
-            </button>
-          </div>
+            <div style={styles.reviewSection}>
+              <h3 style={styles.sectionTitle}>⭐ Reviews & Ratings</h3>
 
-          {book.isEbook && (
-            <div style={styles.ebookSection}>
-              <div style={styles.ebookSectionHeader}>
-                <span style={styles.ebookBadge}>📱 E-Book Available</span>
+              <div style={styles.reviewSummary}>
+                <strong>
+                  {reviewSummary.averageRating?.toFixed(1) || "0.0"}/5
+                </strong>
+                <span style={styles.reviewSummaryText}>
+                  {renderStars(reviewSummary.averageRating)} •{" "}
+                  {reviewSummary.totalReviews || 0} review(s)
+                </span>
               </div>
-              {ebookAccess === null && isAuthenticated && (
-                <p style={styles.ebookChecking}>Checking access...</p>
-              )}
-              <button onClick={handleReadEbook} style={styles.readNowBtn}>
-                📖 Read Now
-              </button>
-              {ebookActionMessage && (
-                <div style={styles.paymentLockNotice}>{ebookActionMessage}</div>
-              )}
-            </div>
-          )}
 
-          <div style={styles.divider}></div>
-
-          <div style={styles.reviewSection}>
-            <h3 style={styles.sectionTitle}>⭐ Reviews & Ratings</h3>
-
-            <div style={styles.reviewSummary}>
-              <strong>
-                {reviewSummary.averageRating?.toFixed(1) || "0.0"}/5
-              </strong>
-              <span style={styles.reviewSummaryText}>
-                {renderStars(reviewSummary.averageRating)} •{" "}
-                {reviewSummary.totalReviews || 0} review(s)
-              </span>
-            </div>
-
-            <div style={styles.reviewFilterRow}>
-              <label style={styles.infoLabel}>Filter by star</label>
-              <select
-                value={selectedRatingFilter}
-                onChange={(event) =>
-                  setSelectedRatingFilter(event.target.value)
-                }
-                style={styles.ratingSelect}
-              >
-                <option value="">All ratings</option>
-                {[5, 4, 3, 2, 1].map((value) => (
-                  <option key={value} value={value}>
-                    {value} star{value > 1 ? "s" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.myReviewBox}>
-              <h4 style={styles.myReviewTitle}>
-                {myReview ? "Edit Your Review" : "Write a Review"}
-              </h4>
-
-              <div style={styles.ratingRow}>
-                <label style={styles.infoLabel}>Rating</label>
+              <div style={styles.reviewFilterRow}>
+                <label style={styles.infoLabel}>Filter by star</label>
                 <select
-                  value={ratingInput}
+                  value={selectedRatingFilter}
                   onChange={(event) =>
-                    setRatingInput(Number(event.target.value))
+                    setSelectedRatingFilter(event.target.value)
                   }
                   style={styles.ratingSelect}
                 >
+                  <option value="">All ratings</option>
                   {[5, 4, 3, 2, 1].map((value) => (
                     <option key={value} value={value}>
                       {value} star{value > 1 ? "s" : ""}
@@ -580,334 +606,368 @@ const BookDetailPage = () => {
                 </select>
               </div>
 
-              <textarea
-                value={commentInput}
-                onChange={(event) => setCommentInput(event.target.value)}
-                placeholder="Share your experience about this book"
-                rows={4}
-                style={styles.reviewTextarea}
-              />
+              <div style={styles.myReviewBox}>
+                <h4 style={styles.myReviewTitle}>
+                  {myReview ? "Edit Your Review" : "Write a Review"}
+                </h4>
 
-              {existingReviewImages.length > 0 && (
-                <div style={styles.reviewImagesRow}>
-                  {existingReviewImages.map((imagePath, index) => (
-                    <div
-                      key={`${imagePath}-${index}`}
-                      style={styles.reviewImageCard}
-                    >
-                      <img
-                        src={resolveImageUrl(imagePath)}
-                        alt="Review"
-                        style={styles.reviewImageThumb}
-                      />
-                      <button
-                        type="button"
-                        style={styles.removeImageBtn}
-                        onClick={() => removeExistingImageAt(index)}
-                        disabled={reviewSubmitting}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {newReviewImagePreviews.length > 0 && (
-                <div style={styles.reviewImagesRow}>
-                  {newReviewImagePreviews.map((previewUrl, index) => (
-                    <div
-                      key={`${previewUrl}-${index}`}
-                      style={styles.reviewImageCard}
-                    >
-                      <img
-                        src={previewUrl}
-                        alt="Preview"
-                        style={styles.reviewImageThumb}
-                      />
-                      <button
-                        type="button"
-                        style={styles.removeImageBtn}
-                        onClick={() => removeNewImageAt(index)}
-                        disabled={reviewSubmitting}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <label style={styles.imageUploadLabel}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ display: "none" }}
-                  onChange={handleSelectNewReviewImages}
-                  disabled={
-                    reviewSubmitting ||
-                    existingReviewImages.length + newReviewImages.length >= 5
-                  }
-                />
-                Upload images (max 5)
-              </label>
-
-              <div style={styles.reviewActionRow}>
-                <button
-                  type="button"
-                  onClick={handleSubmitReview}
-                  disabled={reviewSubmitting}
-                  style={styles.reviewSubmitBtn}
-                >
-                  {reviewSubmitting
-                    ? "Saving..."
-                    : myReview
-                      ? "Update My Review"
-                      : "Submit Review"}
-                </button>
-
-                {myReview && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteMyReview}
-                    disabled={reviewDeleting || reviewSubmitting}
-                    style={styles.deleteReviewBtn}
+                <div style={styles.ratingRow}>
+                  <label style={styles.infoLabel}>Rating</label>
+                  <select
+                    value={ratingInput}
+                    onChange={(event) =>
+                      setRatingInput(Number(event.target.value))
+                    }
+                    style={styles.ratingSelect}
                   >
-                    {reviewDeleting ? "Deleting..." : "Delete My Review"}
-                  </button>
-                )}
-              </div>
-            </div>
+                    {[5, 4, 3, 2, 1].map((value) => (
+                      <option key={value} value={value}>
+                        {value} star{value > 1 ? "s" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {reviewError && <div style={styles.reviewError}>{reviewError}</div>}
+                <textarea
+                  value={commentInput}
+                  onChange={(event) => setCommentInput(event.target.value)}
+                  placeholder="Share your experience about this book"
+                  rows={4}
+                  style={styles.reviewTextarea}
+                />
 
-            <div style={styles.reviewList}>
-              {reviewLoading ? (
-                <p style={styles.reviewHint}>Loading reviews...</p>
-              ) : reviews.length === 0 ? (
-                <p style={styles.reviewHint}>No reviews yet.</p>
-              ) : (
-                <>
-                  {reviews.map((review) => (
-                    <div key={review._id} style={styles.reviewItem}>
-                      <div style={styles.reviewHeader}>
-                        <strong>
-                          {review.user?.firstName || "User"}{" "}
-                          {review.user?.lastName || ""}
-                        </strong>
-                        <span style={styles.reviewStars}>
-                          {renderStars(review.rating)}
-                        </span>
-                      </div>
-                      <p style={styles.reviewComment}>
-                        {review.comment || "(No comment)"}
-                      </p>
-
-                      {Array.isArray(review.images) &&
-                        review.images.length > 0 && (
-                          <div style={styles.reviewImageGallery}>
-                            {review.images.map((imagePath, index) => (
-                              <img
-                                key={`${review._id}-image-${index}`}
-                                src={resolveImageUrl(imagePath)}
-                                alt="Review attachment"
-                                style={styles.reviewImageInList}
-                              />
-                            ))}
-                          </div>
-                        )}
-
-                      <div style={styles.reactionRow}>
-                        <button
-                          type="button"
-                          style={styles.reactionBtn}
-                          onClick={() =>
-                            handleReviewReaction(review._id, "HELPFUL")
-                          }
-                          disabled={
-                            reactionSubmittingId === review._id ||
-                            review.user?._id === user?._id
-                          }
-                        >
-                          Helpful ({review.reactionSummary?.helpful || 0})
-                        </button>
-                        <button
-                          type="button"
-                          style={styles.reactionBtn}
-                          onClick={() =>
-                            handleReviewReaction(review._id, "DISLIKE")
-                          }
-                          disabled={
-                            reactionSubmittingId === review._id ||
-                            review.user?._id === user?._id
-                          }
-                        >
-                          Dislike ({review.reactionSummary?.dislike || 0})
-                        </button>
-                      </div>
-
-                      {Array.isArray(review.replies) &&
-                        review.replies.length > 0 && (
-                          <div style={styles.replyList}>
-                            {review.replies.map((reply) => (
-                              <div
-                                key={
-                                  reply._id ||
-                                  `${review._id}-${reply.createdAt}`
-                                }
-                                style={styles.replyItem}
-                              >
-                                <div style={styles.replyHeader}>
-                                  <strong style={styles.replyAuthor}>
-                                    {reply.user?.firstName || "User"}{" "}
-                                    {reply.user?.lastName || ""}
-                                  </strong>
-                                  {(reply.role === "admin" ||
-                                    reply.role === "manager") && (
-                                    <span style={styles.adminReplyBadge}>
-                                      Admin
-                                    </span>
-                                  )}
-                                </div>
-                                <p style={styles.replyComment}>
-                                  {reply.comment}
-                                </p>
-                                <span style={styles.replyDate}>
-                                  {new Date(reply.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                      <div style={styles.replyComposer}>
-                        <input
-                          type="text"
-                          value={replyInputs[review._id] || ""}
-                          onChange={(event) =>
-                            handleReplyInputChange(
-                              review._id,
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Write a reply to this review"
-                          style={styles.replyInput}
-                          disabled={replySubmittingId === review._id}
+                {existingReviewImages.length > 0 && (
+                  <div style={styles.reviewImagesRow}>
+                    {existingReviewImages.map((imagePath, index) => (
+                      <div
+                        key={`${imagePath}-${index}`}
+                        style={styles.reviewImageCard}
+                      >
+                        <img
+                          src={resolveImageUrl(imagePath)}
+                          alt="Review"
+                          style={styles.reviewImageThumb}
                         />
                         <button
                           type="button"
-                          style={styles.replyButton}
-                          onClick={() => handleReplyToReview(review._id)}
-                          disabled={replySubmittingId === review._id}
+                          style={styles.removeImageBtn}
+                          onClick={() => removeExistingImageAt(index)}
+                          disabled={reviewSubmitting}
                         >
-                          {replySubmittingId === review._id
-                            ? "Replying..."
-                            : "Reply"}
+                          Remove
                         </button>
                       </div>
+                    ))}
+                  </div>
+                )}
 
-                      <span style={styles.reviewDate}>
-                        {new Date(review.createdAt).toLocaleDateString()}{" "}
-                        {review.isEdited ? "• Edited" : ""}
-                      </span>
-                    </div>
-                  ))}
+                {newReviewImagePreviews.length > 0 && (
+                  <div style={styles.reviewImagesRow}>
+                    {newReviewImagePreviews.map((previewUrl, index) => (
+                      <div
+                        key={`${previewUrl}-${index}`}
+                        style={styles.reviewImageCard}
+                      >
+                        <img
+                          src={previewUrl}
+                          alt="Preview"
+                          style={styles.reviewImageThumb}
+                        />
+                        <button
+                          type="button"
+                          style={styles.removeImageBtn}
+                          onClick={() => removeNewImageAt(index)}
+                          disabled={reviewSubmitting}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                  {reviewPagination.totalPages > 1 && (
-                    <div style={styles.reviewPagination}>
-                      <button
-                        type="button"
-                        style={styles.reviewPageButton}
-                        disabled={reviewPagination.page <= 1}
-                        onClick={() =>
-                          fetchReviews(
-                            reviewPagination.page - 1,
-                            selectedRatingFilter,
-                          )
-                        }
-                      >
-                        Previous
-                      </button>
-                      <span style={styles.reviewPageInfo}>
-                        Page {reviewPagination.page} /{" "}
-                        {reviewPagination.totalPages}
-                      </span>
-                      <button
-                        type="button"
-                        style={styles.reviewPageButton}
-                        disabled={
-                          reviewPagination.page >= reviewPagination.totalPages
-                        }
-                        onClick={() =>
-                          fetchReviews(
-                            reviewPagination.page + 1,
-                            selectedRatingFilter,
-                          )
-                        }
-                      >
-                        Next
-                      </button>
-                    </div>
+                <label style={styles.imageUploadLabel}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={handleSelectNewReviewImages}
+                    disabled={
+                      reviewSubmitting ||
+                      existingReviewImages.length + newReviewImages.length >= 5
+                    }
+                  />
+                  Upload images (max 5)
+                </label>
+
+                <div style={styles.reviewActionRow}>
+                  <button
+                    type="button"
+                    onClick={handleSubmitReview}
+                    disabled={reviewSubmitting}
+                    style={styles.reviewSubmitBtn}
+                  >
+                    {reviewSubmitting
+                      ? "Saving..."
+                      : myReview
+                        ? "Update My Review"
+                        : "Submit Review"}
+                  </button>
+
+                  {myReview && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteMyReview}
+                      disabled={reviewDeleting || reviewSubmitting}
+                      style={styles.deleteReviewBtn}
+                    >
+                      {reviewDeleting ? "Deleting..." : "Delete My Review"}
+                    </button>
                   )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      {isPreviewOpen && (
-        <div style={styles.previewOverlay}>
-          <div style={styles.previewModal}>
-            <div style={styles.previewHeader}>
-              <h3 style={styles.previewTitle}>Book Preview</h3>
-              <button
-                type="button"
-                onClick={closePreviewReader}
-                style={styles.previewCloseButton}
-              >
-                Close
-              </button>
-            </div>
+              {reviewError && <div style={styles.reviewError}>{reviewError}</div>}
 
-            <div style={styles.previewImageWrapper}>
-              {currentPreviewSrc ? (
-                <img
-                  src={currentPreviewSrc}
-                  alt={`Preview page ${previewPageIndex + 1}`}
-                  style={styles.previewImage}
+              <div style={styles.reviewList}>
+                {reviewLoading ? (
+                  <p style={styles.reviewHint}>Loading reviews...</p>
+                ) : reviews.length === 0 ? (
+                  <p style={styles.reviewHint}>No reviews yet.</p>
+                ) : (
+                  <>
+                    {reviews.map((review) => (
+                      <div key={review._id} style={styles.reviewItem}>
+                        <div style={styles.reviewHeader}>
+                          <strong>
+                            {review.user?.firstName || "User"}{" "}
+                            {review.user?.lastName || ""}
+                          </strong>
+                          <span style={styles.reviewStars}>
+                            {renderStars(review.rating)}
+                          </span>
+                        </div>
+                        <p style={styles.reviewComment}>
+                          {review.comment || "(No comment)"}
+                        </p>
+
+                        {Array.isArray(review.images) &&
+                          review.images.length > 0 && (
+                            <div style={styles.reviewImageGallery}>
+                              {review.images.map((imagePath, index) => (
+                                <img
+                                  key={`${review._id}-image-${index}`}
+                                  src={resolveImageUrl(imagePath)}
+                                  alt="Review attachment"
+                                  style={styles.reviewImageInList}
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                        <div style={styles.reactionRow}>
+                          <button
+                            type="button"
+                            style={styles.reactionBtn}
+                            onClick={() =>
+                              handleReviewReaction(review._id, "HELPFUL")
+                            }
+                            disabled={
+                              reactionSubmittingId === review._id ||
+                              review.user?._id === user?._id
+                            }
+                          >
+                            Helpful ({review.reactionSummary?.helpful || 0})
+                          </button>
+                          <button
+                            type="button"
+                            style={styles.reactionBtn}
+                            onClick={() =>
+                              handleReviewReaction(review._id, "DISLIKE")
+                            }
+                            disabled={
+                              reactionSubmittingId === review._id ||
+                              review.user?._id === user?._id
+                            }
+                          >
+                            Dislike ({review.reactionSummary?.dislike || 0})
+                          </button>
+                        </div>
+
+                        {Array.isArray(review.replies) &&
+                          review.replies.length > 0 && (
+                            <div style={styles.replyList}>
+                              {review.replies.map((reply) => (
+                                <div
+                                  key={
+                                    reply._id ||
+                                    `${review._id}-${reply.createdAt}`
+                                  }
+                                  style={styles.replyItem}
+                                >
+                                  <div style={styles.replyHeader}>
+                                    <strong style={styles.replyAuthor}>
+                                      {reply.user?.firstName || "User"}{" "}
+                                      {reply.user?.lastName || ""}
+                                    </strong>
+                                    {(reply.role === "admin" ||
+                                      reply.role === "manager") && (
+                                      <span style={styles.adminReplyBadge}>
+                                        Admin
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p style={styles.replyComment}>
+                                    {reply.comment}
+                                  </p>
+                                  <span style={styles.replyDate}>
+                                    {new Date(reply.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                        <div style={styles.replyComposer}>
+                          <input
+                            type="text"
+                            value={replyInputs[review._id] || ""}
+                            onChange={(event) =>
+                              handleReplyInputChange(
+                                review._id,
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Write a reply to this review"
+                            style={styles.replyInput}
+                            disabled={replySubmittingId === review._id}
+                          />
+                          <button
+                            type="button"
+                            style={styles.replyButton}
+                            onClick={() => handleReplyToReview(review._id)}
+                            disabled={replySubmittingId === review._id}
+                          >
+                            {replySubmittingId === review._id
+                              ? "Replying..."
+                              : "Reply"}
+                          </button>
+                        </div>
+
+                        <span style={styles.reviewDate}>
+                          {new Date(review.createdAt).toLocaleDateString()}{" "}
+                          {review.isEdited ? "• Edited" : ""}
+                        </span>
+                      </div>
+                    ))}
+
+                    {reviewPagination.totalPages > 1 && (
+                      <div style={styles.reviewPagination}>
+                        <button
+                          type="button"
+                          style={styles.reviewPageButton}
+                          disabled={reviewPagination.page <= 1}
+                          onClick={() =>
+                            fetchReviews(
+                              reviewPagination.page - 1,
+                              selectedRatingFilter,
+                            )
+                          }
+                        >
+                          Previous
+                        </button>
+                        <span style={styles.reviewPageInfo}>
+                          Page {reviewPagination.page} /{" "}
+                          {reviewPagination.totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          style={styles.reviewPageButton}
+                          disabled={
+                            reviewPagination.page >= reviewPagination.totalPages
+                          }
+                          onClick={() =>
+                            fetchReviews(
+                              reviewPagination.page + 1,
+                              selectedRatingFilter,
+                            )
+                          }
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Compare table dưới Reviews & Writing */}
+              {book?._id && (
+                <BookFeaturePanel
+                  book={book}
+                  layout="inline"
+                  showToggle={false}
+                  showStockAlert={false}
+                  showBackStock={false}
                 />
-              ) : (
-                <div style={styles.previewPlaceholder}>No preview image</div>
               )}
-            </div>
-
-            <div style={styles.previewControls}>
-              <button
-                type="button"
-                onClick={goToPreviousPreviewPage}
-                disabled={previewPageIndex === 0}
-                style={styles.previewNavButton}
-              >
-                Previous Page
-              </button>
-              <span style={styles.previewPageCounter}>
-                Page {previewPageIndex + 1} / {previewPages.length}
-              </span>
-              <button
-                type="button"
-                onClick={goToNextPreviewPage}
-                disabled={previewPageIndex >= previewPages.length - 1}
-                style={styles.previewNavButton}
-              >
-                Next Page
-              </button>
             </div>
           </div>
         </div>
-      )}
-    </div>
+
+        {isPreviewOpen && (
+          <div style={styles.previewOverlay}>
+            <div style={styles.previewModal}>
+              <div style={styles.previewHeader}>
+                <h3 style={styles.previewTitle}>Book Preview</h3>
+                <button
+                  type="button"
+                  onClick={closePreviewReader}
+                  style={styles.previewCloseButton}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={styles.previewImageWrapper}>
+                {currentPreviewSrc ? (
+                  <img
+                    src={currentPreviewSrc}
+                    alt={`Preview page ${previewPageIndex + 1}`}
+                    style={styles.previewImage}
+                  />
+                ) : (
+                  <div style={styles.previewPlaceholder}>No preview image</div>
+                )}
+              </div>
+
+              <div style={styles.previewControls}>
+                <button
+                  type="button"
+                  onClick={goToPreviousPreviewPage}
+                  disabled={previewPageIndex === 0}
+                  style={styles.previewNavButton}
+                >
+                  Previous Page
+                </button>
+                <span style={styles.previewPageCounter}>
+                  Page {previewPageIndex + 1} / {previewPages.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={goToNextPreviewPage}
+                  disabled={previewPageIndex >= previewPages.length - 1}
+                  style={styles.previewNavButton}
+                >
+                  Next Page
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
@@ -1100,6 +1160,23 @@ const styles = {
     display: "flex",
     gap: "1rem",
     paddingTop: "0.5rem",
+    flexWrap: "wrap",
+  },
+  compareToggleBtn: {
+    flex: 0.6,
+    backgroundColor: "#eef2ff",
+    color: "#334155",
+    padding: "0.75rem 1rem",
+    border: "1px solid #c7d2fe",
+    borderRadius: "8px",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  compareToggleBtnActive: {
+    backgroundColor: "#ede9fe",
+    border: "1px solid #a78bfa",
+    color: "#5b21b6",
   },
   reviewSection: {
     display: "flex",

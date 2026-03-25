@@ -35,21 +35,34 @@ router.get('/orders/:orderId', (req, res, next) =>
 router.put('/orders/:orderId/status', (req, res, next) =>
   shipperController.updateOrderStatus(req, res, next)
 );
+// Respond to new order assignment (accept/reject)
 router.post(
   "/orders/:orderId/respond",
   shipperController.respondAssignment
 );
+// Upload delivery proof (image) for an order
 router.post(
   "/orders/:orderId/upload-proof",
   deliveryProofUpload.single("image"),
   shipperController.uploadProof
 );
-
+// Get shipper's order assignment history
 router.get("/assignment-history", shipperController.getAssignmentHistory);
-
+// Get shipper performance metrics
 router.get(
   "/performance",
   authorize("shipper"),
   shipperController.getPerformance
 );
+// Toggle online/offline status
+router.patch(
+  "/toggle-online",
+  shipperController.toggleOnlineStatus
+);
+// Get shipper earnings and statistics
+router.get('/earnings', (req, res, next) =>
+  shipperController.getShipperEarnings(req, res, next)
+);
+// Get shipper's route & ETA
+router.get("/route", shipperController.getRoute);
 export default router;
