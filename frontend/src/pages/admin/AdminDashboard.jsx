@@ -104,6 +104,14 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
+        <Link to="/admin/flash-sale" style={styles.card}>
+          <div style={styles.icon}>⚡</div>
+          <h3 style={styles.cardTitle}>Flash Sale</h3>
+          <p style={styles.cardDesc}>
+            Configure 5-book flash sale campaigns with discount and countdown
+          </p>
+        </Link>
+
         <Link to="/admin/news" style={styles.card}>
           <div style={styles.icon}>📰</div>
           <h3 style={styles.cardTitle}>News Management</h3>

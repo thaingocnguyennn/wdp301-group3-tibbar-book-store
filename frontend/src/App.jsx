@@ -47,6 +47,7 @@ import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
 import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
 import NotificationPage from "./pages/shipper/NotificationPage";
 import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
+import FlashSaleManagement from "./pages/admin/FlashSaleManagement";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -353,6 +354,14 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <InventoryManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/flash-sale"
+          element={
+            <ProtectedRoute adminOnly>
+              <FlashSaleManagement />
             </ProtectedRoute>
           }
         />
