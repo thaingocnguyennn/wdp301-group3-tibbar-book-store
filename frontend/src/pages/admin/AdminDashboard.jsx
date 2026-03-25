@@ -96,6 +96,14 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
+        <Link to="/admin/inventory" style={styles.card}>
+          <div style={styles.icon}>📦</div>
+          <h3 style={styles.cardTitle}>Inventory Management</h3>
+          <p style={styles.cardDesc}>
+            Monitor remaining stock quantities across all books
+          </p>
+        </Link>
+
         <Link to="/admin/news" style={styles.card}>
           <div style={styles.icon}>📰</div>
           <h3 style={styles.cardTitle}>News Management</h3>
