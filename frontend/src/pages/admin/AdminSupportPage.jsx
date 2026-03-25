@@ -1,29 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSocket from "../../hooks/useSocket";
 import { supportApi } from "../../api/supportApi";
 
-const POLL_INTERVAL_MS = 5000;
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+
+const resolveImageUrl = (path) => {
+  if (!path) return "";
+  return path.startsWith("http") ? path : `${serverBaseUrl}${path}`;
+};
+
+const getMessagePreview = (message) => {
+  if (message?.content?.trim()) return message.content;
+  if (message?.imageUrl) return "[Image]";
+  return "";
+};
 
 const AdminSupportPage = () => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const messageListRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const { socket, isConnected } = useSocket();
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item._id === selectedConversationId) || null,
     [conversations, selectedConversationId],
   );
 
-  const fetchConversations = async ({ silent = false } = {}) => {
+  // Load initial conversations
+  const loadConversations = async () => {
     try {
-      if (!silent) {
-        setLoadingConversations(true);
-      }
+      setLoadingConversations(true);
       const response = await supportApi.getAdminConversations();
       const data = response?.data?.conversations || [];
       setConversations(data);
@@ -31,78 +47,208 @@ const AdminSupportPage = () => {
       if (!selectedConversationId && data.length > 0) {
         setSelectedConversationId(data[0]._id);
       }
+      setError("");
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load conversations");
     } finally {
-      if (!silent) {
-        setLoadingConversations(false);
-      }
+      setLoadingConversations(false);
     }
   };
 
-  const fetchMessages = async (conversationId, { silent = false } = {}) => {
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
-
-    try {
-      if (!silent) {
-        setLoadingMessages(true);
-      }
-      const response = await supportApi.getAdminConversationMessages(conversationId);
-      setMessages(response?.data?.messages || []);
-      setError("");
-      await fetchConversations({ silent: true });
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load messages");
-    } finally {
-      if (!silent) {
-        setLoadingMessages(false);
-      }
-    }
-  };
-
+  // Load initial data on mount
   useEffect(() => {
-    fetchConversations();
+    loadConversations();
   }, []);
 
   useEffect(() => {
-    if (selectedConversationId) {
-      fetchMessages(selectedConversationId);
-    }
-  }, [selectedConversationId]);
+    if (!socket || !isConnected) return;
+    socket.emit("admin:join");
+  }, [socket, isConnected]);
 
   useEffect(() => {
-    const intervalId = setInterval(async () => {
-      await fetchConversations({ silent: true });
-      if (selectedConversationId) {
-        await fetchMessages(selectedConversationId, { silent: true });
-      }
-    }, POLL_INTERVAL_MS);
+    if (!socket || !selectedConversationId || !isConnected) return;
+    socket.emit("admin:view-conversation", { conversationId: selectedConversationId });
 
-    return () => clearInterval(intervalId);
+    // Optimistically clear unread badge for the opened conversation.
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv._id === selectedConversationId
+          ? { ...conv, unreadForAdmin: 0 }
+          : conv
+      ),
+    );
+  }, [socket, selectedConversationId, isConnected]);
+
+  // Set up socket event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    // Handle new messages
+    const handleNewMessage = (data) => {
+      // Update message list if it's for current conversation
+      if (data.conversationId === selectedConversationId) {
+        setMessages((prev) => {
+          if (prev.some((item) => item._id === data.message?._id)) {
+            return prev;
+          }
+          return [...prev, data.message];
+        });
+      }
+
+      // Update conversations list (last message preview)
+      setConversations((prev) =>
+        prev.map((conv) => {
+          if (conv._id === data.conversationId) {
+            return {
+              ...conv,
+              lastMessagePreview: getMessagePreview(data.message).slice(0, 300),
+              lastMessageAt: data.message.createdAt,
+              unreadForAdmin:
+                data.senderRole === "customer"
+                  ? (data.conversationId === selectedConversationId
+                    ? 0
+                    : (conv.unreadForAdmin || 0) + 1)
+                  : conv.unreadForAdmin,
+            };
+          }
+          return conv;
+        })
+      );
+    };
+
+    // Handle admin joined
+    const handleAdminJoined = () => {
+      setError("");
+    };
+
+    // Handle errors
+    const handleError = (data) => {
+      setError(data?.message || "An error occurred");
+    };
+
+    socket.on("message:new", handleNewMessage);
+    socket.on("admin:joined", handleAdminJoined);
+    socket.on("error", handleError);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+      socket.off("admin:joined", handleAdminJoined);
+      socket.off("error", handleError);
+    };
+  }, [selectedConversationId, socket]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!selectedConversationId) {
+        setMessages([]);
+        return;
+      }
+
+      try {
+        setLoadingMessages(true);
+        const response = await supportApi.getAdminConversationMessages(selectedConversationId);
+        setMessages(response?.data?.messages || []);
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv._id === selectedConversationId
+              ? { ...conv, unreadForAdmin: 0 }
+              : conv
+          ),
+        );
+        setError("");
+      } catch (err) {
+        setError(err?.response?.data?.message || "Failed to load messages");
+      } finally {
+        setLoadingMessages(false);
+      }
+    };
+
+    loadMessages();
   }, [selectedConversationId]);
 
+  // Auto-scroll to latest message
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
     }
   }, [messages]);
 
+  const canSend = useMemo(
+    () => draft.trim().length > 0 || Boolean(selectedImage),
+    [draft, selectedImage],
+  );
+
+  const resetImageInput = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImage(null);
+    setImagePreviewUrl("");
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+  }, [imagePreviewUrl]);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      resetImageInput();
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Only image files are allowed");
+      resetImageInput();
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image size must be 8MB or less");
+      resetImageInput();
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImage(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setError("");
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!selectedConversationId || !draft.trim() || sending) {
+    if (!selectedConversationId || !canSend || sending) {
+      return;
+    }
+
+    if (!selectedImage && (!socket || !isConnected)) {
       return;
     }
 
     try {
       setSending(true);
-      await supportApi.sendAdminMessage(selectedConversationId, draft.trim());
+      if (selectedImage) {
+        await supportApi.sendAdminImage(selectedConversationId, selectedImage, draft.trim());
+      } else {
+        socket.emit("admin:send-message", {
+          conversationId: selectedConversationId,
+          content: draft.trim(),
+        });
+      }
       setDraft("");
-      await fetchMessages(selectedConversationId, { silent: true });
+      resetImageInput();
+      setError("");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to send message");
+      setError(err?.response?.data?.message || err?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -189,7 +335,21 @@ const AdminSupportPage = () => {
                           }}
                         >
                           <div style={styles.messageRole}>{isAdmin ? "Admin" : "Customer"}</div>
-                          <div>{message.content}</div>
+                          {message.imageUrl && (
+                            <a
+                              href={resolveImageUrl(message.imageUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={styles.imageLink}
+                            >
+                              <img
+                                src={resolveImageUrl(message.imageUrl)}
+                                alt="Support attachment"
+                                style={styles.messageImage}
+                              />
+                            </a>
+                          )}
+                          {message.content?.trim() && <div>{message.content}</div>}
                           <div style={styles.messageTime}>{new Date(message.createdAt).toLocaleString()}</div>
                         </div>
                       </div>
@@ -199,15 +359,34 @@ const AdminSupportPage = () => {
               </div>
 
               <form onSubmit={handleSend} style={styles.form}>
+                <label style={styles.attachButton}>
+                  Attach Image
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={styles.hiddenInput}
+                    disabled={sending}
+                  />
+                </label>
                 <textarea
                   rows={3}
                   style={styles.textarea}
-                  placeholder="Type your reply..."
+                  placeholder={selectedImage ? "Add an optional caption..." : "Type your reply..."}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   disabled={sending}
                 />
-                <button type="submit" style={styles.sendButton} disabled={!draft.trim() || sending}>
+                {imagePreviewUrl && (
+                  <div style={styles.previewBox}>
+                    <img src={imagePreviewUrl} alt="Selected upload" style={styles.previewImage} />
+                    <button type="button" onClick={resetImageInput} style={styles.removeImageButton}>
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <button type="submit" style={styles.sendButton} disabled={!canSend || sending}>
                   {sending ? "Sending..." : "Reply"}
                 </button>
               </form>
@@ -301,7 +480,7 @@ const styles = {
     border: "1px solid #dbe4ef",
     display: "flex",
     flexDirection: "column",
-    minHeight: "680px",
+    overflow: "hidden",
   },
   chatHeader: {
     borderBottom: "1px solid #e8eef6",
@@ -316,7 +495,7 @@ const styles = {
     fontSize: "0.88rem",
   },
   messages: {
-    flex: 1,
+    height: "420px",
     padding: "1rem",
     backgroundColor: "#f6f9fc",
     overflowY: "auto",
@@ -335,6 +514,18 @@ const styles = {
     borderRadius: "12px",
     padding: "0.65rem 0.75rem",
     wordBreak: "break-word",
+  },
+  imageLink: {
+    display: "inline-block",
+    marginBottom: "0.45rem",
+  },
+  messageImage: {
+    display: "block",
+    maxWidth: "220px",
+    maxHeight: "220px",
+    borderRadius: "8px",
+    border: "1px solid rgba(0, 0, 0, 0.08)",
+    objectFit: "cover",
   },
   adminBubble: {
     backgroundColor: "#2f6fed",
@@ -358,9 +549,21 @@ const styles = {
   form: {
     borderTop: "1px solid #e8eef6",
     padding: "0.9rem",
-    display: "flex",
-    gap: "0.7rem",
-    alignItems: "flex-end",
+    display: "grid",
+    gap: "0.6rem",
+  },
+  attachButton: {
+    width: "fit-content",
+    border: "1px solid #cdd8e6",
+    borderRadius: "8px",
+    padding: "0.4rem 0.7rem",
+    fontWeight: 600,
+    color: "#324b64",
+    cursor: "pointer",
+    backgroundColor: "#f8fbff",
+  },
+  hiddenInput: {
+    display: "none",
   },
   textarea: {
     flex: 1,
@@ -370,7 +573,32 @@ const styles = {
     padding: "0.7rem",
     fontFamily: "inherit",
   },
+  previewBox: {
+    width: "fit-content",
+    border: "1px solid #dce4ee",
+    borderRadius: "10px",
+    padding: "0.5rem",
+    backgroundColor: "#f8fbff",
+  },
+  previewImage: {
+    display: "block",
+    width: "120px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "8px",
+    marginBottom: "0.45rem",
+  },
+  removeImageButton: {
+    border: "none",
+    borderRadius: "8px",
+    backgroundColor: "#ffe9e9",
+    color: "#a83a3a",
+    cursor: "pointer",
+    padding: "0.3rem 0.55rem",
+    fontWeight: 700,
+  },
   sendButton: {
+    width: "fit-content",
     border: "none",
     backgroundColor: "#2f6fed",
     color: "#fff",

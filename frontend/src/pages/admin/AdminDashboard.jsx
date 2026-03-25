@@ -119,7 +119,13 @@ const AdminDashboard = () => {
             View customer reviews and reply directly as admin
           </p>
         </Link>
-
+        <Link to="/admin/shipper-feedbacks" style={styles.card}>
+          <div style={styles.icon}>⭐</div>
+          <h3 style={styles.cardTitle}>Shipper Feedbacks</h3>
+          <p style={styles.cardDesc}>
+            View ratings and feedback from customers for shippers
+          </p>
+        </Link>
         <Link to="/admin/support" style={styles.card}>
           <div style={styles.icon}>🛟</div>
           <h3 style={styles.cardTitle}>

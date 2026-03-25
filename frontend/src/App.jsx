@@ -42,6 +42,10 @@ import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 import SupportChatPage from "./pages/SupportChatPage";
 import AdminSupportPage from "./pages/admin/AdminSupportPage";
+import ShipperEarningsPage from "./pages/shipper/ShipperEarningsPage";
+import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
+import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
+import NotificationPage from "./pages/shipper/NotificationPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -260,7 +264,10 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/shipper/earnings" element={<ShipperEarningsPage />} />
+        <Route path="/shipper/route/:orderId" element={<ShipperRoutePage />} />
+        <Route path="/admin/shipper-feedbacks" element={<ShipperFeedbackPage />} />
+        <Route path="/shipper/notifications" element={<NotificationPage />} />
         <Route
           path="/admin/categories"
           element={

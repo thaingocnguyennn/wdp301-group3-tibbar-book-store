@@ -47,6 +47,52 @@ class SupportController {
     }
   }
 
+  async sendMyImageMessage(req, res, next) {
+    try {
+      validateCustomer(req);
+
+      if (!req.file) {
+        throw ApiError.badRequest("Image file is required");
+      }
+
+      const imageUrl = `/uploads/support/${req.file.filename}`;
+      const message = await supportService.sendCustomerMessage(req.user._id, {
+        content: req.body.content,
+        imageUrl,
+      });
+
+      const populatedMessage = await message.populate(
+        "sender",
+        "firstName lastName email role",
+      );
+
+      const io = req.app.get("io");
+      const roomConversationId = populatedMessage.conversation.toString();
+      if (io) {
+        io.to(`conversation:${roomConversationId}`).emit("message:new", {
+          conversationId: roomConversationId,
+          message: populatedMessage,
+          senderRole: "customer",
+        });
+
+        io.to("admin:support").emit("message:new", {
+          conversationId: roomConversationId,
+          message: populatedMessage,
+          senderRole: "customer",
+        });
+      }
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Image message sent",
+        { message: populatedMessage },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAdminConversations(req, res, next) {
     try {
       const conversations = await supportService.getAdminConversations();
@@ -92,6 +138,54 @@ class SupportController {
         HTTP_STATUS.CREATED,
         "Admin message sent",
         { message },
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendAdminImageMessage(req, res, next) {
+    try {
+      if (!req.file) {
+        throw ApiError.badRequest("Image file is required");
+      }
+
+      const conversationId = req.params.conversationId;
+      const imageUrl = `/uploads/support/${req.file.filename}`;
+      const message = await supportService.sendAdminMessage(
+        req.user._id,
+        conversationId,
+        {
+          content: req.body.content,
+          imageUrl,
+        },
+      );
+
+      const populatedMessage = await message.populate(
+        "sender",
+        "firstName lastName email role",
+      );
+
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`conversation:${conversationId}`).emit("message:new", {
+          conversationId,
+          message: populatedMessage,
+          senderRole: "admin",
+        });
+
+        io.to("admin:support").emit("message:new", {
+          conversationId,
+          message: populatedMessage,
+          senderRole: "admin",
+        });
+      }
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Admin image message sent",
+        { message: populatedMessage },
       );
     } catch (error) {
       next(error);

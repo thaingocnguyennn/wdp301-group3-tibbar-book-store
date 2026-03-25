@@ -9,8 +9,9 @@ import { MESSAGES, SHIPPING } from "../config/constants.js";
 import paymentService from "./paymentService.js";
 import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
-
-const MAX_ORDERS = 20;
+import notificationService from "./notificationService.js";
+const MAX_ORDERS = 20;//
+const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
 const ADMIN_STATUS_TRANSITIONS = {
   PENDING: ["PROCESSING"],
@@ -1026,8 +1027,16 @@ class OrderService {
       district: selectedAddress.district,
       commune: selectedAddress.commune,
       description: selectedAddress.description,
-    };
+      // 🔥 THÊM 2 DÒNG NÀY
+      latitude: resolvedAddress.latitude,
+      longitude: resolvedAddress.longitude,
 
+    };
+    if (!resolvedAddress.latitude || !resolvedAddress.longitude) {
+      throw ApiError.badRequest(
+        "Address is missing coordinates. Please update your address."
+      );
+    }
     const paymentMethodToUse =
       paymentMethod || previousOrder.paymentMethod || "COD";
 
@@ -1523,6 +1532,24 @@ class OrderService {
     if (!matchAddress) {
       throw ApiError.badRequest("Shipper does not serve this area");
     }
+    // ================== THÊM Ở ĐÂY ==================
+
+    // 🔥 1. CHECK ONLINE
+    if (!shipper.isOnline) {
+      throw ApiError.badRequest("Shipper is offline");
+    }
+
+    // 🔥 2. CHECK ĐÃ REJECT ĐƠN NÀY CHƯA
+    const rejected = order.assignmentHistory?.some(
+      (h) =>
+        h.shipper.toString() === shipperId.toString() &&
+        h.status === "REJECTED"
+    );
+
+    if (rejected) {
+      throw ApiError.badRequest("This shipper already rejected this order");
+    }
+
     if (order.shipper) {
       throw ApiError.badRequest("Order already assigned to a shipper");
     }
@@ -1547,7 +1574,12 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+    // ✅ CHỈ GIỮ LẠI DATABASE NOTIFICATION
+    await notificationService.notifyNewOrder(shipper._id, order._id);
+    // ⏰ START TIMEOUT
+    this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
+
 
     return order;
   }
@@ -1589,6 +1621,7 @@ class OrderService {
     const shipper = await User.findOne({
       role: ROLES.SHIPPER,
       isActive: true,
+      isOnline: true,
       currentOrders: { $lt: MAX_ORDERS },
       _id: { $nin: order.rejectedShippers || [] },
       addresses: {
@@ -1627,6 +1660,12 @@ class OrderService {
     await User.findByIdAndUpdate(shipper._id, {
       $inc: { currentOrders: 1 },
     });
+
+    // ✅ CHỈ LƯU NOTI DB
+    await notificationService.notifyNewOrder(shipper._id, order._id);
+
+    // ⏰ START TIMEOUT
+    this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
 
     console.log("✅ Assigned to shipper:", shipper.email);
@@ -1700,7 +1739,6 @@ class OrderService {
       await User.findByIdAndUpdate(shipperId, {
         $inc: { currentOrders: -1 },
       });
-
       const { province, district } = order.shippingAddress;
 
       // 3️⃣ Tìm shipper KHÔNG nằm trong rejectedShippers
@@ -1759,10 +1797,12 @@ class OrderService {
         $inc: { currentOrders: 1 },
       });
 
+      // ⏰ START TIMEOUT cho shipper mới
+      this.handleAssignmentTimeout(order._id, nextShipper._id);
+
       return order;
     }
-
-    throw ApiError.badRequest("Invalid action");
+    Error.badRequest("Invalid action");
   }
   // Lấy hiệu suất làm việc của shipper dựa trên lịch sử phân công (tỷ lệ chấp nhận, từ chối, giao thành công)
   async getShipperPerformance(shipperId) {
@@ -1852,6 +1892,117 @@ class OrderService {
     return {
       orders,
     };
+  }
+  // 
+  async handleAssignmentTimeout(orderId, shipperId) {
+    setTimeout(async () => {
+      try {
+        const order = await Order.findById(orderId);
+
+        if (!order) return;
+
+        // ❗ Nếu shipper đã accept rồi → bỏ qua
+        if (order.assignmentStatus !== "PENDING") return;
+
+        console.log("⏰ Assignment timeout → auto reject");
+
+        await this.respondAssignment(orderId, shipperId, "REJECT");
+      } catch (err) {
+        console.error("Timeout error:", err.message);
+      }
+    }, ASSIGNMENT_TIMEOUT);
+  }
+  // Customer submit feedback/rating for an order
+  async submitFeedback(orderId, userId, rating, comment) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    // 🔒 chỉ customer của đơn mới được đánh giá
+    if (order.user.toString() !== userId.toString()) {
+      throw new ApiError(403, "Not your order");
+    }
+
+    // 🔒 chỉ được đánh giá khi đã giao xong
+    if (order.orderStatus !== "DELIVERED") {
+      throw new ApiError(400, "You can only rate after delivery");
+    }
+
+    // 🔒 không cho đánh giá lại
+    if (order.feedback?.rating) {
+      throw new ApiError(400, "You already rated this order");
+    }
+
+    order.feedback = {
+      rating,
+      comment,
+      shipper: order.shipper, // 🔥 FIX CHÍNH
+      createdAt: new Date(),
+    };
+    await order.save();
+
+    return order.feedback;
+  }
+  // Admin: get all feedbacks with shipper and customer info
+  async getAllShipperFeedbacks() {
+    const orders = await Order.find({
+      "feedback.rating": { $exists: true },
+      shipper: { $ne: null },
+    })
+      .populate("user", "firstName lastName")
+      .populate("shipper", "firstName lastName");
+
+    return orders.map((o) => ({
+      orderNumber: o.orderNumber,
+      customer: `${o.user?.firstName} ${o.user?.lastName}`,
+      shipper: `${o.shipper?.firstName} ${o.shipper?.lastName}`,
+      rating: o.feedback.rating,
+      comment: o.feedback.comment,
+    }));
+  }
+  async getShipperRatingStats() {
+    const stats = await Order.aggregate([
+      {
+        $match: {
+          "feedback.rating": { $exists: true },
+          shipper: { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$shipper",
+          avgRating: { $avg: "$feedback.rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "shipper",
+        },
+      },
+      { $unwind: "$shipper" },
+      {
+        $project: {
+          _id: 0,
+          shipperId: "$shipper._id",
+          name: {
+            $concat: ["$shipper.firstName", " ", "$shipper.lastName"],
+          },
+          avgRating: { $round: ["$avgRating", 1] },
+          totalReviews: 1,
+        },
+      },
+      {
+        $sort: { avgRating: -1 },
+      },
+    ]);
+
+    return stats;
   }
 }
 

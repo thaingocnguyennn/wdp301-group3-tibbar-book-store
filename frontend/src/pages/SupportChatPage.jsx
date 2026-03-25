@@ -1,54 +1,146 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSocket from "../hooks/useSocket";
 import { supportApi } from "../api/supportApi";
 
-const POLL_INTERVAL_MS = 5000;
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+
+const resolveImageUrl = (path) => {
+  if (!path) return "";
+  return path.startsWith("http") ? path : `${serverBaseUrl}${path}`;
+};
 
 const SupportChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [draft, setDraft] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const listRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const { socket, isConnected } = useSocket();
 
-  const fetchConversation = async ({ silent = false } = {}) => {
+  // Load initial conversation data via REST API
+  const loadInitialConversation = async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      setLoading(true);
       const response = await supportApi.getMyConversation();
-      setConversationId(response?.data?.conversation?._id || null);
+      const convId = response?.data?.conversation?._id;
+      setConversationId(convId);
       setMessages(response?.data?.messages || []);
       setError("");
+
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load support chat");
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
+  // Load initial data on mount
   useEffect(() => {
-    fetchConversation();
+    loadInitialConversation();
   }, []);
 
+  // Set up socket event listeners
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchConversation({ silent: true });
-    }, POLL_INTERVAL_MS);
+    if (!socket) return;
 
-    return () => clearInterval(intervalId);
-  }, []);
+    const handleNewMessage = (data) => {
+      setMessages((prev) => {
+        if (prev.some((item) => item._id === data.message?._id)) {
+          return prev;
+        }
+        return [...prev, data.message];
+      });
+    };
 
+    const handleCustomerJoined = () => {
+      setError("");
+    };
+
+    const handleError = (data) => {
+      setError(data?.message || "An error occurred");
+    };
+
+    socket.on("message:new", handleNewMessage);
+    socket.on("customer:joined", handleCustomerJoined);
+    socket.on("error", handleError);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+      socket.off("customer:joined", handleCustomerJoined);
+      socket.off("error", handleError);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket || !conversationId || !isConnected) {
+      return;
+    }
+
+    socket.emit("customer:join", { conversationId });
+  }, [socket, conversationId, isConnected]);
+
+  // Auto-scroll to latest message
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const canSend = useMemo(() => draft.trim().length > 0, [draft]);
+  const canSend = useMemo(
+    () => draft.trim().length > 0 || Boolean(selectedImage),
+    [draft, selectedImage],
+  );
+
+  const resetImageInput = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setSelectedImage(null);
+    setImagePreviewUrl("");
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+  }, [imagePreviewUrl]);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      resetImageInput();
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Only image files are allowed");
+      resetImageInput();
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image size must be 8MB or less");
+      resetImageInput();
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setSelectedImage(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setError("");
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -56,13 +148,38 @@ const SupportChatPage = () => {
       return;
     }
 
+    if (!selectedImage && (!conversationId || !socket || !isConnected)) {
+      return;
+    }
+
     try {
       setSending(true);
-      await supportApi.sendMyMessage(draft.trim());
+      if (selectedImage) {
+        const response = await supportApi.sendMyImage(selectedImage, draft.trim());
+        const message = response?.data?.message;
+        if (message) {
+          setMessages((prev) => {
+            if (prev.some((item) => item._id === message._id)) {
+              return prev;
+            }
+            return [...prev, message];
+          });
+          const messageConversationId = message?.conversation?._id || message?.conversation;
+          if (messageConversationId && !conversationId) {
+            setConversationId(messageConversationId.toString());
+          }
+        }
+      } else {
+        socket.emit("customer:send-message", {
+          conversationId,
+          content: draft.trim(),
+        });
+      }
       setDraft("");
-      await fetchConversation({ silent: true });
+      resetImageInput();
+      setError("");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to send message");
+      setError(err?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -102,7 +219,21 @@ const SupportChatPage = () => {
                     }}
                   >
                     <div style={styles.messageSender}>{isCustomer ? "You" : "Admin"}</div>
-                    <div>{message.content}</div>
+                    {message.imageUrl && (
+                      <a
+                        href={resolveImageUrl(message.imageUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.imageLink}
+                      >
+                        <img
+                          src={resolveImageUrl(message.imageUrl)}
+                          alt="Support attachment"
+                          style={styles.messageImage}
+                        />
+                      </a>
+                    )}
+                    {message.content?.trim() && <div>{message.content}</div>}
                     <div style={styles.messageTime}>
                       {new Date(message.createdAt).toLocaleString()}
                     </div>
@@ -114,14 +245,34 @@ const SupportChatPage = () => {
         </div>
 
         <form onSubmit={handleSendMessage} style={styles.form}>
+          <label style={styles.attachButton}>
+            Attach Image
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              style={styles.hiddenInput}
+              disabled={sending}
+            />
+          </label>
+
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type your message..."
+            placeholder={selectedImage ? "Add an optional caption..." : "Type your message..."}
             rows={3}
             style={styles.textarea}
             disabled={sending}
           />
+          {imagePreviewUrl && (
+            <div style={styles.previewBox}>
+              <img src={imagePreviewUrl} alt="Selected upload" style={styles.previewImage} />
+              <button type="button" onClick={resetImageInput} style={styles.removeImageButton}>
+                Remove
+              </button>
+            </div>
+          )}
           <button type="submit" style={styles.sendButton} disabled={!canSend || sending}>
             {sending ? "Sending..." : "Send"}
           </button>
@@ -194,6 +345,18 @@ const styles = {
     lineHeight: 1.4,
     wordBreak: "break-word",
   },
+  imageLink: {
+    display: "inline-block",
+    marginBottom: "0.45rem",
+  },
+  messageImage: {
+    display: "block",
+    maxWidth: "220px",
+    maxHeight: "220px",
+    borderRadius: "8px",
+    border: "1px solid rgba(0, 0, 0, 0.08)",
+    objectFit: "cover",
+  },
   customerBubble: {
     backgroundColor: "#4f7cf7",
     color: "#fff",
@@ -219,9 +382,21 @@ const styles = {
   form: {
     borderTop: "1px solid #eef2f7",
     padding: "1rem 1.25rem",
-    display: "flex",
-    gap: "0.75rem",
-    alignItems: "flex-end",
+    display: "grid",
+    gap: "0.6rem",
+  },
+  attachButton: {
+    width: "fit-content",
+    border: "1px solid #cdd8e6",
+    borderRadius: "8px",
+    padding: "0.4rem 0.7rem",
+    fontWeight: 600,
+    color: "#324b64",
+    cursor: "pointer",
+    backgroundColor: "#f8fbff",
+  },
+  hiddenInput: {
+    display: "none",
   },
   textarea: {
     flex: 1,
@@ -234,7 +409,32 @@ const styles = {
     fontFamily: "inherit",
     fontSize: "0.95rem",
   },
+  previewBox: {
+    width: "fit-content",
+    border: "1px solid #dce4ee",
+    borderRadius: "10px",
+    padding: "0.5rem",
+    backgroundColor: "#f8fbff",
+  },
+  previewImage: {
+    display: "block",
+    width: "120px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "8px",
+    marginBottom: "0.45rem",
+  },
+  removeImageButton: {
+    border: "none",
+    borderRadius: "8px",
+    backgroundColor: "#ffe9e9",
+    color: "#a83a3a",
+    cursor: "pointer",
+    padding: "0.3rem 0.55rem",
+    fontWeight: 700,
+  },
   sendButton: {
+    width: "fit-content",
     border: "none",
     backgroundColor: "#2d6cdf",
     color: "#fff",
