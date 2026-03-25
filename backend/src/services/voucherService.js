@@ -15,6 +15,7 @@ const SEGMENT_TYPES = {
 
 class VoucherService {
   async syncExpiredVouchers(now = new Date()) {
+    // Đồng bộ trạng thái hết hạn theo kiểu lazy: chạy mỗi khi có API voucher được gọi.
     const expiredVouchers = await Voucher.find({
       isActive: true,
       expiryDate: { $ne: null, $lte: now },
@@ -23,6 +24,7 @@ class VoucherService {
       .lean();
 
     if (expiredVouchers.length === 0) {
+      // Không có voucher tổng hết hạn nhưng vẫn cập nhật UserVoucher theo expiresAt.
       await UserVoucher.updateMany(
         {
           status: { $ne: "EXPIRED" },
@@ -36,10 +38,12 @@ class VoucherService {
     const expiredVoucherIds = expiredVouchers.map((item) => item._id);
 
     await Promise.all([
+      // Tắt toàn bộ voucher đã hết hạn.
       Voucher.updateMany(
         { _id: { $in: expiredVoucherIds }, isActive: true },
         { $set: { isActive: false } },
       ),
+      // Đồng bộ trạng thái ví voucher của user về EXPIRED.
       UserVoucher.updateMany(
         {
           $or: [
@@ -118,6 +122,7 @@ class VoucherService {
         return true;
       })
       .map((record) => ({
+        // Đính kèm metadata assignment để FE có thể hiển thị trạng thái sử dụng.
         ...record.voucher,
         assignedVoucherId: record._id,
         assignedStatus: record.status,
@@ -212,6 +217,7 @@ class VoucherService {
 
         let status = record.status || "UNUSED";
         if (voucherExpired || assignmentExpired) {
+          // Ưu tiên đánh dấu hết hạn nếu voucher gốc hoặc assignment đã hết hạn.
           status = "EXPIRED";
           expiredIds.push(record._id);
         } else if (usageExceeded) {
@@ -359,6 +365,7 @@ class VoucherService {
     );
 
     const finalIds = new Set([
+      // Gộp user thủ công + user từ segment, loại trùng bằng Set.
       ...manualUserIds.map((id) => String(id)),
       ...Array.from(segmentUserIds),
     ]);
@@ -389,6 +396,7 @@ class VoucherService {
           voucher: voucher._id,
         },
         update: {
+          // setOnInsert chỉ chạy lần đầu gán, tránh reset usage khi gán lại.
           $setOnInsert: {
             assignedAt: new Date(),
             status: "UNUSED",
@@ -410,6 +418,7 @@ class VoucherService {
 
     await Voucher.findByIdAndUpdate(voucher._id, {
       $set: {
+        // Khi đã gán riêng cho user thì voucher được phân loại ASSIGNED.
         audienceType: "ASSIGNED",
       },
     });
