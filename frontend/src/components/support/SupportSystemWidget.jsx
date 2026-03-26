@@ -91,7 +91,7 @@ const SupportSystemWidget = () => {
         description: description.trim(),
       });
 
-      setSuccess("Gui ticket thanh cong. Trang thai mac dinh: Dang xu ly.");
+      setSuccess("Gui ticket thanh cong.");
       setSelectedIssueKeys([]);
       setDescription("");
     } catch (err) {

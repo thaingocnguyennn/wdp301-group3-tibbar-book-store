@@ -32,7 +32,6 @@ const SupportSystemHistoryPage = () => {
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>Support System History</h1>
-      <p style={styles.subtitle}>Lich su ticket he thong duoc luu tach rieng voi support chat.</p>
 
       {error && <div style={styles.error}>{error}</div>}
 
