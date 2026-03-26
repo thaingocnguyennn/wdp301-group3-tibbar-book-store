@@ -42,6 +42,9 @@ import RecentRequestHistoryPage from "./pages/admin/RecentRequestHistoryPage";
 import ReviewRepliesManagementPage from "./pages/admin/ReviewRepliesManagementPage";
 import SupportChatPage from "./pages/SupportChatPage";
 import AdminSupportPage from "./pages/admin/AdminSupportPage";
+import SupportSystemHistoryPage from "./pages/SupportSystemHistoryPage";
+import AdminSupportSystemPage from "./pages/admin/AdminSupportSystemPage";
+import AdminSupportSystemHistoryPage from "./pages/admin/AdminSupportSystemHistoryPage";
 import ShipperEarningsPage from "./pages/shipper/ShipperEarningsPage";
 import ShipperRoutePage from "./pages/shipper/ShipperRoutePage";
 import ShipperFeedbackPage from "./pages/admin/ShipperFeedbackPage";
@@ -49,6 +52,7 @@ import NotificationPage from "./pages/shipper/NotificationPage";
 import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
 import FlashSaleManagement from "./pages/admin/FlashSaleManagement";
 import ChatbotWidget from "./components/chatbot/ChatbotWidget";
+import SupportSystemWidget from "./components/support/SupportSystemWidget";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -206,6 +210,14 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/support-system/history"
+          element={
+            <ProtectedRoute customerOnly>
+              <SupportSystemHistoryPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
         <Route
@@ -347,6 +359,22 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/support-system"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminSupportSystemPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support-system/history"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminSupportSystemHistoryPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/admin/wishlist" element={<AdminWishlist />} />
         <Route path="/admin/shippers" element={<AdminShippers />} />
         <Route path="/admin/revenue" element={<AdminRevenue />} />
@@ -370,6 +398,7 @@ function AppContent() {
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <SupportSystemWidget />
       <ChatbotWidget />
       <Footer />
     </div>

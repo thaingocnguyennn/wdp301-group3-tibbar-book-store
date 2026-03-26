@@ -151,6 +151,22 @@ const AdminDashboard = () => {
             Review customer support conversations and reply in real-time
           </p>
         </Link>
+
+        <Link to="/admin/support-system" style={styles.card}>
+          <div style={styles.icon}>🧩</div>
+          <h3 style={styles.cardTitle}>Support System</h3>
+          <p style={styles.cardDesc}>
+            Handle system error tickets and send resolution updates to customers
+          </p>
+        </Link>
+
+        <Link to="/admin/support-system/history" style={styles.card}>
+          <div style={styles.icon}>🗂️</div>
+          <h3 style={styles.cardTitle}>Support Inbox History</h3>
+          <p style={styles.cardDesc}>
+            Review resolved ticket history dedicated to support system workflow
+          </p>
+        </Link>
       </div>
     </div>
   );
