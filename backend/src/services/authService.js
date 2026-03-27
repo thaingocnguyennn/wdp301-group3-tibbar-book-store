@@ -56,6 +56,10 @@ class AuthService {
       throw ApiError.forbidden('Your account has been locked. Please contact support.');
     }
 
+    if (user.provider === 'google' && !user.password) {
+      throw ApiError.badRequest('This account uses Google sign-in. Please continue with Google.');
+    }
+
     // Lockout after too many failed attempts.
     if (user.lockUntil && user.lockUntil > new Date()) {
       throw ApiError.forbidden(ACCOUNT_LOCKED_MESSAGE);
