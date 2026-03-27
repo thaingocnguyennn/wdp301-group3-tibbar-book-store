@@ -5,6 +5,9 @@ import authApi from '../api/authApi';
 import GoogleLoginButton from '../components/common/GoogleLoginButton';
 import ReCAPTCHA from 'react-google-recaptcha';
 
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+
 const LoginPage = () => {
   // Login form states
   const [formData, setFormData] = useState({
@@ -13,6 +16,7 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState('');
   const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
@@ -28,6 +32,8 @@ const LoginPage = () => {
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
 
   const { login, handleAuthResponse } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +52,16 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!EMAIL_REGEX.test(formData.email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!PASSWORD_REGEX.test(formData.password)) {
+      setError('Password must be at least 6 characters and include letters and numbers.');
+      return;
+    }
 
     if (!recaptchaSiteKey) {
       setError('reCAPTCHA site key is not configured. Please contact support.');
@@ -97,6 +113,12 @@ const LoginPage = () => {
     e.preventDefault();
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
+
+    if (!EMAIL_REGEX.test(forgotPasswordEmail.trim())) {
+      setForgotPasswordError('Please enter a valid email address.');
+      return;
+    }
+
     setForgotPasswordLoading(true);
 
     try {
@@ -125,6 +147,12 @@ const LoginPage = () => {
     e.preventDefault();
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
+
+    if (!/^\d{6}$/.test(forgotPasswordOTP)) {
+      setForgotPasswordError('OTP must be exactly 6 digits.');
+      return;
+    }
+
     setForgotPasswordLoading(true);
 
     try {
@@ -153,9 +181,8 @@ const LoginPage = () => {
       return;
     }
 
-    // Validate password length
-    if (forgotPasswordNewPassword.length < 6) {
-      setForgotPasswordError('Password must be at least 6 characters');
+    if (!PASSWORD_REGEX.test(forgotPasswordNewPassword)) {
+      setForgotPasswordError('Password must be at least 6 characters and include letters and numbers');
       return;
     }
 
@@ -230,15 +257,24 @@ const LoginPage = () => {
 
             <div style={styles.formGroup}>
               <label style={styles.label}>Password</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                style={styles.input}
-                placeholder="Enter your password"
-              />
+              <div style={styles.passwordInputWrap}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  style={styles.passwordInput}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  style={styles.togglePasswordBtn}
+                  onClick={() => setShowPassword(prev => !prev)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
 
             <div style={styles.formGroup}>
@@ -417,28 +453,48 @@ const LoginPage = () => {
               <form onSubmit={handleResetPassword} style={styles.form}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>New Password</label>
-                  <input
-                    type="password"
-                    value={forgotPasswordNewPassword}
-                    onChange={(e) => setForgotPasswordNewPassword(e.target.value)}
-                    required
-                    style={styles.input}
-                    placeholder="Enter your new password"
-                    disabled={forgotPasswordLoading}
-                  />
+                  <div style={styles.passwordInputWrap}>
+                    <input
+                      type={showForgotNewPassword ? 'text' : 'password'}
+                      value={forgotPasswordNewPassword}
+                      onChange={(e) => setForgotPasswordNewPassword(e.target.value)}
+                      required
+                      style={styles.passwordInput}
+                      placeholder="Enter your new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      style={styles.togglePasswordBtn}
+                      onClick={() => setShowForgotNewPassword(prev => !prev)}
+                      disabled={forgotPasswordLoading}
+                    >
+                      {showForgotNewPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
                 </div>
 
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Confirm Password</label>
-                  <input
-                    type="password"
-                    value={forgotPasswordConfirmPassword}
-                    onChange={(e) => setForgotPasswordConfirmPassword(e.target.value)}
-                    required
-                    style={styles.input}
-                    placeholder="Confirm your new password"
-                    disabled={forgotPasswordLoading}
-                  />
+                  <div style={styles.passwordInputWrap}>
+                    <input
+                      type={showForgotConfirmPassword ? 'text' : 'password'}
+                      value={forgotPasswordConfirmPassword}
+                      onChange={(e) => setForgotPasswordConfirmPassword(e.target.value)}
+                      required
+                      style={styles.passwordInput}
+                      placeholder="Confirm your new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      style={styles.togglePasswordBtn}
+                      onClick={() => setShowForgotConfirmPassword(prev => !prev)}
+                      disabled={forgotPasswordLoading}
+                    >
+                      {showForgotConfirmPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
                 </div>
 
                 <button type="submit" disabled={forgotPasswordLoading} style={styles.button}>
@@ -526,6 +582,30 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '4px',
     fontSize: '1rem'
+  },
+  passwordInputWrap: {
+    position: 'relative'
+  },
+  passwordInput: {
+    padding: '0.75rem',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    width: '100%',
+    paddingRight: '4.25rem'
+  },
+  togglePasswordBtn: {
+    position: 'absolute',
+    right: '0.6rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    border: 'none',
+    background: 'none',
+    color: '#3498db',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '0.85rem'
   },
   button: {
     backgroundColor: '#3498db',
