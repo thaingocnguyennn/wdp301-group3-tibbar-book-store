@@ -13,7 +13,10 @@ class SliderService {
   }
 
   async getAllSliders() {
-    return Slider.find({}).sort({ createdAt: -1 }).lean();
+    return Slider.find({})
+      .populate("adminId", "email firstName lastName role")
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   async createSlider(data) {
