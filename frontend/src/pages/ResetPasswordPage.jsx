@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import authApi from '../api/authApi';
 
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+
 const ResetPasswordPage = () => {
   const { token } = useParams();
   const [formData, setFormData] = useState({
@@ -11,6 +13,8 @@ const ResetPasswordPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const navigate = useNavigate();
 
@@ -32,16 +36,15 @@ const ResetPasswordPage = () => {
       return;
     }
 
-    // Validate password length
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!PASSWORD_REGEX.test(formData.password)) {
+      setError('Password must be at least 6 characters and include letters and numbers');
       return;
     }
 
     setLoading(true);
 
     try {
-      await authApi.resetPassword(token, { password: formData.password });
+      await authApi.resetPassword({ token, password: formData.password });
       setSuccess('Password has been reset successfully! Redirecting to login...');
       setTimeout(() => {
         navigate('/login');
@@ -80,30 +83,50 @@ const ResetPasswordPage = () => {
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
             <label style={styles.label}>New Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              style={styles.input}
-              placeholder="Enter your new password"
-              disabled={loading}
-            />
+            <div style={styles.passwordInputWrap}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                style={styles.passwordInput}
+                placeholder="Enter your new password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                style={styles.togglePasswordBtn}
+                onClick={() => setShowPassword(prev => !prev)}
+                disabled={loading}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Confirm Password</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              style={styles.input}
-              placeholder="Confirm your new password"
-              disabled={loading}
-            />
+            <div style={styles.passwordInputWrap}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                style={styles.passwordInput}
+                placeholder="Confirm your new password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                style={styles.togglePasswordBtn}
+                onClick={() => setShowConfirmPassword(prev => !prev)}
+                disabled={loading}
+              >
+                {showConfirmPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} style={styles.submitButton}>
@@ -182,6 +205,30 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '4px',
     fontSize: '1rem'
+  },
+  passwordInputWrap: {
+    position: 'relative'
+  },
+  passwordInput: {
+    padding: '0.75rem',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    width: '100%',
+    paddingRight: '4.25rem'
+  },
+  togglePasswordBtn: {
+    position: 'absolute',
+    right: '0.6rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    border: 'none',
+    background: 'none',
+    color: '#3498db',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '0.85rem'
   },
   submitButton: {
     backgroundColor: '#3498db',

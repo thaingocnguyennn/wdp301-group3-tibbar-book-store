@@ -2,15 +2,22 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const NAME_REGEX = /^[A-Za-z\s'-]{1,50}$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     firstName: '',
     lastName: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -25,10 +32,37 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!NAME_REGEX.test(formData.firstName.trim())) {
+      setError('First name is required and can only contain letters, spaces, apostrophes, or hyphens.');
+      return;
+    }
+
+    if (!NAME_REGEX.test(formData.lastName.trim())) {
+      setError('Last name is required and can only contain letters, spaces, apostrophes, or hyphens.');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(formData.email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!PASSWORD_REGEX.test(formData.password)) {
+      setError('Password must be at least 6 characters and include letters and numbers.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(formData);
+      const { confirmPassword, ...registerPayload } = formData;
+      await register(registerPayload);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
@@ -46,24 +80,26 @@ const RegisterPage = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>First Name</label>
+            <label style={styles.label}>First Name *</label>
             <input
               type="text"
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
+              required
               style={styles.input}
               placeholder="Enter your first name"
             />
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Last Name</label>
+            <label style={styles.label}>Last Name *</label>
             <input
               type="text"
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
+              required
               style={styles.input}
               placeholder="Enter your last name"
             />
@@ -84,16 +120,48 @@ const RegisterPage = () => {
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Password *</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-              style={styles.input}
-              placeholder="Enter your password (min 6 characters)"
-            />
+            <div style={styles.passwordInputWrap}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                style={styles.passwordInput}
+                placeholder="Enter your password (letters + numbers)"
+              />
+              <button
+                type="button"
+                style={styles.togglePasswordBtn}
+                onClick={() => setShowPassword(prev => !prev)}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Confirm Password *</label>
+            <div style={styles.passwordInputWrap}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                minLength={6}
+                style={styles.passwordInput}
+                placeholder="Confirm your password"
+              />
+              <button
+                type="button"
+                style={styles.togglePasswordBtn}
+                onClick={() => setShowConfirmPassword(prev => !prev)}
+              >
+                {showConfirmPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
@@ -159,6 +227,30 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '4px',
     fontSize: '1rem'
+  },
+  passwordInputWrap: {
+    position: 'relative'
+  },
+  passwordInput: {
+    padding: '0.75rem',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    width: '100%',
+    paddingRight: '4.25rem'
+  },
+  togglePasswordBtn: {
+    position: 'absolute',
+    right: '0.6rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    border: 'none',
+    background: 'none',
+    color: '#3498db',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '0.85rem'
   },
   button: {
     backgroundColor: '#3498db',
