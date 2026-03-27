@@ -13,6 +13,10 @@ import notificationService from "./notificationService.js";
 const MAX_ORDERS = 20;//
 const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
+const ORDER_KINDS = {
+  PHYSICAL: "PHYSICAL",
+  DIGITAL: "DIGITAL",
+};
 const ADMIN_STATUS_TRANSITIONS = {
   PENDING: ["PROCESSING"],
   PROCESSING: ["SHIPPED"],
@@ -69,6 +73,69 @@ class OrderService {
         return isSameItems && isSameTotal;
       }) || null
     );
+  }
+
+  determineOrderKindFromBooks(books = []) {
+    const hasEbook = books.some((book) => book?.isEbook);
+    const hasPhysical = books.some((book) => book && !book?.isEbook);
+
+    if (hasEbook && hasPhysical) {
+      throw ApiError.badRequest(
+        "You cannot checkout physical books and e-books in the same order. Please separate your cart.",
+      );
+    }
+
+    return hasEbook ? ORDER_KINDS.DIGITAL : ORDER_KINDS.PHYSICAL;
+  }
+
+  inferOrderKind(order) {
+    if (order?.orderKind === ORDER_KINDS.DIGITAL) {
+      return ORDER_KINDS.DIGITAL;
+    }
+
+    if (order?.orderKind === ORDER_KINDS.PHYSICAL) {
+      return ORDER_KINDS.PHYSICAL;
+    }
+
+    const items = Array.isArray(order?.items) ? order.items : [];
+    const hasEbook = items.some((item) => item?.book?.isEbook === true);
+    const hasPhysical = items.some((item) => item?.book?.isEbook === false);
+
+    if (hasEbook && !hasPhysical) {
+      return ORDER_KINDS.DIGITAL;
+    }
+
+    return ORDER_KINDS.PHYSICAL;
+  }
+
+  isDigitalOrder(order) {
+    return this.inferOrderKind(order) === ORDER_KINDS.DIGITAL;
+  }
+
+  async resolveOrderKind(order) {
+    if (order?.orderKind) {
+      return order.orderKind;
+    }
+
+    const itemBooks = Array.isArray(order?.items) ? order.items.map((item) => item.book) : [];
+    const populatedBooks = itemBooks.filter(
+      (book) => typeof book === "object" && book !== null && "isEbook" in book,
+    );
+
+    if (populatedBooks.length === itemBooks.length && populatedBooks.length > 0) {
+      return this.determineOrderKindFromBooks(populatedBooks);
+    }
+
+    const bookIds = itemBooks
+      .map((book) => book?._id?.toString?.() || book?.toString?.())
+      .filter(Boolean);
+
+    if (!bookIds.length) {
+      return ORDER_KINDS.PHYSICAL;
+    }
+
+    const books = await Book.find({ _id: { $in: bookIds } }).select("isEbook").lean();
+    return this.determineOrderKindFromBooks(books);
   }
 
   async reserveStockForOrderItems(orderItems) {
@@ -356,8 +423,9 @@ class OrderService {
         });
         continue;
       }
-      // validate stock before create order
-      if (item.book.stock < item.quantity) {
+      // Physical books still follow stock validation. E-books are treated as
+      // instantly fulfilled digital goods.
+      if (!item.book.isEbook && item.book.stock < item.quantity) {
         validationErrors.push({
           message: `Not enough stock. Available: ${item.book.stock}`,
           book: item.book.title,
@@ -382,7 +450,11 @@ class OrderService {
       });
     }
 
-    return { cart, validItems };
+    const orderKind = this.determineOrderKindFromBooks(
+      validItems.map((item) => item.book),
+    );
+
+    return { cart, validItems, orderKind };
   }
 
   // Calculate order totals
@@ -546,13 +618,16 @@ class OrderService {
       throw ApiError.badRequest("Voucher code is required");
     }
 
-    const { validItems } = await this.validateCartForCheckout(userId);
+    const { validItems, orderKind } = await this.validateCartForCheckout(userId);
 
     const subtotal = validItems.reduce((sum, item) => {
       return sum + item.book.price * item.quantity;
     }, 0);
 
-    const shippingFee = this.calculateShippingFee(subtotal);
+    const shippingFee =
+      orderKind === ORDER_KINDS.DIGITAL
+        ? 0
+        : this.calculateShippingFee(subtotal);
     const orderAmount = subtotal + shippingFee;
 
     const { voucher, voucherDiscount } = await this.resolveVoucher(
@@ -590,45 +665,49 @@ class OrderService {
       ipAddress = "127.0.0.1",
     } = orderData;
 
-    // Resolve shipping address from user's saved addresses
     const user = await User.findById(userId);
     if (!user) throw ApiError.notFound("User not found");
 
-    let resolvedAddress = null;
-    if (shippingAddressId) {
-      resolvedAddress = user.addresses.id(shippingAddressId);
-      if (!resolvedAddress)
-        throw ApiError.badRequest("Shipping address not found");
-    } else {
-      // Fall back to default address
-      resolvedAddress =
-        user.addresses.find((a) => a.isDefault) || user.addresses[0];
-    }
-
-    if (!resolvedAddress) {
-      throw ApiError.badRequest(
-        "Please add a shipping address before placing an order",
-      );
-    }
-
-    const shippingAddressSnapshot = {
-      addressId: resolvedAddress._id.toString(),
-      fullName: resolvedAddress.fullName,
-      phone: resolvedAddress.phone,
-      province: resolvedAddress.province,
-      district: resolvedAddress.district,
-      commune: resolvedAddress.commune,
-      description: resolvedAddress.description,
-    };
-
     // Validate cart
-    const { cart, validItems } = await this.validateCartForCheckout(userId);
+    const { cart, validItems, orderKind } =
+      await this.validateCartForCheckout(userId);
 
-    const hasEbookInCart = validItems.some((item) => item.book?.isEbook);
-    if (hasEbookInCart && paymentMethod !== "VNPAY") {
+    if (orderKind === ORDER_KINDS.DIGITAL && paymentMethod !== "VNPAY") {
       throw ApiError.badRequest(
         "E-book orders only support online payment via VNPay",
       );
+    }
+
+    let shippingAddressSnapshot = {};
+    if (orderKind === ORDER_KINDS.PHYSICAL) {
+      let resolvedAddress = null;
+
+      if (shippingAddressId) {
+        resolvedAddress = user.addresses.id(shippingAddressId);
+        if (!resolvedAddress) {
+          throw ApiError.badRequest("Shipping address not found");
+        }
+      } else {
+        resolvedAddress =
+          user.addresses.find((address) => address.isDefault) ||
+          user.addresses[0];
+      }
+
+      if (!resolvedAddress) {
+        throw ApiError.badRequest(
+          "Please add a shipping address before placing an order",
+        );
+      }
+
+      shippingAddressSnapshot = {
+        addressId: resolvedAddress._id.toString(),
+        fullName: resolvedAddress.fullName,
+        phone: resolvedAddress.phone,
+        province: resolvedAddress.province,
+        district: resolvedAddress.district,
+        commune: resolvedAddress.commune,
+        description: resolvedAddress.description,
+      };
     }
 
     // Validate payment method
@@ -645,8 +724,10 @@ class OrderService {
       return sum + item.book.price * item.quantity;
     }, 0);
 
-    // Calculate shipping fee based on subtotal (free if > 200,000 VND)
-    const shippingFee = this.calculateShippingFee(subtotal);
+    const shippingFee =
+      orderKind === ORDER_KINDS.DIGITAL
+        ? 0
+        : this.calculateShippingFee(subtotal);
 
     const orderAmount = subtotal + shippingFee;
 
@@ -730,7 +811,9 @@ class OrderService {
     let stockReservations = [];
 
     try {
-      stockReservations = await this.reserveStockForOrderItems(orderItems);
+      if (orderKind === ORDER_KINDS.PHYSICAL) {
+        stockReservations = await this.reserveStockForOrderItems(orderItems);
+      }
 
       // Create order in database
       console.log("📝 [OrderService] Creating order in database...");
@@ -746,6 +829,7 @@ class OrderService {
         paymentMethod,
         paymentStatus: paymentResult.paymentStatus,
         orderStatus: "PENDING",
+        orderKind,
         shippingAddress: shippingAddressSnapshot,
         voucher: voucher?._id || null,
         notes,
@@ -947,6 +1031,12 @@ class OrderService {
     const order = await Order.findById(orderId);
     if (!order) throw ApiError.notFound("Order not found");
 
+    if ((await this.resolveOrderKind(order)) === ORDER_KINDS.DIGITAL) {
+      throw ApiError.badRequest(
+        "Digital orders do not support shipping status updates",
+      );
+    }
+
     this.validateAdminStatusTransition(order.orderStatus, status);
 
     if (status === "SHIPPED" && !order.shipper) {
@@ -989,7 +1079,6 @@ class OrderService {
       ipAddress = "127.0.0.1",
     } = options;
 
-    // 1) Tải đơn cũ và kiểm tra quyền sở hữu.
     const previousOrder = await Order.findById(orderId).lean();
     if (!previousOrder) {
       throw ApiError.notFound("Order not found");
@@ -1004,56 +1093,57 @@ class OrderService {
       throw ApiError.notFound("User not found");
     }
 
-    // 2) Ưu tiên địa chỉ giao hàng cũ, fallback sang địa chỉ mặc định hiện tại.
-    const previousAddressId = previousOrder.shippingAddress?.addressId;
-    const preferredAddress = previousAddressId
-      ? user.addresses.id(previousAddressId)
-      : null;
-    const fallbackAddress =
-      user.addresses.find((address) => address.isDefault) || user.addresses[0];
-    const selectedAddress = preferredAddress || fallbackAddress;
-
-    if (!selectedAddress) {
-      throw ApiError.badRequest(
-        "Please add a shipping address before reordering",
-      );
-    }
-
-    const shippingAddressSnapshot = {
-      addressId: selectedAddress._id.toString(),
-      fullName: selectedAddress.fullName,
-      phone: selectedAddress.phone,
-      province: selectedAddress.province,
-      district: selectedAddress.district,
-      commune: selectedAddress.commune,
-      description: selectedAddress.description,
-      // 🔥 THÊM 2 DÒNG NÀY
-      latitude: resolvedAddress.latitude,
-      longitude: resolvedAddress.longitude,
-
-    };
-    if (!resolvedAddress.latitude || !resolvedAddress.longitude) {
-      throw ApiError.badRequest(
-        "Address is missing coordinates. Please update your address."
-      );
-    }
-    const paymentMethodToUse =
-      paymentMethod || previousOrder.paymentMethod || "COD";
-
-    // 3) Validate lại catalog hiện tại: sách còn tồn tại và đủ tồn kho.
     const requestedBookIds = previousOrder.items
       .map((item) => item.book?.toString())
       .filter(Boolean);
 
     const books = await Book.find({ _id: { $in: requestedBookIds } });
     const booksById = new Map(books.map((book) => [book._id.toString(), book]));
+    const availableBooks = previousOrder.items
+      .map((item) => booksById.get(item.book?.toString()))
+      .filter(Boolean);
+    const orderKind = this.determineOrderKindFromBooks(availableBooks);
 
-    const hasEbookInOrder = books.some((book) => book.isEbook);
-    // Quy tắc nghiệp vụ: đơn có ebook bắt buộc thanh toán online qua VNPay.
-    if (hasEbookInOrder && paymentMethodToUse !== "VNPAY") {
+    const paymentMethodToUse =
+      paymentMethod ||
+      previousOrder.paymentMethod ||
+      (orderKind === ORDER_KINDS.DIGITAL ? "VNPAY" : "COD");
+
+    if (
+      orderKind === ORDER_KINDS.DIGITAL &&
+      paymentMethodToUse !== "VNPAY"
+    ) {
       throw ApiError.badRequest(
         "E-book orders only support online payment via VNPay",
       );
+    }
+
+    let shippingAddressSnapshot = {};
+    if (orderKind === ORDER_KINDS.PHYSICAL) {
+      const previousAddressId = previousOrder.shippingAddress?.addressId;
+      const preferredAddress = previousAddressId
+        ? user.addresses.id(previousAddressId)
+        : null;
+      const fallbackAddress =
+        user.addresses.find((address) => address.isDefault) ||
+        user.addresses[0];
+      const selectedAddress = preferredAddress || fallbackAddress;
+
+      if (!selectedAddress) {
+        throw ApiError.badRequest(
+          "Please add a shipping address before reordering",
+        );
+      }
+
+      shippingAddressSnapshot = {
+        addressId: selectedAddress._id.toString(),
+        fullName: selectedAddress.fullName,
+        phone: selectedAddress.phone,
+        province: selectedAddress.province,
+        district: selectedAddress.district,
+        commune: selectedAddress.commune,
+        description: selectedAddress.description,
+      };
     }
 
     const paymentProvider = paymentService.getProvider(paymentMethodToUse);
@@ -1073,14 +1163,14 @@ class OrderService {
 
       if (!book) {
         validationErrors.push({
-          message: `Book \"${item.title}\" is no longer available`,
+          message: `Book "${item.title}" is no longer available`,
         });
         continue;
       }
 
-      if (book.stock < item.quantity) {
+      if (!book.isEbook && book.stock < item.quantity) {
         validationErrors.push({
-          message: `Not enough stock for \"${book.title}\". Available: ${book.stock}`,
+          message: `Not enough stock for "${book.title}". Available: ${book.stock}`,
         });
         continue;
       }
@@ -1090,20 +1180,24 @@ class OrderService {
         title: book.title,
         author: book.author,
         price: book.price,
-        quantity: item.quantity,
-        subtotal: Math.round(book.price * item.quantity * 100) / 100,
+        quantity: book.isEbook ? 1 : item.quantity,
+        subtotal: Math.round(
+          book.price * (book.isEbook ? 1 : item.quantity) * 100,
+        ) / 100,
       });
     }
 
     if (validationErrors.length > 0) {
-      // Trả về toàn bộ lỗi validation để FE hiển thị đầy đủ cho user.
       throw ApiError.badRequest("Reorder cannot be completed", {
         errors: validationErrors,
       });
     }
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const shippingFee = this.calculateShippingFee(subtotal);
+    const shippingFee =
+      orderKind === ORDER_KINDS.DIGITAL
+        ? 0
+        : this.calculateShippingFee(subtotal);
     const total = Math.max(0, subtotal + shippingFee);
     const orderNumber = this.generateOrderNumber();
 
@@ -1112,7 +1206,6 @@ class OrderService {
       orderItems,
       total,
     );
-    // Chặn double-click / submit lặp gây tạo đơn giống nhau trong thời gian ngắn.
     if (duplicateOrder) {
       throw ApiError.conflict(
         `A similar order was just created (${duplicateOrder.orderNumber}). Please refresh and check your order history.`,
@@ -1124,8 +1217,9 @@ class OrderService {
     let paymentResult = null;
 
     try {
-      // 4) Reserve stock trước khi tạo payment + order để tránh oversell.
-      stockReservations = await this.reserveStockForOrderItems(orderItems);
+      if (orderKind === ORDER_KINDS.PHYSICAL) {
+        stockReservations = await this.reserveStockForOrderItems(orderItems);
+      }
 
       paymentResult = await paymentProvider.createPayment({
         orderNumber,
@@ -1145,6 +1239,7 @@ class OrderService {
         paymentMethod: paymentMethodToUse,
         paymentStatus: paymentResult.paymentStatus,
         orderStatus: "PENDING",
+        orderKind,
         shippingAddress: shippingAddressSnapshot,
         notes,
         transactionId: paymentResult.transactionId || null,
@@ -1157,7 +1252,6 @@ class OrderService {
         payment: paymentResult,
       };
     } catch (error) {
-      // Nếu có lỗi ở bất kỳ bước nào thì rollback để dữ liệu nhất quán.
       await this.rollbackOrderCreation({
         order,
         userId,
@@ -1391,6 +1485,7 @@ class OrderService {
     // Get payment provider and verify the callback
     const paymentProvider = paymentService.getProvider(order.paymentMethod);
     const confirmResult = await paymentProvider.confirmPayment(callbackParams);
+    const orderKind = await this.resolveOrderKind(order);
 
     // Update order payment status
     order.paymentStatus = confirmResult.paymentStatus;
@@ -1398,6 +1493,11 @@ class OrderService {
     if (confirmResult.success) {
       order.transactionId = confirmResult.transactionId || order.transactionId;
       order.paidAt = new Date();
+      order.orderKind = orderKind;
+
+      if (orderKind === ORDER_KINDS.DIGITAL) {
+        order.orderStatus = "COMPLETED";
+      }
     } else {
       order.paymentStatus = "FAILED";
     }
@@ -1426,14 +1526,21 @@ class OrderService {
       throw ApiError.badRequest("Order cannot be cancelled at this stage");
     }
 
+    const orderKind = await this.resolveOrderKind(order);
+    if (orderKind === ORDER_KINDS.DIGITAL && order.paymentStatus === "PAID") {
+      throw ApiError.badRequest("Paid e-book orders cannot be cancelled");
+    }
+
     order.orderStatus = "CANCELLED";
+    order.orderKind = orderKind;
     await order.save();
 
-    // Restore book stock
-    for (const item of order.items) {
-      await Book.findByIdAndUpdate(item.book, {
-        $inc: { stock: item.quantity },
-      });
+    if (orderKind === ORDER_KINDS.PHYSICAL) {
+      for (const item of order.items) {
+        await Book.findByIdAndUpdate(item.book, {
+          $inc: { stock: item.quantity },
+        });
+      }
     }
 
     return order;
@@ -1445,41 +1552,46 @@ class OrderService {
   }
 
   async getRevenue(range) {
-    // Thống kê doanh thu, nếu range = "month" thì thống kê doanh thu trong tháng hiện tại, ngược lại thống kê toàn bộ
-    const filter = { orderStatus: "DELIVERED" }; // Chỉ tính doanh thu từ những đơn hàng đã được giao thành công
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const now = new Date(); // Lấy ngày hiện tại để xác định khoảng thời gian thống kê
+    const orders = await Order.find({
+      orderStatus: { $in: ["DELIVERED", "COMPLETED"] },
+    });
 
-    if (range === "month") {
-      // Nếu range là "month", chỉ thống kê doanh thu từ đầu tháng đến hiện tại
-      filter.deliveredAt = {
-        // Chỉ tính những đơn hàng được giao trong tháng hiện tại
-        $gte: new Date(now.getFullYear(), now.getMonth(), 1), // Ngày đầu tiên của tháng hiện tại
-      };
-    }
+    const eligibleOrders = orders.filter((order) => {
+      const effectiveDate =
+        order.deliveredAt || order.paidAt || order.updatedAt || order.createdAt;
 
-    const orders = await Order.find(filter); // Lấy tất cả đơn hàng đã được giao thành công (và nếu range là "month" thì chỉ lấy những đơn hàng được giao trong tháng hiện tại)
+      if (!effectiveDate) {
+        return false;
+      }
 
-    const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0); // Tính tổng doanh thu bằng cách cộng tổng tiền của tất cả đơn hàng đã được giao thành công (đã lọc theo khoảng thời gian nếu range là "month")
+      if (range === "month") {
+        return effectiveDate >= monthStart;
+      }
 
-    // 👇 group theo ngày
-    const chartMap = {}; // Tạo một object để nhóm doanh thu theo ngày, key là ngày (yyyy-mm-dd) và value là tổng doanh thu của ngày đó
+      return true;
+    });
 
-    orders.forEach((order) => {
-      const day = order.deliveredAt.toISOString().slice(0, 10); // yyyy-mm-dd
-      chartMap[day] = (chartMap[day] || 0) + order.total; // Cộng dồn doanh thu của đơn hàng vào ngày tương ứng trong chartMap
+    const totalRevenue = eligibleOrders.reduce((sum, order) => sum + order.total, 0);
+    const chartMap = {};
+
+    eligibleOrders.forEach((order) => {
+      const effectiveDate =
+        order.deliveredAt || order.paidAt || order.updatedAt || order.createdAt;
+      const day = effectiveDate.toISOString().slice(0, 10);
+      chartMap[day] = (chartMap[day] || 0) + order.total;
     });
 
     const chartData = Object.keys(chartMap).map((day) => ({
-      // Chuyển đổi chartMap thành mảng để dễ sử dụng cho biểu đồ, mỗi phần tử có dạng { date: "yyyy-mm-dd", revenue: tổng doanh thu của ngày đó }
-      date: day, // Ngày (yyyy-mm-dd)
-      revenue: chartMap[day], // Tổng doanh thu của ngày đó
+      date: day,
+      revenue: chartMap[day],
     }));
 
     return {
-      // Trả về tổng doanh thu, số lượng đơn hàng đã giao thành công và dữ liệu để vẽ biểu đồ doanh thu theo ngày
       totalRevenue,
-      totalOrders: orders.length,
+      totalOrders: eligibleOrders.length,
       chartData,
     };
   }
@@ -1513,6 +1625,10 @@ class OrderService {
     if (!order) {
       // Kiểm tra nếu không tìm thấy order
       throw ApiError.notFound("Order not found"); // Trả về lỗi nếu không tìm thấy order
+    }
+
+    if ((await this.resolveOrderKind(order)) === ORDER_KINDS.DIGITAL) {
+      throw ApiError.badRequest("Digital orders cannot be assigned to shippers");
     }
 
     if (!["PENDING", "PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
@@ -1597,6 +1713,10 @@ class OrderService {
 
     if (!order) {
       throw ApiError.notFound("Order not found");
+    }
+
+    if ((await this.resolveOrderKind(order)) === ORDER_KINDS.DIGITAL) {
+      return order;
     }
 
     if (order.shipper) {

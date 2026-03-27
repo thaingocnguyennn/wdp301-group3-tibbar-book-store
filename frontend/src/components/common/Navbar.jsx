@@ -1,21 +1,82 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useWishlist } from "../../hooks/useWishlist";
 import { useCart } from "../../hooks/useCart";
-import { orderApi } from "../../api/orderApi";
+import { bookApi } from "../../api/bookApi";
 import { supportApi } from "../../api/supportApi";
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const moreMenuRef = useRef(null);
   const { wishlist } = useWishlist();
   const { cart } = useCart();
   const [ebookCount, setEbookCount] = useState(0);
   const [adminUnreadMessages, setAdminUnreadMessages] = useState(0);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
   const isShipper = user?.role?.toLowerCase() === "shipper";
   const showCustomerNavLinks = !isAdmin;
   const cartCount = Array.isArray(cart?.items) ? cart.items.length : 0;
+
+  const primaryNavLinks = [{ to: "/", label: "Home" }];
+  const overflowNavLinks = [];
+
+  if (isAdmin) {
+    primaryNavLinks.push({ to: "/admin/dashboard", label: "Admin Dashboard" });
+    primaryNavLinks.push({
+      to: "/admin/support",
+      label:
+        adminUnreadMessages > 0
+          ? `Support Inbox (${adminUnreadMessages})`
+          : "Support Inbox",
+    });
+
+    overflowNavLinks.push({
+      to: "/admin/support-system",
+      label: "Support System",
+    });
+    overflowNavLinks.push({
+      to: "/admin/support-system/history",
+      label: "Support Inbox History",
+    });
+  }
+
+  if (showCustomerNavLinks) {
+    primaryNavLinks.push({ to: "/newest", label: "Newest" });
+    overflowNavLinks.push({
+      to: "/recently-viewed",
+      label: "Recently Viewed",
+    });
+  }
+
+  if (isAuthenticated && showCustomerNavLinks) {
+    primaryNavLinks.push({ to: "/orders", label: "My Orders" });
+    primaryNavLinks.push({
+      to: "/ebooks",
+      label: ebookCount > 0 ? `E-Books (${ebookCount})` : "E-Books",
+    });
+
+    overflowNavLinks.push({ to: "/my-vouchers", label: "My Vouchers" });
+    overflowNavLinks.push({ to: "/support", label: "Support" });
+    overflowNavLinks.push({
+      to: "/support-system/history",
+      label: "Support History",
+    });
+    overflowNavLinks.push({
+      to: "/wishlist",
+      label:
+        wishlist?.length > 0 ? `Wishlist (${wishlist.length})` : "Wishlist",
+    });
+  }
+
+  if (isAuthenticated && isShipper) {
+    overflowNavLinks.push({
+      to: "/assignment-history",
+      label: "Assignment History",
+    });
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !showCustomerNavLinks) {
@@ -27,21 +88,10 @@ const Navbar = () => {
 
     const fetchEbookCount = async () => {
       try {
-        const response = await orderApi.getUserOrders(1, 100);
-        const orders = response?.data?.orders || [];
-        const uniqueEbookIds = new Set();
-
-        orders.forEach((order) => {
-          (order.items || []).forEach((item) => {
-            const book = item?.book;
-            if (book?._id && book?.isEbook) {
-              uniqueEbookIds.add(book._id);
-            }
-          });
-        });
-
+        const response = await bookApi.getMyEbooks();
+        const ebooks = response?.data?.ebooks || [];
         if (!cancelled) {
-          setEbookCount(uniqueEbookIds.size);
+          setEbookCount(ebooks.length);
         }
       } catch {
         if (!cancelled) {
@@ -87,111 +137,93 @@ const Navbar = () => {
     };
   }, [isAuthenticated, isAdmin]);
 
+  useEffect(() => {
+    if (!moreMenuOpen) {
+      return undefined;
+    }
+
+    const handleClickOutside = (event) => {
+      if (!moreMenuRef.current?.contains(event.target)) {
+        setMoreMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setMoreMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [moreMenuOpen]);
+
   const handleLogout = async () => {
+    setMoreMenuOpen(false);
     await logout();
     navigate("/");
   };
+
+  const closeMoreMenu = () => setMoreMenuOpen(false);
 
   return (
     <nav style={styles.nav}>
       <div style={styles.container}>
         <Link to="/" style={styles.logo}>
-          📚 Bookstore
+          Bookstore
         </Link>
 
         <div style={styles.links}>
           <div style={styles.primaryLinks}>
-            <Link to="/" style={styles.link}>
-              Home
-            </Link>
-            {isAdmin && (
-              <Link to="/admin/dashboard" style={styles.link}>
-                Admin Dashboard
+            {primaryNavLinks.map((item) => (
+              <Link key={item.to} to={item.to} style={styles.link}>
+                {item.label}
               </Link>
-            )}
-            {isAdmin && (
-              <Link to="/admin/support" style={styles.link}>
-                Support Inbox {adminUnreadMessages > 0 && `(${adminUnreadMessages})`}
-              </Link>
-            )}
-            {isAdmin && (
-              <Link to="/admin/support-system" style={styles.link}>
-                Support System
-              </Link>
-            )}
-            {isAdmin && (
-              <Link to="/admin/support-system/history" style={styles.link}>
-                Support Inbox History
-              </Link>
-            )}
-            {isAuthenticated && (
-              <Link to="/profile" style={styles.link}>
-                Profile
-              </Link>
-            )}
+            ))}
           </div>
 
           <div style={styles.secondaryLinks}>
-            {showCustomerNavLinks && (
-              <Link to="/newest" style={styles.link}>
-                ✨ Newest
-              </Link>
-            )}
-
-            {showCustomerNavLinks && (
-              <Link to="/recently-viewed" style={styles.link}>
-                🕒 Recently Viewed
-              </Link>
-            )}
-
             {isAuthenticated ? (
               <>
-                {showCustomerNavLinks && (
-                  <Link to="/orders" style={styles.link}>
-                    My Orders
-                  </Link>
-                )}
-
-                {showCustomerNavLinks && (
-                  <Link to="/my-vouchers" style={styles.link}>
-                    My Vouchers
-                  </Link>
-                )}
-
-                {showCustomerNavLinks && (
-                  <Link to="/support" style={styles.link}>
-                    Support
-                  </Link>
-                )}
-
-                {showCustomerNavLinks && (
-                  <Link to="/support-system/history" style={styles.link}>
-                    Support History
-                  </Link>
-                )}
-
-                {isShipper && (
-                  <Link to="/assignment-history" style={styles.link}>
-                    Assignment History
-                  </Link>
-                )}
-
-                {showCustomerNavLinks && (
-                  <Link to="/wishlist" style={styles.link}>
-                    Wishlist {wishlist?.length > 0 && `(${wishlist.length})`}
-                  </Link>
-                )}
-
-                {showCustomerNavLinks && (
-                  <Link to="/ebooks" style={styles.link}>
-                    E-Books {ebookCount > 0 && `(${ebookCount})`}
-                  </Link>
-                )}
+                <Link to="/profile" style={styles.link}>
+                  Profile
+                </Link>
 
                 {showCustomerNavLinks && (
                   <Link to="/cart" style={styles.link}>
-                    Cart {cartCount > 0 && `(${cartCount})`}
+                    {cartCount > 0 ? `Cart (${cartCount})` : "Cart"}
                   </Link>
+                )}
+
+                {overflowNavLinks.length > 0 && (
+                  <div ref={moreMenuRef} style={styles.dropdown}>
+                    <button
+                      type="button"
+                      style={styles.dropdownButton}
+                      onClick={() => setMoreMenuOpen((prev) => !prev)}
+                    >
+                      More
+                    </button>
+                    {moreMenuOpen && (
+                      <div style={styles.dropdownMenu}>
+                        {overflowNavLinks.map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            style={styles.dropdownLink}
+                            onClick={closeMoreMenu}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <button onClick={handleLogout} style={styles.button}>
@@ -199,7 +231,6 @@ const Navbar = () => {
                 </button>
 
                 <span style={styles.user}>
-                  👤{" "}
                   {user?.role
                     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
                     : "User"}
@@ -207,6 +238,32 @@ const Navbar = () => {
               </>
             ) : (
               <>
+                {overflowNavLinks.length > 0 && (
+                  <div ref={moreMenuRef} style={styles.dropdown}>
+                    <button
+                      type="button"
+                      style={styles.dropdownButton}
+                      onClick={() => setMoreMenuOpen((prev) => !prev)}
+                    >
+                      More
+                    </button>
+                    {moreMenuOpen && (
+                      <div style={styles.dropdownMenu}>
+                        {overflowNavLinks.map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            style={styles.dropdownLink}
+                            onClick={closeMoreMenu}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Link to="/login" style={styles.link}>
                   Login
                 </Link>
@@ -262,7 +319,7 @@ const styles = {
   primaryLinks: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     gap: "1rem",
     flex: 1,
     flexWrap: "wrap",
@@ -273,6 +330,44 @@ const styles = {
     justifyContent: "flex-end",
     gap: "1rem",
     flexWrap: "wrap",
+  },
+  dropdown: {
+    position: "relative",
+    flexShrink: 0,
+  },
+  dropdownButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    color: "#fff",
+    border: "1px solid rgba(255, 255, 255, 0.28)",
+    borderRadius: "999px",
+    padding: "0.5rem 0.9rem",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "calc(100% + 0.6rem)",
+    right: 0,
+    minWidth: "220px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.25rem",
+    backgroundColor: "rgba(15, 23, 42, 0.96)",
+    border: "1px solid rgba(255, 255, 255, 0.18)",
+    borderRadius: "14px",
+    padding: "0.5rem",
+    boxShadow: "0 18px 40px rgba(15, 23, 42, 0.32)",
+    backdropFilter: "blur(14px)",
+  },
+  dropdownLink: {
+    color: "#fff",
+    textDecoration: "none",
+    padding: "0.7rem 0.8rem",
+    borderRadius: "10px",
+    fontWeight: "500",
+    whiteSpace: "nowrap",
   },
   link: {
     color: "#fff",

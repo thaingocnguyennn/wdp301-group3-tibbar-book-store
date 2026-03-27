@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { orderApi } from "../api/orderApi";
+import { bookApi } from "../api/bookApi";
 
 const MyEbooksPage = () => {
   const navigate = useNavigate();
@@ -17,8 +17,8 @@ const MyEbooksPage = () => {
       setLoading(true);
       setError("");
 
-      const response = await orderApi.getUserOrders(1, 100);
-      setOrders(response.data.orders || []);
+      const response = await bookApi.getMyEbooks();
+      setOrders(response.data.ebooks || []);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load your e-books");
     } finally {
@@ -26,53 +26,7 @@ const MyEbooksPage = () => {
     }
   };
 
-  const ebooks = useMemo(() => {
-    const uniqueByBookId = new Map();
-
-    orders.forEach((order) => {
-      (order.items || []).forEach((item) => {
-        const book = item.book;
-        if (!book?._id || !book?.isEbook) return;
-
-        const isPaid = order.paymentStatus === "PAID";
-
-        if (!uniqueByBookId.has(book._id)) {
-          uniqueByBookId.set(book._id, {
-            _id: book._id,
-            title: book.title || item.title || "Untitled E-Book",
-            author: book.author || item.author || "Unknown Author",
-            imageUrl: book.imageUrl || "",
-            price: Number(book.price || item.price || 0),
-            latestOrderAt: order.createdAt,
-            latestPaidAt: isPaid ? order.createdAt : null,
-            hasPaidOrder: isPaid,
-          });
-          return;
-        }
-
-        const existing = uniqueByBookId.get(book._id);
-
-        uniqueByBookId.set(book._id, {
-          ...existing,
-          latestOrderAt:
-            new Date(order.createdAt) > new Date(existing.latestOrderAt)
-              ? order.createdAt
-              : existing.latestOrderAt,
-          latestPaidAt:
-            isPaid &&
-            (!existing.latestPaidAt ||
-              new Date(order.createdAt) > new Date(existing.latestPaidAt))
-              ? order.createdAt
-              : existing.latestPaidAt,
-          hasPaidOrder: existing.hasPaidOrder || isPaid,
-        });
-      });
-    });
-
-    return Array.from(uniqueByBookId.values()).sort(
-      (a, b) => new Date(b.latestOrderAt) - new Date(a.latestOrderAt),
-    );
-  }, [orders]);
+  const ebooks = orders;
 
   const paidCount = ebooks.filter((book) => book.hasPaidOrder).length;
   const pendingCount = ebooks.length - paidCount;

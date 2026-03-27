@@ -94,8 +94,20 @@ const orderSchema = new mongoose.Schema(
     // Order status
     orderStatus: {
       type: String,
-      enum: ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"],
+      enum: [
+        "PENDING",
+        "PROCESSING",
+        "SHIPPED",
+        "DELIVERED",
+        "COMPLETED",
+        "CANCELLED",
+      ],
       default: "PENDING",
+    },
+    orderKind: {
+      type: String,
+      enum: ["PHYSICAL", "DIGITAL"],
+      default: "PHYSICAL",
     },
     // 🔥 THÊM ĐOẠN NÀY
     assignmentStatus: {

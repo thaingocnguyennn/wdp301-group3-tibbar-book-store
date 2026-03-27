@@ -3,10 +3,171 @@ import Category from "../models/Category.js";
 import Cart from "../models/Cart.js";
 // FIX: getBestSellingBooks uses Order.aggregate, so Order model must be imported.
 import Order from "../models/Order.js";
+import EbookReaderState from "../models/EbookReaderState.js";
 import ApiError from "../utils/ApiError.js";
 import { MESSAGES, PAGINATION, BOOK_VISIBILITY } from "../config/constants.js";
 import User from "../models/User.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.resolve(__dirname, "../../uploads");
+
 class BookService {
+  getDefaultReaderSettings() {
+    return {
+      theme: "dark",
+      fontSize: 18,
+      fontFamily: "serif",
+      lineSpacing: 1.6,
+      zoomPercent: 100,
+    };
+  }
+
+  resolveAbsoluteEbookPath(ebookRelPath = "") {
+    if (!ebookRelPath || !ebookRelPath.startsWith("/uploads/ebooks/")) {
+      return null;
+    }
+
+    return path.join(uploadsRoot, ebookRelPath.replace(/^\/uploads/, ""));
+  }
+
+  estimatePdfTotalPages(ebookRelPath = "") {
+    const absolutePath = this.resolveAbsoluteEbookPath(ebookRelPath);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      return 0;
+    }
+
+    try {
+      const pdfContent = fs.readFileSync(absolutePath).toString("latin1");
+      const pageMatches = pdfContent.match(/\/Type\s*\/Page\b/g);
+      if (pageMatches?.length) {
+        return pageMatches.length;
+      }
+
+      const countMatches = [...pdfContent.matchAll(/\/Count\s+(\d+)/g)]
+        .map((match) => Number(match[1]))
+        .filter((value) => Number.isFinite(value) && value > 0);
+
+      return countMatches.length ? Math.max(...countMatches) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async requireReadableEbook(userId, bookId) {
+    const book = await Book.findById(bookId)
+      .select("title author imageUrl isEbook ebookFile ebookMetadata")
+      .lean();
+
+    if (!book) {
+      throw ApiError.notFound(MESSAGES.NOT_FOUND);
+    }
+
+    if (!book.isEbook || !book.ebookFile) {
+      throw ApiError.notFound("E-book not available");
+    }
+
+    const access = await this.checkEbookAccess(userId, bookId);
+    if (!access.hasAccess) {
+      throw ApiError.forbidden("Please complete payment to read this e-book.");
+    }
+
+    return book;
+  }
+
+  normalizeReaderProgress(progress = {}, totalPages = 0) {
+    const safeTotalPages = Number(totalPages) > 0 ? Number(totalPages) : 0;
+    const currentPageRaw = Number(progress?.currentPage || 1);
+    const scrollOffsetRaw = Number(progress?.scrollOffset || 0);
+    const currentPage =
+      safeTotalPages > 0
+        ? Math.min(Math.max(currentPageRaw, 1), safeTotalPages)
+        : Math.max(currentPageRaw, 1);
+    const completionPercent =
+      safeTotalPages > 0
+        ? Math.min(100, Math.max(0, Number(((currentPage / safeTotalPages) * 100).toFixed(1))))
+        : Math.min(100, Math.max(0, Number(progress?.completionPercent || 0)));
+
+    return {
+      currentPage,
+      completionPercent,
+      scrollOffset: Number.isFinite(scrollOffsetRaw) && scrollOffsetRaw >= 0 ? scrollOffsetRaw : 0,
+      lastReadAt: progress?.lastReadAt || null,
+    };
+  }
+
+  buildReaderStatePayload(book, readerState = null) {
+    const totalPages =
+      Number(book?.ebookMetadata?.totalPages || 0) ||
+      this.estimatePdfTotalPages(book?.ebookFile || "");
+    const toc = Array.isArray(book?.ebookMetadata?.toc)
+      ? book.ebookMetadata.toc
+          .filter((item) => item?.title && Number(item?.page) > 0)
+          .map((item) => ({
+            title: item.title,
+            page: Number(item.page),
+          }))
+      : [];
+    const defaultSettings = this.getDefaultReaderSettings();
+
+    return {
+      book: {
+        _id: book._id,
+        title: book.title,
+        author: book.author,
+        imageUrl: book.imageUrl || "",
+        totalPages,
+        toc,
+      },
+      readerState: {
+        progress: this.normalizeReaderProgress(readerState?.progress, totalPages),
+        settings: {
+          ...defaultSettings,
+          ...(readerState?.settings || {}),
+        },
+        bookmarks: Array.isArray(readerState?.bookmarks)
+          ? readerState.bookmarks
+          : [],
+        annotations: Array.isArray(readerState?.annotations)
+          ? readerState.annotations
+          : [],
+      },
+      capabilities: {
+        supportsPdfPageTracking: true,
+        supportsAutomaticScrollTracking: false,
+        supportsTypographyControlsOnPdf: false,
+        supportsInlinePdfHighlights: false,
+        supportsToc: toc.length > 0,
+      },
+    };
+  }
+
+  async findOrCreateReaderState(userId, bookId) {
+    let state = await EbookReaderState.findOne({ user: userId, book: bookId });
+    if (!state) {
+      state = await EbookReaderState.create({
+        user: userId,
+        book: bookId,
+      });
+    }
+
+    return state;
+  }
+
+  sanitizePublicBook(book) {
+    if (!book) return book;
+
+    const { ebookFile, ...safeBook } = book;
+    return safeBook;
+  }
+
+  sanitizePublicBooks(books = []) {
+    return books.map((book) => this.sanitizePublicBook(book));
+  }
+
   async getPublicBooks(filters = {}) {
     const {
       category,
@@ -44,6 +205,7 @@ class BookService {
     const [books, totalBooks] = await Promise.all([
       Book.find(query)
         .populate("category", "name")
+        .select("-ebookFile")
         .skip(skip)
         .limit(actualLimit)
         .sort({ createdAt: -1 })
@@ -52,7 +214,7 @@ class BookService {
     ]);
 
     return {
-      books,
+      books: this.sanitizePublicBooks(books),
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(totalBooks / actualLimit),
@@ -65,11 +227,12 @@ class BookService {
   async getNewestBooks(limit = 10) {
     const books = await Book.find({ visibility: BOOK_VISIBILITY.PUBLIC })
       .populate("category", "name")
+      .select("-ebookFile")
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
 
-    return books;
+    return this.sanitizePublicBooks(books);
   }
 
   async getBestSellingBooks(limit = 8) {
@@ -142,7 +305,7 @@ class BookService {
       },
     ]);
 
-    return bestSellers;
+    return this.sanitizePublicBooks(bestSellers);
   }
 
   async getPersonalizedBooks(userId, options = {}) {
@@ -178,11 +341,12 @@ class BookService {
     const newestFallback = async (strategy = "fallback-newest", signals = {}) => {
       const books = await Book.find({ visibility: BOOK_VISIBILITY.PUBLIC })
         .populate("category", "name")
+        .select("-ebookFile")
         .sort({ createdAt: -1 })
         .limit(actualLimit)
         .lean();
 
-      return { books, strategy, signals };
+      return { books: this.sanitizePublicBooks(books), strategy, signals };
     };
 
     // Guest users: Recommend For You behaves like Newest.
@@ -281,6 +445,7 @@ class BookService {
         $or: matchConditions,
       })
         .populate("category", "name")
+        .select("-ebookFile")
         .sort({ createdAt: -1 })
         .limit(actualLimit * 6)
         .lean();
@@ -334,6 +499,7 @@ class BookService {
         },
       })
         .populate("category", "name")
+        .select("-ebookFile")
         .sort({ createdAt: -1 })
         .limit(actualLimit - scoredCandidates.length)
         .lean();
@@ -396,17 +562,20 @@ class BookService {
 
     const paidOrder = await Order.findOne({
       user: userId,
-      'items.book': bookId,
-      paymentStatus: 'PAID',
+      "items.book": bookId,
+      paymentStatus: "PAID",
+      orderStatus: { $ne: "CANCELLED" },
+      orderKind: { $in: ["DIGITAL", null] },
     }).lean();
 
-    if (paidOrder) return { hasAccess: true, paymentStatus: 'PAID' };
+    if (paidOrder) return { hasAccess: true, paymentStatus: "PAID" };
 
     const anyOrder = await Order.findOne({
       user: userId,
-      'items.book': bookId,
+      "items.book": bookId,
     })
-      .select('paymentStatus')
+      .select("paymentStatus orderStatus")
+      .sort({ createdAt: -1 })
       .lean();
 
     return { hasAccess: false, paymentStatus: anyOrder?.paymentStatus || null };
@@ -423,6 +592,258 @@ class BookService {
     }
 
     return book.ebookFile; // e.g. '/uploads/ebooks/xxx.pdf'
+  }
+
+  async getEbookReaderState(userId, bookId) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const readerState = await EbookReaderState.findOne({
+      user: userId,
+      book: bookId,
+    }).lean();
+
+    return this.buildReaderStatePayload(book, readerState);
+  }
+
+  async updateEbookReaderProgress(userId, bookId, payload = {}) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const totalPages =
+      Number(book?.ebookMetadata?.totalPages || 0) ||
+      this.estimatePdfTotalPages(book?.ebookFile || "");
+    const currentPage = Number(payload.currentPage || state.progress?.currentPage || 1);
+
+    if (!Number.isFinite(currentPage) || currentPage < 1) {
+      throw ApiError.badRequest("Current page must be greater than 0");
+    }
+
+    state.progress.currentPage =
+      totalPages > 0 ? Math.min(currentPage, totalPages) : currentPage;
+    state.progress.scrollOffset = Math.max(0, Number(payload.scrollOffset || 0));
+    state.progress.completionPercent =
+      totalPages > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Number((((state.progress.currentPage || 1) / totalPages) * 100).toFixed(1)),
+            ),
+          )
+        : Number(payload.completionPercent || state.progress?.completionPercent || 0);
+    state.progress.lastReadAt = new Date();
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async updateEbookReaderSettings(userId, bookId, payload = {}) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const defaultSettings = this.getDefaultReaderSettings();
+    const nextSettings = {
+      ...defaultSettings,
+      ...(state.settings?.toObject?.() || state.settings || {}),
+      ...(payload || {}),
+    };
+
+    if (!["light", "dark", "sepia"].includes(nextSettings.theme)) {
+      throw ApiError.badRequest("Invalid theme");
+    }
+
+    if (!["serif", "sans", "mono"].includes(nextSettings.fontFamily)) {
+      throw ApiError.badRequest("Invalid font family");
+    }
+
+    state.settings.theme = nextSettings.theme;
+    state.settings.fontSize = Math.min(30, Math.max(14, Number(nextSettings.fontSize || defaultSettings.fontSize)));
+    state.settings.fontFamily = nextSettings.fontFamily;
+    state.settings.lineSpacing = Math.min(2.4, Math.max(1.2, Number(nextSettings.lineSpacing || defaultSettings.lineSpacing)));
+    state.settings.zoomPercent = Math.min(180, Math.max(80, Number(nextSettings.zoomPercent || defaultSettings.zoomPercent)));
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async addEbookBookmark(userId, bookId, payload = {}) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const page = Number(payload.page);
+
+    if (!Number.isFinite(page) || page < 1) {
+      throw ApiError.badRequest("Bookmark page must be greater than 0");
+    }
+
+    const hasLabel = Object.prototype.hasOwnProperty.call(payload, "label");
+    const hasSnippet = Object.prototype.hasOwnProperty.call(payload, "snippet");
+    const hasNote = Object.prototype.hasOwnProperty.call(payload, "note");
+    const defaultLabel = `Page ${page}`;
+    const defaultSnippet = `Saved on page ${page}`;
+    const existingBookmark = state.bookmarks.find(
+      (bookmark) => Number(bookmark.page) === page,
+    );
+
+    const nextBookmark = {
+      label: hasLabel
+        ? String(payload.label || "").trim() || defaultLabel
+        : String(existingBookmark?.label || "").trim() || defaultLabel,
+      page,
+      snippet: hasSnippet
+        ? String(payload.snippet || "").trim() || defaultSnippet
+        : String(existingBookmark?.snippet || "").trim() || defaultSnippet,
+      note: hasNote
+        ? String(payload.note || "").trim()
+        : String(existingBookmark?.note || "").trim(),
+    };
+
+    const remainingBookmarks = state.bookmarks
+      .filter((bookmark) => Number(bookmark.page) !== page)
+      .map((bookmark) =>
+        typeof bookmark.toObject === "function" ? bookmark.toObject() : bookmark,
+      );
+
+    state.bookmarks = [nextBookmark, ...remainingBookmarks];
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async deleteEbookBookmark(userId, bookId, bookmarkId) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const bookmark = state.bookmarks.id(bookmarkId);
+
+    if (!bookmark) {
+      throw ApiError.notFound("Bookmark not found");
+    }
+
+    bookmark.deleteOne();
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async addEbookAnnotation(userId, bookId, payload = {}) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const page = Number(payload.page);
+
+    if (!Number.isFinite(page) || page < 1) {
+      throw ApiError.badRequest("Annotation page must be greater than 0");
+    }
+
+    state.annotations.unshift({
+      page,
+      snippet: String(payload.snippet || "").trim(),
+      note: String(payload.note || "").trim(),
+      color: ["yellow", "mint", "rose", "sky"].includes(payload.color)
+        ? payload.color
+        : "yellow",
+    });
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async updateEbookAnnotation(userId, bookId, annotationId, payload = {}) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const annotation = state.annotations.id(annotationId);
+
+    if (!annotation) {
+      throw ApiError.notFound("Annotation not found");
+    }
+
+    const page = Number(payload.page || annotation.page);
+
+    if (!Number.isFinite(page) || page < 1) {
+      throw ApiError.badRequest("Annotation page must be greater than 0");
+    }
+
+    annotation.page = page;
+    annotation.snippet = String(payload.snippet || annotation.snippet || "").trim();
+    annotation.note = String(payload.note || "").trim();
+    annotation.color = ["yellow", "mint", "rose", "sky"].includes(payload.color)
+      ? payload.color
+      : annotation.color;
+
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async deleteEbookAnnotation(userId, bookId, annotationId) {
+    const book = await this.requireReadableEbook(userId, bookId);
+    const state = await this.findOrCreateReaderState(userId, bookId);
+    const annotation = state.annotations.id(annotationId);
+
+    if (!annotation) {
+      throw ApiError.notFound("Annotation not found");
+    }
+
+    annotation.deleteOne();
+    await state.save();
+
+    return this.buildReaderStatePayload(book, state.toObject());
+  }
+
+  async getMyEbooks(userId) {
+    const orders = await Order.find({
+      user: userId,
+      orderKind: { $in: ["DIGITAL", null] },
+    })
+      .populate("items.book")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const uniqueByBookId = new Map();
+
+    orders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const book = item.book;
+        if (!book?._id || !book?.isEbook) return;
+
+        const isAccessible =
+          order.paymentStatus === "PAID" && order.orderStatus !== "CANCELLED";
+        const existing = uniqueByBookId.get(book._id.toString());
+        const candidate = {
+          _id: book._id,
+          title: book.title || item.title || "Untitled E-Book",
+          author: book.author || item.author || "Unknown Author",
+          imageUrl: book.imageUrl || "",
+          price: Number(book.price || item.price || 0),
+          latestOrderAt: order.createdAt,
+          latestPaidAt: isAccessible ? order.createdAt : null,
+          hasPaidOrder: isAccessible,
+          paymentStatus: order.paymentStatus || null,
+          orderStatus: order.orderStatus || null,
+        };
+
+        if (!existing) {
+          uniqueByBookId.set(book._id.toString(), candidate);
+          return;
+        }
+
+        uniqueByBookId.set(book._id.toString(), {
+          ...existing,
+          latestOrderAt:
+            new Date(candidate.latestOrderAt) > new Date(existing.latestOrderAt)
+              ? candidate.latestOrderAt
+              : existing.latestOrderAt,
+          latestPaidAt:
+            candidate.latestPaidAt &&
+            (!existing.latestPaidAt ||
+              new Date(candidate.latestPaidAt) > new Date(existing.latestPaidAt))
+              ? candidate.latestPaidAt
+              : existing.latestPaidAt,
+          hasPaidOrder: existing.hasPaidOrder || candidate.hasPaidOrder,
+          paymentStatus: candidate.paymentStatus || existing.paymentStatus,
+          orderStatus: candidate.orderStatus || existing.orderStatus,
+        });
+      });
+    });
+
+    return Array.from(uniqueByBookId.values()).sort(
+      (a, b) => new Date(b.latestOrderAt) - new Date(a.latestOrderAt),
+    );
   }
 
   async getAllBooksAdmin(filters = {}) {
