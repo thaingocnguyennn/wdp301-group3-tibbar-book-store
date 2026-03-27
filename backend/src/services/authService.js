@@ -36,11 +36,15 @@ class AuthService {
     return { user, accessToken, refreshToken };
   }
 
-  async login(email, password, recaptchaToken, requesterIp) {
-    const isCaptchaValid = await recaptchaService.verifyToken(recaptchaToken, requesterIp);
+  async login(email, password, recaptchaToken, requesterIp, options = {}) {
+    const { skipCaptcha = false } = options;
 
-    if (!isCaptchaValid) {
-      throw ApiError.badRequest('reCAPTCHA verification failed. Please try again.');
+    if (!skipCaptcha) {
+      const isCaptchaValid = await recaptchaService.verifyToken(recaptchaToken, requesterIp);
+
+      if (!isCaptchaValid) {
+        throw ApiError.badRequest('reCAPTCHA verification failed. Please try again.');
+      }
     }
 
     const user = await User.findOne({ email }).select(

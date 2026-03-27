@@ -33,12 +33,15 @@ class AuthController {
     try {
       const { email, password, recaptchaToken } = req.body;
       const requesterIp = req.ip;
+      const clientPlatform = (req.headers['x-client-platform'] || '').toString().toLowerCase();
+      const skipCaptcha = clientPlatform === 'mobile';
 
       const { user, accessToken, refreshToken } = await authService.login(
         email,
         password,
         recaptchaToken,
-        requesterIp
+        requesterIp,
+        { skipCaptcha }
       );
 
       setRefreshTokenCookie(res, refreshToken);
