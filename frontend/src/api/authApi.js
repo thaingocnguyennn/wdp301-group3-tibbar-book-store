@@ -1,11 +1,6 @@
 import axiosInstance from './axios.js';
 
 export const authApi = {
-  getCaptcha: async () => {
-    const response = await axiosInstance.get('/auth/captcha');
-    return response.data;
-  },
-
   register: async (userData) => {
     const response = await axiosInstance.post('/auth/register', userData);
     return response.data;
