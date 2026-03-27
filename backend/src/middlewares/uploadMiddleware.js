@@ -14,6 +14,7 @@ const previewUploadsDir = path.join(uploadsRoot, "book-previews");
 const newsUploadsDir = path.join(uploadsRoot, "news");
 const reviewUploadsDir = path.join(uploadsRoot, "reviews");
 const supportUploadsDir = path.join(uploadsRoot, "support");
+const cvUploadsDir = path.join(uploadsRoot, "cvs");
 
 [
   sliderUploadsDir,
@@ -23,6 +24,7 @@ const supportUploadsDir = path.join(uploadsRoot, "support");
   newsUploadsDir,
   reviewUploadsDir,
   supportUploadsDir,
+  cvUploadsDir,
 ].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -46,6 +48,14 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(new Error("Only image files are allowed"), false);
+  }
+};
+
+const pdfFileFilter = (req, file, cb) => {
+  if (file.mimetype === "application/pdf") {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF files are allowed"), false);
   }
 };
 
@@ -133,6 +143,12 @@ export const supportChatUpload = multer({
   storage: createStorage(supportUploadsDir),
   fileFilter,
   limits: { fileSize: 8 * 1024 * 1024 },
+});
+
+export const cvUpload = multer({
+  storage: createStorage(cvUploadsDir),
+  fileFilter: pdfFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 // Middleware upload cho bằng chứng giao hàng của shipper

@@ -114,6 +114,16 @@ const Navbar = () => {
                 Support Inbox {adminUnreadMessages > 0 && `(${adminUnreadMessages})`}
               </Link>
             )}
+            {isAdmin && (
+              <Link to="/admin/support-system" style={styles.link}>
+                Support System
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin/support-system/history" style={styles.link}>
+                Support Inbox History
+              </Link>
+            )}
             {isAuthenticated && (
               <Link to="/profile" style={styles.link}>
                 Profile
@@ -151,6 +161,12 @@ const Navbar = () => {
                 {showCustomerNavLinks && (
                   <Link to="/support" style={styles.link}>
                     Support
+                  </Link>
+                )}
+
+                {showCustomerNavLinks && (
+                  <Link to="/support-system/history" style={styles.link}>
+                    Support History
                   </Link>
                 )}
 
