@@ -41,3 +41,5 @@ frontend/.env.production
 ####################
 coverage/
 .cache/
+
+mobile/

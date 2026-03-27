@@ -4,7 +4,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { MESSAGES } from '../config/constants.js';
 import { sendOTPEmail, sendPasswordResetConfirmationEmail } from '../utils/emailHelper.js';
 import { OAuth2Client } from 'google-auth-library';
-import captchaService from './captchaService.js';
+import recaptchaService from './recaptchaService.js';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const ACCOUNT_LOCK_DURATION_MS = 30 * 60 * 1000;
@@ -12,10 +12,6 @@ const ACCOUNT_LOCKED_MESSAGE =
   'Your account is locked due to 5 failed login attempts. Please try again after 30 minutes.';
 
 class AuthService {
-  async getCaptcha() {
-    return captchaService.generateCaptcha();
-  }
-
   async register(userData) {
     const { email, password, firstName, lastName } = userData;
 
@@ -40,11 +36,11 @@ class AuthService {
     return { user, accessToken, refreshToken };
   }
 
-  async login(email, password, captchaId, captchaAnswer) {
-    const isCaptchaValid = captchaService.verifyCaptcha(captchaId, captchaAnswer);
+  async login(email, password, recaptchaToken, requesterIp) {
+    const isCaptchaValid = await recaptchaService.verifyToken(recaptchaToken, requesterIp);
 
     if (!isCaptchaValid) {
-      throw ApiError.badRequest('Captcha verification failed. Please try again.');
+      throw ApiError.badRequest('reCAPTCHA verification failed. Please try again.');
     }
 
     const user = await User.findOne({ email }).select(
