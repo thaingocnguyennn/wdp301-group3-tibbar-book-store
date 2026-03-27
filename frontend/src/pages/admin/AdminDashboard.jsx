@@ -112,6 +112,14 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
+        <Link to="/admin/cvs" style={styles.card}>
+          <div style={styles.icon}>📄</div>
+          <h3 style={styles.cardTitle}>CV Management</h3>
+          <p style={styles.cardDesc}>
+            Review CV applications and update pending requests to accepted or rejected
+          </p>
+        </Link>
+
         <Link to="/admin/news" style={styles.card}>
           <div style={styles.icon}>📰</div>
           <h3 style={styles.cardTitle}>News Management</h3>

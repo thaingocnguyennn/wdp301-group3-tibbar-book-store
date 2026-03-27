@@ -53,6 +53,8 @@ import InventoryManagementPage from "./pages/admin/InventoryManagementPage";
 import FlashSaleManagement from "./pages/admin/FlashSaleManagement";
 import ChatbotWidget from "./components/chatbot/ChatbotWidget";
 import SupportSystemWidget from "./components/support/SupportSystemWidget";
+import JoinUsPage from "./pages/JoinUsPage";
+import AdminCvManagementPage from "./pages/admin/AdminCvManagementPage";
 // Protected Route Component - Only for authenticated routes
 const ProtectedRoute = ({
   children,
@@ -215,6 +217,14 @@ function AppContent() {
           element={
             <ProtectedRoute customerOnly>
               <SupportSystemHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/join-us"
+          element={
+            <ProtectedRoute customerOnly>
+              <JoinUsPage />
             </ProtectedRoute>
           }
         />
@@ -391,6 +401,14 @@ function AppContent() {
           element={
             <ProtectedRoute adminOnly>
               <FlashSaleManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/cvs"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminCvManagementPage />
             </ProtectedRoute>
           }
         />
