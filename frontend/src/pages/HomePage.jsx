@@ -236,6 +236,26 @@ const HomePage = () => {
         <Slider images={sliders} />
       </section>
 
+      <section style={styles.joinUsSection}>
+        <div style={styles.joinUsContent}>
+          <div>
+            <h2 style={styles.joinUsTitle}>Want to join our team?</h2>
+            <p style={styles.joinUsSubtitle}>
+              Submit your CV in PDF and our admin team will review your application.
+            </p>
+          </div>
+          {isAuthenticated ? (
+            <Link to="/join-us" style={styles.joinUsButton}>
+              Join us
+            </Link>
+          ) : (
+            <Link to="/login" style={styles.joinUsButton}>
+              Join us
+            </Link>
+          )}
+        </div>
+      </section>
+
       {/* Homepage News */}
       <section style={styles.section}>
         <div style={styles.sectionHeader}>
@@ -560,6 +580,40 @@ const styles = {
     margin: "0 auto",
     padding: "0 2rem",
     marginBottom: "3rem",
+  },
+  joinUsSection: {
+    maxWidth: "1200px",
+    margin: "0 auto 2rem",
+    padding: "0 2rem",
+  },
+  joinUsContent: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+    color: "#f8fafc",
+    borderRadius: "16px",
+    padding: "1.2rem 1.4rem",
+    boxShadow: "0 10px 24px rgba(15, 23, 42, 0.28)",
+  },
+  joinUsTitle: {
+    margin: "0 0 0.25rem",
+    fontSize: "1.5rem",
+    fontWeight: 800,
+  },
+  joinUsSubtitle: {
+    margin: 0,
+    color: "#cbd5e1",
+  },
+  joinUsButton: {
+    textDecoration: "none",
+    background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+    color: "#fff",
+    padding: "0.7rem 1.1rem",
+    borderRadius: "10px",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
   },
   sectionHeader: {
     marginBottom: "2rem",
