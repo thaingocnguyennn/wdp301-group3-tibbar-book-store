@@ -7,6 +7,16 @@ const CartPage = () => {
   const navigate = useNavigate();
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
+  const containsEbook = useMemo(
+    () => (cart.items || []).some((item) => item.book?.isEbook),
+    [cart.items],
+  );
+  const containsPhysical = useMemo(
+    () => (cart.items || []).some((item) => item.book && !item.book?.isEbook),
+    [cart.items],
+  );
+  const isDigitalCart = containsEbook && !containsPhysical;
+  const isMixedCart = containsEbook && containsPhysical;
 
   const totals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
@@ -17,16 +27,20 @@ const CartPage = () => {
     // Free shipping if subtotal > 200,000 VND
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
-    const shippingFee = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+    const shippingFee = isDigitalCart
+      ? 0
+      : subtotal > FREE_SHIPPING_THRESHOLD
+        ? 0
+        : SHIPPING_FEE;
     const total = subtotal + shippingFee;
 
     return {
       subtotal,
       shippingFee,
       total,
-      isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
+      isFreeShipping: isDigitalCart || subtotal > FREE_SHIPPING_THRESHOLD,
     };
-  }, [cart.items]);
+  }, [cart.items, isDigitalCart]);
 
   if (!cart.items || cart.items.length === 0) {
     return (
@@ -51,6 +65,11 @@ const CartPage = () => {
 
       <div style={styles.grid}>
         <div style={styles.items}>
+          {isMixedCart && (
+            <div style={styles.mixedCartNotice}>
+              E-books and physical books must be checked out separately. Please remove one type before continuing.
+            </div>
+          )}
           {cart.items.map((item) => (
             <div key={item.book?._id} style={styles.itemCard}>
               <div style={styles.itemInfo}>
@@ -76,6 +95,9 @@ const CartPage = () => {
                 <div style={styles.itemText}>
                   <h3 style={styles.itemTitle}>{item.book?.title}</h3>
                   <p style={styles.itemAuthor}>by {item.book?.author}</p>
+                  {item.book?.isEbook && (
+                    <p style={styles.itemType}>Digital access</p>
+                  )}
                   <p style={styles.itemPrice}>
                     {item.book?.price?.toLocaleString('vi-VN')}₫
                   </p>
@@ -83,21 +105,25 @@ const CartPage = () => {
               </div>
 
               <div style={styles.itemActions}>
-                <div style={styles.qtyControls}>
-                  <button
-                    style={styles.qtyButton}
-                    onClick={() => update(item.book._id, item.quantity - 1)}
-                  >
-                    −
-                  </button>
-                  <span style={styles.qtyValue}>{item.quantity}</span>
-                  <button
-                    style={styles.qtyButton}
-                    onClick={() => update(item.book._id, item.quantity + 1)}
-                  >
-                    +
-                  </button>
-                </div>
+                {item.book?.isEbook ? (
+                  <div style={styles.ebookQtyBadge}>Instant access</div>
+                ) : (
+                  <div style={styles.qtyControls}>
+                    <button
+                      style={styles.qtyButton}
+                      onClick={() => update(item.book._id, item.quantity - 1)}
+                    >
+                      −
+                    </button>
+                    <span style={styles.qtyValue}>{item.quantity}</span>
+                    <button
+                      style={styles.qtyButton}
+                      onClick={() => update(item.book._id, item.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
                 <button
                   style={styles.removeButton}
                   onClick={() => remove(item.book._id)}
@@ -118,14 +144,16 @@ const CartPage = () => {
           <div style={styles.summaryRow}>
             <span>Shipping</span>
             <strong>
-              {totals.isFreeShipping ? (
+              {isDigitalCart ? (
+                <span style={{color: '#27ae60'}}>Instant delivery</span>
+              ) : totals.isFreeShipping ? (
                 <span style={{color: '#27ae60'}}>Free ✓</span>
               ) : (
                 `${totals.shippingFee.toLocaleString('vi-VN')}₫`
               )}
             </strong>
           </div>
-          {!totals.isFreeShipping && totals.subtotal > 0 && (
+          {!isDigitalCart && !totals.isFreeShipping && totals.subtotal > 0 && (
             <div style={styles.freeShippingNotice}>
               💡 Add {(200000 - totals.subtotal).toLocaleString('vi-VN')}₫ more for free shipping
             </div>
@@ -136,8 +164,12 @@ const CartPage = () => {
             <strong style={{fontSize: '1.2rem'}}>{totals.total.toLocaleString('vi-VN')}₫</strong>
           </div>
           <button 
-            style={styles.checkoutButton} 
+            style={{
+              ...styles.checkoutButton,
+              ...(isMixedCart ? styles.checkoutButtonDisabled : {}),
+            }} 
             onClick={() => navigate("/checkout")}
+            disabled={isMixedCart}
           >
             Proceed to Checkout
           </button>
@@ -223,6 +255,12 @@ const styles = {
     margin: 0,
     color: "#7f8c8d",
   },
+  itemType: {
+    margin: 0,
+    color: "#2563eb",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+  },
   itemPrice: {
     margin: 0,
     fontWeight: "600",
@@ -255,6 +293,15 @@ const styles = {
     fontWeight: "600",
     minWidth: "20px",
     textAlign: "center",
+  },
+  ebookQtyBadge: {
+    backgroundColor: "#ecfdf5",
+    color: "#047857",
+    border: "1px solid #a7f3d0",
+    padding: "0.45rem 0.75rem",
+    borderRadius: "999px",
+    fontSize: "0.85rem",
+    fontWeight: "600",
   },
   removeButton: {
     border: "1px solid #e74c3c",
@@ -308,6 +355,18 @@ const styles = {
     cursor: "pointer",
     fontSize: "1rem",
     fontWeight: "600",
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: "#cbd5e1",
+    cursor: "not-allowed",
+  },
+  mixedCartNotice: {
+    backgroundColor: "#fff7ed",
+    border: "1px solid #fdba74",
+    color: "#9a3412",
+    padding: "0.9rem 1rem",
+    borderRadius: "12px",
+    lineHeight: 1.5,
   },
   primaryButton: {
     backgroundColor: "#667eea",

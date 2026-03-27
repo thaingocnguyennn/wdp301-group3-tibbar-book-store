@@ -12,6 +12,7 @@ const BookDetailPage = () => {
   const { add } = useCart();
   const { isAuthenticated, user } = useAuth();
   const bookInfoRef = useRef(null);
+  const cartNoticeTimerRef = useRef(null);
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -38,6 +39,7 @@ const BookDetailPage = () => {
   const [newReviewImagePreviews, setNewReviewImagePreviews] = useState([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [ebookActionMessage, setEbookActionMessage] = useState("");
+  const [cartNotice, setCartNotice] = useState(null);
   const [reviewDeleting, setReviewDeleting] = useState(false);
   const [reactionSubmittingId, setReactionSubmittingId] = useState("");
   const [replyInputs, setReplyInputs] = useState({});
@@ -57,6 +59,13 @@ const BookDetailPage = () => {
     ? book.previewPages.slice(0, 10)
     : [];
   const currentPreviewSrc = resolveImageUrl(previewPages[previewPageIndex]);
+  const isDigitalBook = Boolean(book?.isEbook);
+  const canPurchaseBook = isDigitalBook || Number(book?.stock || 0) > 0;
+  const stockCountLabel = isDigitalBook
+    ? "Delivered instantly after payment"
+    : Number(book?.stock || 0) > 0
+      ? `${book.stock} available`
+      : "Out of stock";
 
   useEffect(() => {
     fetchBook();
@@ -85,6 +94,14 @@ const BookDetailPage = () => {
     window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
     bookInfoRef.current.focus({ preventScroll: true });
   }, [loading, book, id]);
+
+  useEffect(() => {
+    return () => {
+      if (cartNoticeTimerRef.current) {
+        window.clearTimeout(cartNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   const fetchBook = async () => {
     try {
@@ -218,16 +235,67 @@ const BookDetailPage = () => {
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      alert("Please login to add items to cart");
-      navigate("/login");
+      setCartNotice({
+        tone: "info",
+        title: "Login Required",
+        message: isDigitalBook
+          ? "Please login to add this e-book to your cart and continue to checkout."
+          : "Please login to add this book to your cart.",
+        primaryLabel: "Go to Login",
+        primaryAction: "login",
+      });
       return;
     }
 
     try {
       await add(book._id, 1);
-      alert("Added to cart");
+      if (cartNoticeTimerRef.current) {
+        window.clearTimeout(cartNoticeTimerRef.current);
+      }
+      setCartNotice({
+        tone: "success",
+        title: isDigitalBook ? "E-Book Added to Cart" : "Added to Cart",
+        message: isDigitalBook
+          ? "Complete payment at checkout to unlock instant reading."
+          : "This book is ready in your cart.",
+        primaryLabel: "Go to Cart",
+        primaryAction: "cart",
+      });
+
+      cartNoticeTimerRef.current = window.setTimeout(() => {
+        setCartNotice(null);
+        cartNoticeTimerRef.current = null;
+      }, 3500);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add to cart");
+      setCartNotice({
+        tone: "error",
+        title: "Unable to Add Item",
+        message: err.response?.data?.message || "Failed to add to cart",
+        primaryLabel: "Close",
+        primaryAction: null,
+      });
+    }
+  };
+
+  const dismissCartNotice = () => {
+    if (cartNoticeTimerRef.current) {
+      window.clearTimeout(cartNoticeTimerRef.current);
+      cartNoticeTimerRef.current = null;
+    }
+    setCartNotice(null);
+  };
+
+  const handleCartNoticePrimaryAction = () => {
+    const action = cartNotice?.primaryAction;
+    dismissCartNotice();
+
+    if (action === "login") {
+      navigate("/login", { state: { from: `/books/${id}` } });
+      return;
+    }
+
+    if (action === "cart") {
+      navigate("/cart");
     }
   };
 
@@ -450,6 +518,63 @@ const BookDetailPage = () => {
 
   return (
     <>
+      {cartNotice && (
+        <div style={styles.cartNoticeOverlay} onClick={dismissCartNotice}>
+          <div
+            style={{
+              ...styles.cartNoticeCard,
+              ...(cartNotice.tone === "success"
+                ? styles.cartNoticeCardSuccess
+                : cartNotice.tone === "error"
+                  ? styles.cartNoticeCardError
+                  : styles.cartNoticeCardInfo),
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                ...styles.cartNoticeIcon,
+                ...(cartNotice.tone === "success"
+                  ? styles.cartNoticeIconSuccess
+                  : cartNotice.tone === "error"
+                    ? styles.cartNoticeIconError
+                    : styles.cartNoticeIconInfo),
+              }}
+            >
+              {cartNotice.tone === "success"
+                ? "✓"
+                : cartNotice.tone === "error"
+                  ? "!"
+                  : "i"}
+            </div>
+            <h3 style={styles.cartNoticeTitle}>{cartNotice.title}</h3>
+            <p style={styles.cartNoticeMessage}>{cartNotice.message}</p>
+            <div style={styles.cartNoticeActions}>
+              {cartNotice.primaryAction && (
+                <button
+                  type="button"
+                  style={styles.cartNoticeSecondaryButton}
+                  onClick={dismissCartNotice}
+                >
+                  Continue Browsing
+                </button>
+              )}
+              <button
+                type="button"
+                style={{
+                  ...styles.cartNoticePrimaryButton,
+                  ...(cartNotice.tone === "error"
+                    ? styles.cartNoticePrimaryButtonError
+                    : {}),
+                }}
+                onClick={handleCartNoticePrimaryAction}
+              >
+                {cartNotice.primaryLabel || "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={styles.container}>
         <div ref={bookInfoRef} tabIndex={-1} style={styles.content}>
           <div style={styles.imageSection}>
@@ -459,7 +584,7 @@ const BookDetailPage = () => {
               <div style={styles.placeholder}>📖</div>
             )}
             <div style={styles.stockBadge}>
-              {book.stock > 0 ? (
+              {isDigitalBook || book.stock > 0 ? (
                 <span style={styles.inStockBadge}>✓ In Stock</span>
               ) : (
                 <span style={styles.outOfStockBadge}>✗ Out of Stock</span>
@@ -507,9 +632,11 @@ const BookDetailPage = () => {
                 </div>
               )}
               <div style={styles.infoItem}>
-                <span style={styles.infoLabel}>Stock</span>
+                <span style={styles.infoLabel}>
+                  {isDigitalBook ? "Access" : "Stock"}
+                </span>
                 <span style={styles.infoValue}>
-                  {book.stock > 0 ? `${book.stock} available` : "Out of stock"}
+                  {stockCountLabel}
                 </span>
               </div>
             </div>
@@ -518,14 +645,18 @@ const BookDetailPage = () => {
 
             <div style={styles.actions}>
               <button
-                disabled={book.stock === 0}
+                disabled={!canPurchaseBook}
                 onClick={handleAddToCart}
                 style={{
                   ...styles.addToCart,
-                  ...(book.stock === 0 && styles.disabled),
+                  ...(!canPurchaseBook && styles.disabled),
                 }}
               >
-                {book.stock > 0 ? "🛒 Add to Cart" : "✗ Out of Stock"}
+                {canPurchaseBook
+                  ? isDigitalBook
+                    ? "Read Instantly"
+                    : "Add to Cart"
+                  : "Out of Stock"}
               </button>
               <button
                 onClick={() => navigate("/")}
@@ -1484,6 +1615,113 @@ const styles = {
     fontWeight: "600",
     cursor: "pointer",
     transition: "all 0.3s ease",
+  },
+  cartNoticeOverlay: {
+    position: "fixed",
+    inset: 0,
+    backgroundColor: "rgba(15, 23, 42, 0.32)",
+    backdropFilter: "blur(6px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1100,
+    padding: "1rem",
+  },
+  cartNoticeCard: {
+    width: "100%",
+    maxWidth: "420px",
+    backgroundColor: "#ffffff",
+    borderRadius: "18px",
+    padding: "1.5rem",
+    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.18)",
+    border: "1px solid rgba(148, 163, 184, 0.18)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+    gap: "0.85rem",
+  },
+  cartNoticeCardSuccess: {
+    background:
+      "linear-gradient(180deg, rgba(248, 250, 255, 1) 0%, rgba(255, 255, 255, 1) 100%)",
+  },
+  cartNoticeCardError: {
+    background:
+      "linear-gradient(180deg, rgba(255, 247, 247, 1) 0%, rgba(255, 255, 255, 1) 100%)",
+  },
+  cartNoticeCardInfo: {
+    background:
+      "linear-gradient(180deg, rgba(244, 247, 255, 1) 0%, rgba(255, 255, 255, 1) 100%)",
+  },
+  cartNoticeIcon: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "1.4rem",
+    fontWeight: "700",
+  },
+  cartNoticeIconSuccess: {
+    background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+    color: "#fff",
+    boxShadow: "0 10px 24px rgba(34, 197, 94, 0.28)",
+  },
+  cartNoticeIconError: {
+    background: "linear-gradient(135deg, #f87171 0%, #dc2626 100%)",
+    color: "#fff",
+    boxShadow: "0 10px 24px rgba(239, 68, 68, 0.28)",
+  },
+  cartNoticeIconInfo: {
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "#fff",
+    boxShadow: "0 10px 24px rgba(102, 126, 234, 0.28)",
+  },
+  cartNoticeTitle: {
+    margin: 0,
+    fontSize: "1.15rem",
+    fontWeight: "700",
+    color: "#1e293b",
+  },
+  cartNoticeMessage: {
+    margin: 0,
+    fontSize: "0.95rem",
+    lineHeight: "1.6",
+    color: "#475569",
+  },
+  cartNoticeActions: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    gap: "0.75rem",
+    flexWrap: "wrap",
+    marginTop: "0.35rem",
+  },
+  cartNoticeSecondaryButton: {
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#fff",
+    color: "#334155",
+    borderRadius: "999px",
+    padding: "0.7rem 1.1rem",
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  cartNoticePrimaryButton: {
+    border: "none",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "#fff",
+    borderRadius: "999px",
+    padding: "0.7rem 1.2rem",
+    fontSize: "0.9rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 10px 22px rgba(102, 126, 234, 0.24)",
+  },
+  cartNoticePrimaryButtonError: {
+    background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+    boxShadow: "0 10px 22px rgba(239, 68, 68, 0.2)",
   },
   previewOverlay: {
     position: "fixed",

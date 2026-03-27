@@ -91,7 +91,7 @@ const BookCard = ({ book }) => {
           </Link>
         </div>
 
-        {book.stock === 0 && (
+        {!book.isEbook && book.stock === 0 && (
           <span style={styles.outOfStock}>Out of Stock</span>
         )}
       </div>
