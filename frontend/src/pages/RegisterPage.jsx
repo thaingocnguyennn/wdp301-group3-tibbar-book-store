@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
-const NAME_REGEX = /^[A-Za-z\s'-]{1,50}$/;
+const NAME_REGEX = /^[\p{L}\s'-]{1,50}$/u;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 
 const RegisterPage = () => {
