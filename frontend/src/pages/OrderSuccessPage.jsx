@@ -16,6 +16,10 @@ const ORDER_STATUS_CONFIG = {
   DELIVERED: { icon: "✅", label: "Delivered", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
   CANCELLED: { icon: "✕", label: "Cancelled", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
 };
+ORDER_STATUS_CONFIG.COMPLETED = {
+  ...ORDER_STATUS_CONFIG.DELIVERED,
+  label: "Completed",
+};
 
 const PAYMENT_METHOD_LABELS = {
   COD: "Cash on Delivery",
@@ -90,6 +94,7 @@ const OrderSuccessPage = () => {
 
   const paymentConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
   const statusConfig = ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
+  const isDigitalOrder = order.orderKind === "DIGITAL";
   const getItemImageSrc = (item) => {
     const imageUrl = item?.book?.imageUrl;
     if (!imageUrl) return "";
@@ -104,9 +109,13 @@ const OrderSuccessPage = () => {
           <div style={styles.successCircle}>
             <span style={styles.successCheck}>✓</span>
           </div>
-          <h1 style={styles.successTitle}>Order Placed Successfully!</h1>
+          <h1 style={styles.successTitle}>
+            {isDigitalOrder ? "E-Book Purchase Completed!" : "Order Placed Successfully!"}
+          </h1>
           <p style={styles.successSubtitle}>
-            Thank you for your purchase. Your order has been received and is being processed.
+            {isDigitalOrder
+              ? "Your payment was recorded and digital access is now available in My E-Books."
+              : "Thank you for your purchase. Your order has been received and is being processed."}
           </p>
         </div>
 
@@ -165,7 +174,7 @@ const OrderSuccessPage = () => {
         </div>
 
         {/* ─── Shipping Address ─── */}
-        {order.shippingAddress && order.shippingAddress.fullName && (
+        {!isDigitalOrder && order.shippingAddress && order.shippingAddress.fullName && (
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>
               <span style={styles.sectionIcon}>📍</span>
@@ -249,7 +258,9 @@ const OrderSuccessPage = () => {
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Shipping Fee</span>
               <span style={styles.summaryValue}>
-                {order.shippingFee === 0 ? (
+                {isDigitalOrder ? (
+                  <span style={{ color: "#16a34a", fontWeight: 600 }}>Instant delivery</span>
+                ) : order.shippingFee === 0 ? (
                   <span style={{ color: "#16a34a", fontWeight: 600 }}>Free</span>
                 ) : (
                   `${order.shippingFee.toLocaleString("vi-VN")}₫`
@@ -306,8 +317,11 @@ const OrderSuccessPage = () => {
 
         {/* ─── Actions ─── */}
         <div style={styles.actions}>
-          <button style={styles.primaryButton} onClick={() => navigate("/orders")}>
-            View My Orders
+          <button
+            style={styles.primaryButton}
+            onClick={() => navigate(isDigitalOrder ? "/ebooks" : "/orders")}
+          >
+            {isDigitalOrder ? "Go to My E-Books" : "View My Orders"}
           </button>
           <button style={styles.secondaryButton} onClick={() => navigate("/")}>
             Continue Shopping

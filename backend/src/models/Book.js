@@ -71,6 +71,29 @@ const bookSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  ebookMetadata: {
+    totalPages: {
+      type: Number,
+      min: [1, 'Total pages must be greater than 0'],
+      default: null
+    },
+    toc: {
+      type: [
+        {
+          title: {
+            type: String,
+            trim: true,
+            maxlength: [200, 'TOC title cannot exceed 200 characters']
+          },
+          page: {
+            type: Number,
+            min: [1, 'TOC page must be greater than 0']
+          }
+        }
+      ],
+      default: []
+    }
+  },
   ebookFile: {
     type: String,
     trim: true

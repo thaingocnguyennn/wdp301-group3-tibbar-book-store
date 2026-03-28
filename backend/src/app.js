@@ -27,13 +27,19 @@ import newsRoutes from "./routes/newsRoutes.js";
 import adminNewsRoutes from "./routes/adminNewsRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import adminSupportRoutes from "./routes/adminSupportRoutes.js";
+import supportSystemRoutes from "./routes/supportSystemRoutes.js";
+import adminSupportSystemRoutes from "./routes/adminSupportSystemRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import ApiResponse from "./utils/ApiResponse.js";
 import { HTTP_STATUS } from "./config/constants.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import bookFeatureRoutes from "./routes/bookFeatureRoutes.js";
 import adminInventoryRoutes from "./routes/adminInventory.routes.js";
+import flashSaleRoutes from "./routes/flashSaleRoutes.js";
+import adminFlashSaleRoutes from "./routes/adminFlashSaleRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+import cvRoutes from "./routes/cvRoutes.js";
+import adminCvRoutes from "./routes/adminCvRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -122,10 +128,16 @@ app.use("/api/news", newsRoutes);
 app.use("/api/admin/news", adminNewsRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/support-system", supportSystemRoutes);
+app.use("/api/admin/support-system", adminSupportSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/book-features", bookFeatureRoutes);
 app.use("/api/admin/inventory", adminInventoryRoutes);
+app.use("/api/flash-sale", flashSaleRoutes);
+app.use("/api/admin/flash-sale", adminFlashSaleRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/cvs", cvRoutes);
+app.use("/api/admin/cvs", adminCvRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

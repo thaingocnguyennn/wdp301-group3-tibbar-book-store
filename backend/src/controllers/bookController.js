@@ -140,6 +140,170 @@ class BookController {
     }
   }
 
+  async getMyEbooks(req, res, next) {
+    try {
+      const ebooks = await bookService.getMyEbooks(req.user._id);
+
+      return ApiResponse.success(res, HTTP_STATUS.OK, "E-books fetched", {
+        ebooks,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getEbookReaderState(req, res, next) {
+    try {
+      const result = await bookService.getEbookReaderState(
+        req.user._id,
+        req.params.id,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book reader state fetched",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEbookReaderProgress(req, res, next) {
+    try {
+      const result = await bookService.updateEbookReaderProgress(
+        req.user._id,
+        req.params.id,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book progress saved",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEbookReaderSettings(req, res, next) {
+    try {
+      const result = await bookService.updateEbookReaderSettings(
+        req.user._id,
+        req.params.id,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book reader settings saved",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addEbookBookmark(req, res, next) {
+    try {
+      const result = await bookService.addEbookBookmark(
+        req.user._id,
+        req.params.id,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book bookmark added",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteEbookBookmark(req, res, next) {
+    try {
+      const result = await bookService.deleteEbookBookmark(
+        req.user._id,
+        req.params.id,
+        req.params.bookmarkId,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book bookmark deleted",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addEbookAnnotation(req, res, next) {
+    try {
+      const result = await bookService.addEbookAnnotation(
+        req.user._id,
+        req.params.id,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book annotation added",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEbookAnnotation(req, res, next) {
+    try {
+      const result = await bookService.updateEbookAnnotation(
+        req.user._id,
+        req.params.id,
+        req.params.annotationId,
+        req.body,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book annotation updated",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteEbookAnnotation(req, res, next) {
+    try {
+      const result = await bookService.deleteEbookAnnotation(
+        req.user._id,
+        req.params.id,
+        req.params.annotationId,
+      );
+
+      return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "E-book annotation deleted",
+        result,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async streamEbookFile(req, res, next) {
     try {
       const ebookRelPath = await bookService.getEbookFilePath(req.user._id, req.params.id);

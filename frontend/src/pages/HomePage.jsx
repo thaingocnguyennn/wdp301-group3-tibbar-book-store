@@ -4,6 +4,7 @@ import { bookApi } from "../api/bookApi";
 import { categoryApi } from "../api/categoryApi";
 import { sliderApi } from "../api/sliderApi";
 import { newsApi } from "../api/newsApi";
+import { flashSaleApi } from "../api/flashSaleApi";
 import BookCard from "../components/books/BookCard";
 import Slider from "../components/common/Slider";
 import { useAuth } from "../hooks/useAuth";
@@ -25,6 +26,9 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState([]);
   const [homepageNews, setHomepageNews] = useState([]);
+  const [flashSaleCampaign, setFlashSaleCampaign] = useState(null);
+  const [flashSaleRemainingMs, setFlashSaleRemainingMs] = useState(0);
+  const [flashSaleLoading, setFlashSaleLoading] = useState(true);
   const [filters, setFilters] = useState({
     category: "",
     minPrice: "",
@@ -44,7 +48,33 @@ const HomePage = () => {
     fetchSliders();
     fetchHomepageNews();
     fetchBestSellingBooks();
+    fetchFlashSaleCampaign();
   }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchFlashSaleCampaign();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (!flashSaleCampaign?.endsAt) return undefined;
+
+    const intervalId = setInterval(() => {
+      setFlashSaleRemainingMs((prev) => {
+        if (prev <= 1000) {
+          clearInterval(intervalId);
+          setFlashSaleCampaign(null);
+          return 0;
+        }
+        return prev - 1000;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [flashSaleCampaign]);
 
   useEffect(() => {
     fetchPersonalizedBooks();
@@ -147,6 +177,45 @@ const HomePage = () => {
     }
   };
 
+  const fetchFlashSaleCampaign = async () => {
+    try {
+      setFlashSaleLoading(true);
+      const response = await flashSaleApi.getActiveFlashSale();
+      const campaign = response?.data?.campaign || null;
+
+      setFlashSaleCampaign(campaign);
+
+      if (campaign?.remainingMs) {
+        setFlashSaleRemainingMs(Number(campaign.remainingMs));
+      } else {
+        setFlashSaleRemainingMs(0);
+      }
+    } catch (error) {
+      console.error("Error fetching flash sale campaign:", error);
+      setFlashSaleCampaign(null);
+      setFlashSaleRemainingMs(0);
+    } finally {
+      setFlashSaleLoading(false);
+    }
+  };
+
+  const formatCountdown = (remainingMs) => {
+    const totalSeconds = Math.max(0, Math.floor(Number(remainingMs || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+      .map((value) => String(value).padStart(2, "0"))
+      .join(":");
+  };
+
+  const resolveBookImage = (imageUrl) => {
+    if (!imageUrl) return "";
+    if (imageUrl.startsWith("http")) return imageUrl;
+    return `${serverBaseUrl}${imageUrl}`;
+  };
+
   const handleFilterChange = (e) => {
     setFilters({
       ...filters,
@@ -165,6 +234,26 @@ const HomePage = () => {
       {/* Slider Section */}
       <section style={styles.sliderWrapper}>
         <Slider images={sliders} />
+      </section>
+
+      <section style={styles.joinUsSection}>
+        <div style={styles.joinUsContent}>
+          <div>
+            <h2 style={styles.joinUsTitle}>Want to join our team?</h2>
+            <p style={styles.joinUsSubtitle}>
+              Submit your CV in PDF and our admin team will review your application.
+            </p>
+          </div>
+          {isAuthenticated ? (
+            <Link to="/join-us" style={styles.joinUsButton}>
+              Join us
+            </Link>
+          ) : (
+            <Link to="/login" style={styles.joinUsButton}>
+              Join us
+            </Link>
+          )}
+        </div>
       </section>
 
       {/* Homepage News */}
@@ -301,6 +390,74 @@ const HomePage = () => {
         )}
       </section>
 
+      {/* Flash Sale (UC-118 + UC-119) */}
+      <section style={styles.section}>
+        <div style={styles.flashSaleHeader}>
+          <div>
+            <h2 style={styles.flashSaleTitle}>⚡ Flash Sale</h2>
+            <p style={styles.flashSaleSubtitle}>Limited-time discounts for selected books</p>
+          </div>
+          {flashSaleCampaign && (
+            <div style={styles.countdownBadge}>
+              <span style={styles.countdownLabel}>Ends in</span>
+              <strong style={styles.countdownValue}>
+                {formatCountdown(flashSaleRemainingMs)}
+              </strong>
+            </div>
+          )}
+        </div>
+
+        {flashSaleLoading ? (
+          <div style={styles.empty}>
+            <p>Loading flash sale campaign...</p>
+          </div>
+        ) : !flashSaleCampaign || !flashSaleCampaign.books?.length ? (
+          <div style={styles.empty}>
+            <p>No flash sale campaign right now</p>
+            <p style={styles.emptySmall}>Come back soon for limited-time deals.</p>
+          </div>
+        ) : (
+          <div style={styles.flashSaleGrid}>
+            {flashSaleCampaign.books.map((book) => (
+              <article key={book._id} style={styles.flashSaleCard}>
+                <span style={styles.discountChip}>-{book.discountPercent}%</span>
+                <Link to={`/books/${book._id}`} style={styles.flashSaleImageLink}>
+                  {resolveBookImage(book.imageUrl) ? (
+                    <img
+                      src={resolveBookImage(book.imageUrl)}
+                      alt={book.title}
+                      style={styles.flashSaleImage}
+                    />
+                  ) : (
+                    <div style={styles.flashSalePlaceholder}>📚</div>
+                  )}
+                </Link>
+
+                <div style={styles.flashSaleContent}>
+                  <Link to={`/books/${book._id}`} style={styles.flashSaleBookTitle}>
+                    {book.title}
+                  </Link>
+                  <p style={styles.flashSaleAuthor}>by {book.author}</p>
+
+                  <div style={styles.flashSalePriceRow}>
+                    <span style={styles.flashSalePrice}>
+                      {Number(book.flashSalePrice || 0).toLocaleString("vi-VN")}₫
+                    </span>
+                    <span style={styles.flashSaleOriginalPrice}>
+                      {Number(book.originalPrice || 0).toLocaleString("vi-VN")}₫
+                    </span>
+                  </div>
+
+                  <Link to={`/books/${book._id}`} style={styles.flashSaleButton}>
+                    View Deal
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Best Selling Books */}
       <section style={styles.section}>
         <div style={styles.sectionHeader}>
@@ -424,6 +581,40 @@ const styles = {
     padding: "0 2rem",
     marginBottom: "3rem",
   },
+  joinUsSection: {
+    maxWidth: "1200px",
+    margin: "0 auto 2rem",
+    padding: "0 2rem",
+  },
+  joinUsContent: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+    color: "#f8fafc",
+    borderRadius: "16px",
+    padding: "1.2rem 1.4rem",
+    boxShadow: "0 10px 24px rgba(15, 23, 42, 0.28)",
+  },
+  joinUsTitle: {
+    margin: "0 0 0.25rem",
+    fontSize: "1.5rem",
+    fontWeight: 800,
+  },
+  joinUsSubtitle: {
+    margin: 0,
+    color: "#cbd5e1",
+  },
+  joinUsButton: {
+    textDecoration: "none",
+    background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+    color: "#fff",
+    padding: "0.7rem 1.1rem",
+    borderRadius: "10px",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+  },
   sectionHeader: {
     marginBottom: "2rem",
   },
@@ -491,6 +682,137 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "2rem",
+  },
+  flashSaleHeader: {
+    marginBottom: "1rem",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    background: "linear-gradient(135deg, #ffedd5 0%, #fee2e2 100%)",
+    border: "1px solid #fecaca",
+    borderRadius: "14px",
+    padding: "1rem 1.1rem",
+  },
+  flashSaleTitle: {
+    fontSize: "1.8rem",
+    color: "#991b1b",
+    margin: "0 0 0.2rem",
+    fontWeight: 800,
+  },
+  flashSaleSubtitle: {
+    margin: 0,
+    color: "#9f1239",
+    fontSize: "0.95rem",
+  },
+  countdownBadge: {
+    background: "#7f1d1d",
+    color: "#fff",
+    borderRadius: "10px",
+    padding: "0.5rem 0.8rem",
+    minWidth: "130px",
+    textAlign: "center",
+  },
+  countdownLabel: {
+    display: "block",
+    fontSize: "0.75rem",
+    textTransform: "uppercase",
+    opacity: 0.85,
+  },
+  countdownValue: {
+    display: "block",
+    fontSize: "1.05rem",
+    letterSpacing: "0.07em",
+  },
+  flashSaleGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+    gap: "1.1rem",
+  },
+  flashSaleCard: {
+    position: "relative",
+    background: "#fff",
+    border: "1px solid #fecaca",
+    borderRadius: "14px",
+    boxShadow: "0 8px 18px rgba(153, 27, 27, 0.12)",
+    overflow: "hidden",
+  },
+  discountChip: {
+    position: "absolute",
+    top: "10px",
+    left: "10px",
+    zIndex: 2,
+    background: "linear-gradient(135deg, #ef4444 0%, #be123c 100%)",
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: "0.82rem",
+    borderRadius: "999px",
+    padding: "0.28rem 0.55rem",
+  },
+  flashSaleImageLink: {
+    display: "block",
+    width: "100%",
+    aspectRatio: "3 / 4",
+    background: "#f8fafc",
+  },
+  flashSaleImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  flashSalePlaceholder: {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "3rem",
+    color: "#94a3b8",
+  },
+  flashSaleContent: {
+    padding: "0.8rem",
+  },
+  flashSaleBookTitle: {
+    display: "inline-block",
+    color: "#0f172a",
+    fontWeight: 700,
+    lineHeight: 1.35,
+    textDecoration: "none",
+    minHeight: "2.7rem",
+  },
+  flashSaleAuthor: {
+    margin: "0.35rem 0 0.65rem",
+    fontSize: "0.88rem",
+    color: "#64748b",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  flashSalePriceRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "0.6rem",
+    marginBottom: "0.75rem",
+  },
+  flashSalePrice: {
+    color: "#b91c1c",
+    fontSize: "1.2rem",
+    fontWeight: 800,
+  },
+  flashSaleOriginalPrice: {
+    color: "#94a3b8",
+    textDecoration: "line-through",
+    fontSize: "0.9rem",
+  },
+  flashSaleButton: {
+    display: "inline-block",
+    textDecoration: "none",
+    background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+    color: "#fff",
+    padding: "0.5rem 0.75rem",
+    borderRadius: "8px",
+    fontSize: "0.84rem",
+    fontWeight: 700,
   },
   newsGrid: {
     display: "grid",

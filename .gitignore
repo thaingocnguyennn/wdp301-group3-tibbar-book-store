@@ -37,6 +37,29 @@ frontend/.env.development
 frontend/.env.production
 
 ####################
+# MOBILE (React Native / Expo)
+####################
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+
+mobile/.env
+mobile/.env.example
+mobile/.env.local
+mobile/.env.*.local
+
+mobile/npm-debug.*
+mobile/*.orig.*
+
+# sensitive files
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+
+####################
 # TEST / CACHE
 ####################
 coverage/

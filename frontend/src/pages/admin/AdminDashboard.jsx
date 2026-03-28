@@ -104,6 +104,22 @@ const AdminDashboard = () => {
           </p>
         </Link>
 
+        <Link to="/admin/flash-sale" style={styles.card}>
+          <div style={styles.icon}>⚡</div>
+          <h3 style={styles.cardTitle}>Flash Sale</h3>
+          <p style={styles.cardDesc}>
+            Configure 5-book flash sale campaigns with discount and countdown
+          </p>
+        </Link>
+
+        <Link to="/admin/cvs" style={styles.card}>
+          <div style={styles.icon}>📄</div>
+          <h3 style={styles.cardTitle}>CV Management</h3>
+          <p style={styles.cardDesc}>
+            Review CV applications and update pending requests to accepted or rejected
+          </p>
+        </Link>
+
         <Link to="/admin/news" style={styles.card}>
           <div style={styles.icon}>📰</div>
           <h3 style={styles.cardTitle}>News Management</h3>
@@ -141,6 +157,22 @@ const AdminDashboard = () => {
           </h3>
           <p style={styles.cardDesc}>
             Review customer support conversations and reply in real-time
+          </p>
+        </Link>
+
+        <Link to="/admin/support-system" style={styles.card}>
+          <div style={styles.icon}>🧩</div>
+          <h3 style={styles.cardTitle}>Support System</h3>
+          <p style={styles.cardDesc}>
+            Handle system error tickets and send resolution updates to customers
+          </p>
+        </Link>
+
+        <Link to="/admin/support-system/history" style={styles.card}>
+          <div style={styles.icon}>🗂️</div>
+          <h3 style={styles.cardTitle}>Support Inbox History</h3>
+          <p style={styles.cardDesc}>
+            Review resolved ticket history dedicated to support system workflow
           </p>
         </Link>
       </div>
