@@ -25,15 +25,6 @@ const testCustomers = [
     isActive: true
   },
   {
-    email: 'bob.manager@example.com',
-    password: 'Manager@123',
-    firstName: 'Bob',
-    lastName: 'Manager',
-    role: ROLES.MANAGER,
-    phone: '+1234567892',
-    isActive: true
-  },
-  {
     email: 'locked.user@example.com',
     password: 'Locked@123',
     firstName: 'Locked',
@@ -125,7 +116,6 @@ const seedCustomers = async () => {
     console.log('   - michael.brown@example.com / Customer@123');
     console.log('   - david.customer@example.com / Customer@123');
     console.log('\n   Other Roles:');
-    console.log('   - bob.manager@example.com / Manager@123 (Manager)');
     console.log('   - sarah.admin@example.com / Admin@123 (Admin)');
     console.log('\n   Locked Accounts:');
     console.log('   - locked.user@example.com / Locked@123');

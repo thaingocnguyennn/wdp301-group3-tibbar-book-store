@@ -3,6 +3,9 @@ import ApiError from '../utils/ApiError.js';
 import { MESSAGES, ROLES } from '../config/constants.js';
 import Order from "../models/Order.js";
 import orderService from "./orderService.js";
+
+const USER_MANAGEMENT_ROLES = [ROLES.CUSTOMER, ROLES.SHIPPER, ROLES.ADMIN];
+
 class UserService {
   async getProfile(userId) {
     const user = await User.findById(userId);
@@ -34,7 +37,13 @@ class UserService {
     const filter = {};
 
     if (role && role !== 'all') {
+      if (!USER_MANAGEMENT_ROLES.includes(role)) {
+        return [];
+      }
+
       filter.role = role;
+    } else {
+      filter.role = { $in: USER_MANAGEMENT_ROLES };
     }
 
     if (status) {
@@ -94,7 +103,7 @@ class UserService {
   }
 
   async updateUserRole(userId, newRole) {
-    if (!Object.values(ROLES).includes(newRole)) {
+    if (!USER_MANAGEMENT_ROLES.includes(newRole)) {
       throw ApiError.badRequest('Invalid role specified');
     }
 

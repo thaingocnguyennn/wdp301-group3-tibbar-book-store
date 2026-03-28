@@ -18,13 +18,12 @@ const UsersManagement = () => {
   const [newRole, setNewRole] = useState('');
   const [notice, setNotice] = useState(null);
 
-  const roles = ['customer', 'shipper', 'admin', 'manager'];
+  const roles = ['customer', 'shipper', 'admin'];
 
   const roleBadgeColor = {
     customer: { backgroundColor: '#d1ecf1', color: '#0c5460' },
     shipper: { backgroundColor: '#d4edda', color: '#155724' },
     admin: { backgroundColor: '#f8d7da', color: '#721c24' },
-    manager: { backgroundColor: '#fff3cd', color: '#856404' },
     guest: { backgroundColor: '#e2e3e5', color: '#383d41' },
   };
 
@@ -246,7 +245,6 @@ const UsersManagement = () => {
               <option value="customer">Customer</option>
               <option value="shipper">Shipper</option>
               <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
             </select>
           </div>
 
