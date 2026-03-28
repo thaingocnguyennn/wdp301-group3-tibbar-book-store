@@ -18,6 +18,13 @@ const newsSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    createdByEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: [255, "Creator email cannot exceed 255 characters"],
+      immutable: true,
+    },
   },
   {
     timestamps: true,

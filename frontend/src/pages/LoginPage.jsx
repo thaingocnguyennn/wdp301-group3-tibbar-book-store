@@ -6,7 +6,7 @@ import GoogleLoginButton from '../components/common/GoogleLoginButton';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
-const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z]).{6,}$/;
 
 const LoginPage = () => {
   // Login form states

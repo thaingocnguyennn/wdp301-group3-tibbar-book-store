@@ -17,6 +17,7 @@ class AdminNewsController {
       const payload = {
         title: req.body.title,
         content: req.body.content,
+        createdByEmail: req.user?.email,
       };
 
       if (req.file) {

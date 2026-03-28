@@ -151,6 +151,7 @@ const NewsManagement = () => {
                 )}
                 <div style={styles.cardBody}>
                   <h4 style={styles.cardTitle}>{news.title}</h4>
+                  <p style={styles.cardMeta}>Created by: {news.createdByEmail || "N/A"}</p>
                   <p style={styles.cardMeta}>Created: {new Date(news.createdAt).toLocaleDateString()}</p>
                   <p style={styles.cardMeta}>Updated: {new Date(news.updatedAt).toLocaleDateString()}</p>
                   <div style={styles.cardActions}>

@@ -55,6 +55,7 @@ const NewsPage = () => {
           />
         )}
         <div style={styles.meta}>{new Date(news.createdAt).toLocaleDateString()}</div>
+        <div style={styles.meta}>Created by: {news.createdByEmail || "N/A"}</div>
         <h1 style={styles.title}>{news.title}</h1>
         <p style={styles.content}>{news.content}</p>
       </article>
