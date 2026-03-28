@@ -145,6 +145,19 @@ class FlashSaleService {
     return this.mapCampaignToDto(campaign);
   }
 
+  // Get discount map for current flash sale: { bookId -> discountPercent }
+  async getFlashSaleDiscountMap() {
+    const campaign = await this.getCurrentCampaign();
+    if (!campaign) return {};
+
+    return (campaign.books || []).reduce((map, item) => {
+      if (item?.book?._id) {
+        map[item.book._id.toString()] = item.discountPercent;
+      }
+      return map;
+    }, {});
+  }
+
   async upsertCurrentFlashSale(payload, adminId) {
     const items = this.normalizeFlashSaleItems(payload?.books);
     const durationMinutes = this.normalizeDurationMinutes(payload?.durationMinutes);

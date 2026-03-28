@@ -10,6 +10,7 @@ import paymentService from "./paymentService.js";
 import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
 import notificationService from "./notificationService.js";
+import flashSaleService from "./flashSaleService.js";
 const MAX_ORDERS = 20;//
 const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
@@ -391,9 +392,15 @@ class OrderService {
     voucherDiscount = 0,
     shippingFee = 0,
     coinDiscount = 0,
+    flashSaleDiscountMap = {},
   ) {
     const subtotal = items.reduce((sum, item) => {
-      return sum + item.book.price * item.quantity;
+      const originalPrice = item.book.price;
+      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price = discountPercent > 0 
+        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+        : originalPrice;
+      return sum + price * item.quantity;
     }, 0);
 
     const discount = voucherDiscount;
@@ -548,8 +555,16 @@ class OrderService {
 
     const { validItems } = await this.validateCartForCheckout(userId);
 
+    // Get flash sale discount map for calculating prices
+    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+
     const subtotal = validItems.reduce((sum, item) => {
-      return sum + item.book.price * item.quantity;
+      const originalPrice = item.book.price;
+      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price = discountPercent > 0 
+        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+        : originalPrice;
+      return sum + price * item.quantity;
     }, 0);
 
     const shippingFee = this.calculateShippingFee(subtotal);
@@ -564,6 +579,8 @@ class OrderService {
       validItems,
       voucherDiscount,
       shippingFee,
+      0,
+      flashSaleDiscountMap,
     );
 
     return {
@@ -640,9 +657,17 @@ class OrderService {
       );
     }
 
-    // Calculate subtotal first
+    // Get flash sale discount map for calculating prices
+    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+
+    // Calculate subtotal first (with flash sale prices if applicable)
     const subtotal = validItems.reduce((sum, item) => {
-      return sum + item.book.price * item.quantity;
+      const originalPrice = item.book.price;
+      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price = discountPercent > 0 
+        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+        : originalPrice;
+      return sum + price * item.quantity;
     }, 0);
 
     // Calculate shipping fee based on subtotal (free if > 200,000 VND)
@@ -676,20 +701,29 @@ class OrderService {
       voucherDiscount,
       shippingFee,
       coinsToUse,
+      flashSaleDiscountMap,
     );
 
     // Generate order number
     const orderNumber = this.generateOrderNumber();
 
-    // Prepare order items with snapshot of book data
-    const orderItems = validItems.map((item) => ({
-      book: item.book._id,
-      title: item.book.title,
-      author: item.book.author,
-      price: item.book.price,
-      quantity: item.quantity,
-      subtotal: Math.round(item.book.price * item.quantity * 100) / 100,
-    }));
+    // Prepare order items with snapshot of book data (using flash sale prices if applicable)
+    const orderItems = validItems.map((item) => {
+      const originalPrice = item.book.price;
+      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const finalPrice = discountPercent > 0 
+        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+        : originalPrice;
+
+      return {
+        book: item.book._id,
+        title: item.book.title,
+        author: item.book.author,
+        price: finalPrice,
+        quantity: item.quantity,
+        subtotal: Math.round(finalPrice * item.quantity * 100) / 100,
+      };
+    });
 
     const duplicateOrder = await this.findRecentDuplicateOrder(
       userId,

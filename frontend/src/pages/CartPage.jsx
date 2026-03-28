@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useCart } from "../hooks/useCart";
 import { useNavigate } from "react-router-dom";
+import { flashSaleApi } from "../api/flashSaleApi";
 
 const CartPage = () => {
   const { cart, update, remove } = useCart();
@@ -8,9 +9,40 @@ const CartPage = () => {
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
 
+  const [flashSaleMap, setFlashSaleMap] = useState({});
+
+  useEffect(() => {
+    const fetchFlashSale = async () => {
+      try {
+        const response = await flashSaleApi.getActiveFlashSale();
+        const campaign = response.data?.campaign;
+        if (campaign?.books) {
+          // Create map of bookId -> discount info
+          const map = {};
+          campaign.books.forEach((book) => {
+            map[book._id] = {
+              discountPercent: book.discountPercent,
+              flashSalePrice: book.flashSalePrice,
+            };
+          });
+          setFlashSaleMap(map);
+        }
+      } catch (error) {
+        // Flash sale might not exist, that's fine
+        console.log("No active flash sale");
+      }
+    };
+    fetchFlashSale();
+  }, []);
+
   const totals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
-      const price = item.book?.price || 0;
+      const bookId = item.book?._id;
+      const originalPrice = item.book?.price || 0;
+      const isOnFlashSale = flashSaleMap[bookId];
+      
+      // Use flash sale price if available, otherwise use original price
+      const price = isOnFlashSale ? flashSaleMap[bookId].flashSalePrice : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -26,7 +58,7 @@ const CartPage = () => {
       total,
       isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
     };
-  }, [cart.items]);
+  }, [cart.items, flashSaleMap]);
 
   if (!cart.items || cart.items.length === 0) {
     return (
@@ -76,9 +108,25 @@ const CartPage = () => {
                 <div style={styles.itemText}>
                   <h3 style={styles.itemTitle}>{item.book?.title}</h3>
                   <p style={styles.itemAuthor}>by {item.book?.author}</p>
-                  <p style={styles.itemPrice}>
-                    {item.book?.price?.toLocaleString('vi-VN')}₫
-                  </p>
+                  <div style={styles.priceContainer}>
+                    {flashSaleMap[item.book?._id] ? (
+                      <>
+                        <span style={styles.originalPrice}>
+                          {item.book?.price?.toLocaleString('vi-VN')}₫
+                        </span>
+                        <span style={styles.flashSalePrice}>
+                          {flashSaleMap[item.book?._id].flashSalePrice?.toLocaleString('vi-VN')}₫
+                        </span>
+                        <span style={styles.discountBadge}>
+                          -{flashSaleMap[item.book?._id].discountPercent}%
+                        </span>
+                      </>
+                    ) : (
+                      <p style={styles.itemPrice}>
+                        {item.book?.price?.toLocaleString('vi-VN')}₫
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -227,6 +275,30 @@ const styles = {
     margin: 0,
     fontWeight: "600",
     color: "#34495e",
+  },
+  priceContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.7rem",
+    flexWrap: "wrap",
+  },
+  originalPrice: {
+    fontSize: "0.95rem",
+    color: "#95a5a6",
+    textDecoration: "line-through",
+  },
+  flashSalePrice: {
+    fontSize: "1.05rem",
+    fontWeight: "700",
+    color: "#e74c3c",
+  },
+  discountBadge: {
+    backgroundColor: "#e74c3c",
+    color: "#fff",
+    padding: "0.2rem 0.5rem",
+    borderRadius: "4px",
+    fontSize: "0.8rem",
+    fontWeight: "600",
   },
   itemActions: {
     display: "flex",

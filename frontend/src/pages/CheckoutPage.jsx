@@ -6,6 +6,7 @@ import { orderApi } from "../api/orderApi";
 import { voucherApi } from "../api/voucherApi";
 import { addressApi } from "../api/addressApi";
 import { coinApi } from "../api/coinApi";
+import { flashSaleApi } from "../api/flashSaleApi";
 import AvailableVouchers from "../components/payment/AvailableVouchers";
 
 const CheckoutPage = () => {
@@ -40,6 +41,33 @@ const CheckoutPage = () => {
   const [coinStatus, setCoinStatus] = useState(null);
   const [coinDiscount, setCoinDiscount] = useState(0);
   const [acceptedReturnPolicy, setAcceptedReturnPolicy] = useState(false);
+
+  // Flash sale state
+  const [flashSaleMap, setFlashSaleMap] = useState({});
+
+  // Fetch flash sale data
+  useEffect(() => {
+    const fetchFlashSale = async () => {
+      try {
+        const response = await flashSaleApi.getActiveFlashSale();
+        const campaign = response.data?.campaign;
+        if (campaign?.books) {
+          const map = {};
+          campaign.books.forEach((book) => {
+            map[book._id] = {
+              discountPercent: book.discountPercent,
+              flashSalePrice: book.flashSalePrice,
+            };
+          });
+          setFlashSaleMap(map);
+        }
+      } catch (error) {
+        // Flash sale might not exist, that's fine
+        setFlashSaleMap({});
+      }
+    };
+    fetchFlashSale();
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -119,10 +147,19 @@ const CheckoutPage = () => {
     fetchCoinStatus();
   }, [isAuthenticated]);
 
+  // Get price for an item (flash sale price if available, otherwise original price)
+  const getItemPrice = (item) => {
+    const bookId = item.book?._id;
+    if (flashSaleMap[bookId]) {
+      return flashSaleMap[bookId].flashSalePrice;
+    }
+    return item.book?.price || 0;
+  };
+
   // Calculate totals
   const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
-      const price = item.book?.price || 0;
+      const price = getItemPrice(item);
       return sum + price * item.quantity;
     }, 0);
 
@@ -140,7 +177,7 @@ const CheckoutPage = () => {
       total: Math.round(total * 100) / 100,
       isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
     };
-  }, [cart.items]);
+  }, [cart.items, flashSaleMap]);
 
   const totals = useMemo(() => {
     let currentTotals = baseTotals;
@@ -186,9 +223,9 @@ const CheckoutPage = () => {
   const cartIsValid = useMemo(() => {
     if (!cart.items || cart.items.length === 0) return false;
     return cart.items.every(
-      (item) => item.book && item.quantity > 0 && item.book.price > 0,
+      (item) => item.book && item.quantity > 0 && getItemPrice(item) > 0,
     );
-  }, [cart.items]);
+  }, [cart.items, flashSaleMap]);
 
   const hasEbookInCart = useMemo(() => {
     return (cart.items || []).some((item) => item.book?.isEbook);
@@ -697,17 +734,34 @@ const CheckoutPage = () => {
               {cart.items.map((item) => (
                 <div key={item.book?._id} style={styles.orderItem}>
                   <div style={styles.orderItemInfo}>
-                    <span style={styles.orderItemTitle}>
-                      {item.book?.title}
-                    </span>
+                    <div>
+                      <span style={styles.orderItemTitle}>
+                        {item.book?.title}
+                      </span>
+                      {flashSaleMap[item.book?._id] && (
+                        <span style={styles.flashSaleBadgeInline}>
+                          -{flashSaleMap[item.book?._id].discountPercent}%
+                        </span>
+                      )}
+                    </div>
                     <span style={styles.orderItemQty}>× {item.quantity}</span>
                   </div>
-                  <span style={styles.orderItemPrice}>
-                    {((item.book?.price || 0) * item.quantity).toLocaleString(
-                      "vi-VN",
+                  <div style={styles.orderItemPriceSection}>
+                    {flashSaleMap[item.book?._id] && (
+                      <span style={styles.originalPriceStrike}>
+                        {((item.book?.price || 0) * item.quantity).toLocaleString(
+                          "vi-VN",
+                        )}
+                        ₫
+                      </span>
                     )}
-                    ₫
-                  </span>
+                    <span style={styles.orderItemPrice}>
+                      {((getItemPrice(item) || 0) * item.quantity).toLocaleString(
+                        "vi-VN",
+                      )}
+                      ₫
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1295,6 +1349,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: "0.75rem",
   },
   orderItemInfo: {
     display: "flex",
@@ -1321,6 +1376,27 @@ const styles = {
     fontSize: "0.88rem",
     flexShrink: 0,
     marginLeft: "0.75rem",
+  },
+  orderItemPriceSection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "0.2rem",
+  },
+  originalPriceStrike: {
+    fontSize: "0.75rem",
+    color: "#94a3b8",
+    textDecoration: "line-through",
+  },
+  flashSaleBadgeInline: {
+    backgroundColor: "#ef4444",
+    color: "#fff",
+    padding: "0.2rem 0.5rem",
+    borderRadius: "4px",
+    fontSize: "0.7rem",
+    fontWeight: "600",
+    marginLeft: "0.5rem",
+    display: "inline-block",
   },
   summaryRow: {
     display: "flex",
