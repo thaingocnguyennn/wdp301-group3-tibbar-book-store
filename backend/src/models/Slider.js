@@ -3,6 +3,12 @@ import { BOOK_VISIBILITY } from "../config/constants.js";
 
 const sliderSchema = new mongoose.Schema(
   {
+    adminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
     imageUrl: {
       type: String,
       required: [true, "Image URL is required"],
@@ -39,6 +45,7 @@ const sliderSchema = new mongoose.Schema(
 );
 
 sliderSchema.index({ visibility: 1, createdAt: -1 });
+sliderSchema.index({ adminId: 1, createdAt: -1 });
 
 const Slider = mongoose.model("Slider", sliderSchema);
 

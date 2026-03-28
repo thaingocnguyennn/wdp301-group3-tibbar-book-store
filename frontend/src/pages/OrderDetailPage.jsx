@@ -11,6 +11,11 @@ const ORDER_STATUS_CONFIG = {
   DELIVERED: { icon: "✅", label: "Delivered", color: "#16a34a" },
   CANCELLED: { icon: "✕", label: "Cancelled", color: "#dc2626" },
 };
+ORDER_STATUS_CONFIG.COMPLETED = {
+  ...ORDER_STATUS_CONFIG.DELIVERED,
+  label: "Completed",
+};
+
 const PAYMENT_STATUS_CONFIG = {
   PENDING: {
     icon: "○",
@@ -268,6 +273,7 @@ const OrderDetailPage = () => {
   const getCurrentStepIndex = () => {
     if (!order) return 0;
     if (order.orderStatus === "CANCELLED") return -1;
+    if (order.orderStatus === "COMPLETED") return ORDER_STEPS.length - 1;
     return ORDER_STEPS.indexOf(order.orderStatus);
   };
 
@@ -300,6 +306,7 @@ const OrderDetailPage = () => {
     ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
   const paymentConfig =
     PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
+  const isDigitalOrder = order.orderKind === "DIGITAL";
   const currentStep = getCurrentStepIndex();
   const returnRequestStatus = order.returnRequest?.status;
   const returnRequestStatusConfig =
@@ -308,10 +315,14 @@ const OrderDetailPage = () => {
     ? new Date(new Date(order.deliveredAt).getTime() + 7 * 24 * 60 * 60 * 1000)
     : null;
   const canRequestReturnRefund =
+    !isDigitalOrder &&
     order.orderStatus === "DELIVERED" &&
     !order.returnRequest?.requestedAt &&
     returnRequestExpiresAt &&
     returnRequestExpiresAt.getTime() >= Date.now();
+  const canCancelOrder =
+    order.orderStatus === "PENDING" &&
+    !(isDigitalOrder && order.paymentStatus === "PAID");
 
   const getItemImageSrc = (item) => {
     const imageUrl = item?.book?.imageUrl;
@@ -339,7 +350,12 @@ const OrderDetailPage = () => {
       )}
 
       {/* Status Timeline */}
-      {order.orderStatus !== "CANCELLED" ? (
+      {isDigitalOrder ? (
+        <div style={styles.infoBanner}>
+          This is a digital order. Once payment is confirmed, the e-book is
+          available immediately in My E-Books.
+        </div>
+      ) : order.orderStatus !== "CANCELLED" ? (
         <div style={styles.timelineCard}>
           <div style={styles.timeline}>
             {ORDER_STEPS.map((step, i) => {
@@ -466,7 +482,9 @@ const OrderDetailPage = () => {
       </div>
 
       {/* Shipping Address */}
-      {order.shippingAddress && order.shippingAddress.fullName && (
+      {!isDigitalOrder &&
+        order.shippingAddress &&
+        order.shippingAddress.fullName && (
         <div style={styles.sectionCard}>
           <h3 style={styles.sectionTitle}>
             <span style={styles.sectionIcon}>📍</span>
@@ -550,7 +568,9 @@ const OrderDetailPage = () => {
         </div>
       </div>
       {/* Delivery Proof */}
-      {order.orderStatus === "DELIVERED" && order.deliveryProof?.imageUrl && (
+      {!isDigitalOrder &&
+        order.orderStatus === "DELIVERED" &&
+        order.deliveryProof?.imageUrl && (
         <div style={styles.sectionCard}>
           <h3 style={styles.sectionTitle}>
             <span style={styles.sectionIcon}>📸</span>
@@ -572,7 +592,7 @@ const OrderDetailPage = () => {
         </div>
       )}
       {/* ⭐ Shipper Rating */}
-      {order.orderStatus === "DELIVERED" && (
+      {!isDigitalOrder && order.orderStatus === "DELIVERED" && (
         <div style={styles.sectionCard}>
           <h3 style={styles.sectionTitle}>
             <span style={styles.sectionIcon}>⭐</span>
@@ -656,7 +676,11 @@ const OrderDetailPage = () => {
           <div style={styles.summaryRow}>
             <span style={styles.summaryLabel}>Shipping Fee</span>
             <span style={styles.summaryValue}>
-              {Number(order.shippingFee || 0) === 0 ? (
+              {isDigitalOrder ? (
+                <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                  Instant delivery
+                </span>
+              ) : Number(order.shippingFee || 0) === 0 ? (
                 <span style={{ color: "#16a34a", fontWeight: 600 }}>Free</span>
               ) : (
                 `${Number(order.shippingFee || 0).toLocaleString("vi-VN")}₫`
@@ -680,16 +704,26 @@ const OrderDetailPage = () => {
         </h3>
 
         <div style={styles.actionButtonRow}>
-          <button
-            type="button"
-            style={styles.secondaryActionButton}
-            disabled={actionLoading.reorder}
-            onClick={handleReorder}
-          >
-            {actionLoading.reorder ? "Reordering..." : "Order Again"}
-          </button>
+          {isDigitalOrder ? (
+            <button
+              type="button"
+              style={styles.secondaryActionButton}
+              onClick={() => navigate("/ebooks")}
+            >
+              Go to My E-Books
+            </button>
+          ) : (
+            <button
+              type="button"
+              style={styles.secondaryActionButton}
+              disabled={actionLoading.reorder}
+              onClick={handleReorder}
+            >
+              {actionLoading.reorder ? "Reordering..." : "Order Again"}
+            </button>
+          )}
 
-          {order.orderStatus === "DELIVERED" && (
+          {!isDigitalOrder && order.orderStatus === "DELIVERED" && (
             <>
               <button
                 type="button"
@@ -714,7 +748,7 @@ const OrderDetailPage = () => {
         </div>
       </div>
 
-      {order.orderStatus === "DELIVERED" && (
+      {!isDigitalOrder && order.orderStatus === "DELIVERED" && (
         <div style={styles.sectionCard}>
           <h3 style={styles.sectionTitle}>
             <span style={styles.sectionIcon}>↩</span>
@@ -831,7 +865,7 @@ const OrderDetailPage = () => {
       )}
 
       {/* Cancel Action */}
-      {order.orderStatus === "PENDING" && (
+      {canCancelOrder && (
         <div style={styles.cancelSection}>
           <button
             type="button"
@@ -907,6 +941,17 @@ const styles = {
     marginBottom: "1.25rem",
     border: "1px solid #fecaca",
     fontSize: "0.9rem",
+    fontWeight: 500,
+  },
+  infoBanner: {
+    backgroundColor: "#ecfdf5",
+    color: "#166534",
+    padding: "0.95rem 1.15rem",
+    borderRadius: "10px",
+    marginBottom: "1.25rem",
+    border: "1px solid #86efac",
+    lineHeight: 1.5,
+    fontSize: "0.92rem",
     fontWeight: 500,
   },
 

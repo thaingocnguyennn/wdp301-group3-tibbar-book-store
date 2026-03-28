@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
@@ -127,9 +127,12 @@ const RoleBasedHome = () => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  const isReaderRoute = /^\/books\/[^/]+\/read$/.test(location.pathname);
+
   return (
     <div style={styles.app}>
-      <Navbar />
+      {!isReaderRoute && <Navbar />}
       <Routes>
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<RoleBasedHome />} />
@@ -416,9 +419,9 @@ function AppContent() {
         {/* 404 - Redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <SupportSystemWidget />
-      <ChatbotWidget />
-      <Footer />
+      {!isReaderRoute && <SupportSystemWidget />}
+      {!isReaderRoute && <ChatbotWidget />}
+      {!isReaderRoute && <Footer />}
     </div>
   );
 }

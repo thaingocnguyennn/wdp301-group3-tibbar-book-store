@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import authApi from '../api/authApi';
 import GoogleLoginButton from '../components/common/GoogleLoginButton';
+import ReCAPTCHA from 'react-google-recaptcha';
+
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 
 const LoginPage = () => {
   // Login form states
@@ -12,10 +16,10 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [captchaId, setCaptchaId] = useState('');
-  const [captchaQuestion, setCaptchaQuestion] = useState('');
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState('');
+  const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   // Forgot password flow states
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -28,6 +32,8 @@ const LoginPage = () => {
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
 
   const { login, handleAuthResponse } = useAuth();
   const navigate = useNavigate();
@@ -35,27 +41,6 @@ const LoginPage = () => {
 
   // Get the page user was trying to access, or default to home
   const from = location.state?.from || '/';
-
-  const loadCaptcha = async () => {
-    setCaptchaLoading(true);
-    try {
-      const response = await authApi.getCaptcha();
-      const captcha = response?.data || {};
-      setCaptchaId(captcha.captchaId || '');
-      setCaptchaQuestion(captcha.question || '');
-      setCaptchaAnswer('');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load captcha');
-      setCaptchaId('');
-      setCaptchaQuestion('');
-    } finally {
-      setCaptchaLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCaptcha();
-  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -68,8 +53,23 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
 
-    if (!captchaId || !captchaAnswer.trim()) {
-      setError('Please complete CAPTCHA before logging in.');
+    if (!EMAIL_REGEX.test(formData.email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!PASSWORD_REGEX.test(formData.password)) {
+      setError('Password must be at least 6 characters and include letters and numbers.');
+      return;
+    }
+
+    if (!recaptchaSiteKey) {
+      setError('reCAPTCHA site key is not configured. Please contact support.');
+      return;
+    }
+
+    if (!recaptchaToken) {
+      setError('Please complete reCAPTCHA before logging in.');
       return;
     }
 
@@ -78,14 +78,14 @@ const LoginPage = () => {
     try {
       await login({
         ...formData,
-        captchaId,
-        captchaAnswer: captchaAnswer.trim()
+        recaptchaToken
       });
       // Redirect to the page user was trying to access, or home
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
-      await loadCaptcha();
+      setRecaptchaToken('');
+      setRecaptchaWidgetKey(prev => prev + 1);
     } finally {
       setLoading(false);
     }
@@ -113,6 +113,12 @@ const LoginPage = () => {
     e.preventDefault();
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
+
+    if (!EMAIL_REGEX.test(forgotPasswordEmail.trim())) {
+      setForgotPasswordError('Please enter a valid email address.');
+      return;
+    }
+
     setForgotPasswordLoading(true);
 
     try {
@@ -141,6 +147,12 @@ const LoginPage = () => {
     e.preventDefault();
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
+
+    if (!/^\d{6}$/.test(forgotPasswordOTP)) {
+      setForgotPasswordError('OTP must be exactly 6 digits.');
+      return;
+    }
+
     setForgotPasswordLoading(true);
 
     try {
@@ -169,9 +181,8 @@ const LoginPage = () => {
       return;
     }
 
-    // Validate password length
-    if (forgotPasswordNewPassword.length < 6) {
-      setForgotPasswordError('Password must be at least 6 characters');
+    if (!PASSWORD_REGEX.test(forgotPasswordNewPassword)) {
+      setForgotPasswordError('Password must be at least 6 characters and include letters and numbers');
       return;
     }
 
@@ -246,46 +257,46 @@ const LoginPage = () => {
 
             <div style={styles.formGroup}>
               <label style={styles.label}>Password</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                style={styles.input}
-                placeholder="Enter your password"
-              />
+              <div style={styles.passwordInputWrap}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  style={styles.passwordInput}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  style={styles.togglePasswordBtn}
+                  onClick={() => setShowPassword(prev => !prev)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
 
             <div style={styles.formGroup}>
-              <label style={styles.label}>CAPTCHA</label>
-              <div style={styles.captchaQuestionWrap}>
-                <span style={styles.captchaQuestion}>
-                  {captchaLoading ? 'Loading CAPTCHA...' : captchaQuestion || 'Unable to load CAPTCHA'}
-                </span>
-                <button
-                  type="button"
-                  onClick={loadCaptcha}
-                  disabled={captchaLoading || loading}
-                  style={styles.captchaRefreshBtn}
-                >
-                  Refresh
-                </button>
-              </div>
-              <input
-                type="text"
-                value={captchaAnswer}
-                onChange={(e) => setCaptchaAnswer(e.target.value)}
-                required
-                style={styles.input}
-                placeholder="Enter CAPTCHA answer"
-                disabled={captchaLoading || loading}
-              />
+              <label style={styles.label}>reCAPTCHA</label>
+              {recaptchaSiteKey ? (
+                <div style={styles.recaptchaWrap}>
+                  <ReCAPTCHA
+                    key={recaptchaWidgetKey}
+                    sitekey={recaptchaSiteKey}
+                    onChange={(token) => setRecaptchaToken(token || '')}
+                    onExpired={() => setRecaptchaToken('')}
+                    onErrored={() => setRecaptchaToken('')}
+                  />
+                </div>
+              ) : (
+                <div style={styles.error}>VITE_RECAPTCHA_SITE_KEY is missing.</div>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading || captchaLoading || !captchaId}
+              disabled={loading || !recaptchaToken || !recaptchaSiteKey}
               style={styles.button}
             >
               {loading ? 'Logging in...' : 'Login'}
@@ -442,28 +453,48 @@ const LoginPage = () => {
               <form onSubmit={handleResetPassword} style={styles.form}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>New Password</label>
-                  <input
-                    type="password"
-                    value={forgotPasswordNewPassword}
-                    onChange={(e) => setForgotPasswordNewPassword(e.target.value)}
-                    required
-                    style={styles.input}
-                    placeholder="Enter your new password"
-                    disabled={forgotPasswordLoading}
-                  />
+                  <div style={styles.passwordInputWrap}>
+                    <input
+                      type={showForgotNewPassword ? 'text' : 'password'}
+                      value={forgotPasswordNewPassword}
+                      onChange={(e) => setForgotPasswordNewPassword(e.target.value)}
+                      required
+                      style={styles.passwordInput}
+                      placeholder="Enter your new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      style={styles.togglePasswordBtn}
+                      onClick={() => setShowForgotNewPassword(prev => !prev)}
+                      disabled={forgotPasswordLoading}
+                    >
+                      {showForgotNewPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
                 </div>
 
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Confirm Password</label>
-                  <input
-                    type="password"
-                    value={forgotPasswordConfirmPassword}
-                    onChange={(e) => setForgotPasswordConfirmPassword(e.target.value)}
-                    required
-                    style={styles.input}
-                    placeholder="Confirm your new password"
-                    disabled={forgotPasswordLoading}
-                  />
+                  <div style={styles.passwordInputWrap}>
+                    <input
+                      type={showForgotConfirmPassword ? 'text' : 'password'}
+                      value={forgotPasswordConfirmPassword}
+                      onChange={(e) => setForgotPasswordConfirmPassword(e.target.value)}
+                      required
+                      style={styles.passwordInput}
+                      placeholder="Confirm your new password"
+                      disabled={forgotPasswordLoading}
+                    />
+                    <button
+                      type="button"
+                      style={styles.togglePasswordBtn}
+                      onClick={() => setShowForgotConfirmPassword(prev => !prev)}
+                      disabled={forgotPasswordLoading}
+                    >
+                      {showForgotConfirmPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
                 </div>
 
                 <button type="submit" disabled={forgotPasswordLoading} style={styles.button}>
@@ -552,6 +583,30 @@ const styles = {
     borderRadius: '4px',
     fontSize: '1rem'
   },
+  passwordInputWrap: {
+    position: 'relative'
+  },
+  passwordInput: {
+    padding: '0.75rem',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    width: '100%',
+    paddingRight: '4.25rem'
+  },
+  togglePasswordBtn: {
+    position: 'absolute',
+    right: '0.6rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    border: 'none',
+    background: 'none',
+    color: '#3498db',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '0.85rem'
+  },
   button: {
     backgroundColor: '#3498db',
     color: '#fff',
@@ -617,29 +672,9 @@ const styles = {
     fontSize: '0.9rem',
     color: '#7f8c8d'
   },
-  captchaQuestionWrap: {
+  recaptchaWrap: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '0.75rem',
-    padding: '0.75rem',
-    border: '1px dashed #bdc3c7',
-    borderRadius: '4px',
-    backgroundColor: '#f8f9fa'
-  },
-  captchaQuestion: {
-    color: '#2c3e50',
-    fontWeight: '600',
-    fontSize: '1rem'
-  },
-  captchaRefreshBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#3498db',
-    cursor: 'pointer',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    padding: 0
+    justifyContent: 'center'
   },
   dividerLine: {
     flex: 1,

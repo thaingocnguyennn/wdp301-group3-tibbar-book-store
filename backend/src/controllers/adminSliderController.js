@@ -25,6 +25,7 @@ class AdminSliderController {
       }
 
       const payload = {
+        adminId: req.user?._id || req.user?.userId || undefined,
         imageUrl: `/uploads/sliders/${req.file.filename}`,
        
         visibility: req.body.visibility || "public",

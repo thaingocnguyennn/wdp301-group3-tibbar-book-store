@@ -10,6 +10,7 @@ export default function BookFeaturePanel({
 }) {
   const threshold = 5;
   const stock = Number(book?.stock || 0);
+  const isEbook = Boolean(book?.isEbook);
   const isLowStock = stock > 0 && stock <= threshold;
   const isOutOfStock = stock <= 0;
   const isInline = layout === "inline";
@@ -102,7 +103,7 @@ export default function BookFeaturePanel({
         backgroundColor: "#f8fafc",
       }}
     >
-      {showStockAlert && (isLowStock || isOutOfStock) && (
+      {!isEbook && showStockAlert && (isLowStock || isOutOfStock) && (
         <div
           style={{
             marginBottom: 10,
@@ -136,7 +137,7 @@ export default function BookFeaturePanel({
         </div>
       )}
 
-      {showBackStock && isOutOfStock && (
+      {!isEbook && showBackStock && isOutOfStock && (
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
           <input
             type="email"

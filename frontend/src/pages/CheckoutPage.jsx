@@ -156,6 +156,17 @@ const CheckoutPage = () => {
     return item.book?.price || 0;
   };
 
+  const hasEbookInCart = useMemo(() => {
+    return (cart.items || []).some((item) => item.book?.isEbook);
+  }, [cart.items]);
+
+  const hasPhysicalInCart = useMemo(() => {
+    return (cart.items || []).some((item) => item.book && !item.book?.isEbook);
+  }, [cart.items]);
+
+  const isDigitalCart = hasEbookInCart && !hasPhysicalInCart;
+  const isMixedCart = hasEbookInCart && hasPhysicalInCart;
+
   // Calculate totals
   const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
@@ -166,7 +177,11 @@ const CheckoutPage = () => {
     // Free shipping if subtotal > 200,000 VND
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
-    const shippingFee = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+    const shippingFee = isDigitalCart
+      ? 0
+      : subtotal > FREE_SHIPPING_THRESHOLD
+        ? 0
+        : SHIPPING_FEE;
 
     const total = subtotal + shippingFee;
 
@@ -175,9 +190,9 @@ const CheckoutPage = () => {
       discount: 0,
       shippingFee: Math.round(shippingFee * 100) / 100,
       total: Math.round(total * 100) / 100,
-      isFreeShipping: subtotal > FREE_SHIPPING_THRESHOLD,
+      isFreeShipping: isDigitalCart || subtotal > FREE_SHIPPING_THRESHOLD,
     };
-  }, [cart.items, flashSaleMap]);
+  }, [cart.items, flashSaleMap, isDigitalCart]);
 
   const totals = useMemo(() => {
     let currentTotals = baseTotals;
@@ -226,10 +241,6 @@ const CheckoutPage = () => {
       (item) => item.book && item.quantity > 0 && getItemPrice(item) > 0,
     );
   }, [cart.items, flashSaleMap]);
-
-  const hasEbookInCart = useMemo(() => {
-    return (cart.items || []).some((item) => item.book?.isEbook);
-  }, [cart.items]);
 
   const clearVoucherState = (keepCode = false) => {
     setAppliedVoucher(null);
@@ -371,7 +382,14 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (!selectedAddressId) {
+    if (isMixedCart) {
+      setError(
+        "E-books and physical books must be checked out separately. Please update your cart first.",
+      );
+      return;
+    }
+
+    if (!isDigitalCart && !selectedAddressId) {
       setError("Please select a shipping address");
       return;
     }
@@ -387,7 +405,7 @@ const CheckoutPage = () => {
     try {
       const orderData = {
         paymentMethod: selectedPaymentMethod,
-        shippingAddressId: selectedAddressId,
+        shippingAddressId: isDigitalCart ? null : selectedAddressId,
         voucherCode: appliedVoucher?.code || null,
         useCoin: useCoin,
         notes: notes.trim(),
@@ -481,10 +499,25 @@ const CheckoutPage = () => {
         </div>
       )}
 
+      {isMixedCart && (
+        <div style={styles.warningBanner}>
+          E-books and physical books must be checked out separately. Please go
+          back to the cart and remove one type before placing this order.
+        </div>
+      )}
+
+      {isDigitalCart && (
+        <div style={styles.infoBanner}>
+          This is a digital order. Delivery is instant after successful payment,
+          and shipping details are not required.
+        </div>
+      )}
+
       <div style={styles.grid}>
         {/* Left Column - Checkout Details */}
         <div style={styles.leftColumn}>
           {/* Shipping Address */}
+          {!isDigitalCart && (
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>
@@ -561,6 +594,7 @@ const CheckoutPage = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Voucher */}
           <div style={styles.section}>
@@ -811,7 +845,11 @@ const CheckoutPage = () => {
             <div style={styles.summaryRow}>
               <span style={styles.summaryLabel}>Shipping Fee</span>
               <span style={styles.summaryValue}>
-                {totals.isFreeShipping ? (
+                {isDigitalCart ? (
+                  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                    Instant delivery
+                  </span>
+                ) : totals.isFreeShipping ? (
                   <span style={{ color: "#16a34a", fontWeight: 600 }}>
                     Free ✓
                   </span>
@@ -820,7 +858,7 @@ const CheckoutPage = () => {
                 )}
               </span>
             </div>
-            {!totals.isFreeShipping && totals.subtotal > 0 && (
+            {!isDigitalCart && !totals.isFreeShipping && totals.subtotal > 0 && (
               <div style={styles.freeShippingNotice}>
                 Add {(200000 - totals.subtotal).toLocaleString("vi-VN")}₫ more
                 for free shipping
@@ -882,7 +920,8 @@ const CheckoutPage = () => {
                 ...(isSubmitting ||
                 !selectedPaymentMethod ||
                 !cartIsValid ||
-                !selectedAddressId ||
+                (!isDigitalCart && !selectedAddressId) ||
+                isMixedCart ||
                 !acceptedReturnPolicy
                   ? styles.placeOrderButtonDisabled
                   : {}),
@@ -892,8 +931,9 @@ const CheckoutPage = () => {
                 isSubmitting ||
                 !selectedPaymentMethod ||
                 !cartIsValid ||
-                !selectedAddressId ||
-                addresses.length === 0 ||
+                (!isDigitalCart && !selectedAddressId) ||
+                isMixedCart ||
+                (!isDigitalCart && addresses.length === 0) ||
                 !acceptedReturnPolicy
               }
             >
@@ -964,6 +1004,24 @@ const styles = {
     border: "1px solid #fecaca",
     fontSize: "0.9rem",
     fontWeight: 500,
+  },
+  warningBanner: {
+    marginBottom: "1.25rem",
+    padding: "0.95rem 1rem",
+    borderRadius: "12px",
+    backgroundColor: "#fff7ed",
+    border: "1px solid #fdba74",
+    color: "#9a3412",
+    lineHeight: 1.5,
+  },
+  infoBanner: {
+    marginBottom: "1.25rem",
+    padding: "0.95rem 1rem",
+    borderRadius: "12px",
+    backgroundColor: "#ecfdf5",
+    border: "1px solid #86efac",
+    color: "#166534",
+    lineHeight: 1.5,
   },
   errorIcon: {
     fontSize: "1.1rem",

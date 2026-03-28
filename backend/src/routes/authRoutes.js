@@ -4,7 +4,6 @@ import { authenticate } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/captcha', authController.getCaptcha);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/google-login', authController.googleLogin);

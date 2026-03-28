@@ -7,6 +7,7 @@ const ORDER_STATUS_CONFIG = {
   PROCESSING: { icon: "📦", label: "Processing", bg: "#e0f2fe", color: "#0284c7", border: "#7dd3fc" },
   SHIPPED: { icon: "🚚", label: "Shipped", bg: "#e0e7ff", color: "#4f46e5", border: "#a5b4fc" },
   DELIVERED: { icon: "✅", label: "Delivered", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
+  COMPLETED: { icon: "✅", label: "Completed", bg: "#dcfce7", color: "#16a34a", border: "#86efac" },
   CANCELLED: { icon: "✕", label: "Cancelled", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
 };
 
@@ -84,7 +85,9 @@ const OrderHistoryPage = () => {
     fetchOrders(newPage);
   };
 
-  const canCancel = (order) => order.orderStatus === "PENDING";
+  const canCancel = (order) =>
+    order.orderStatus === "PENDING" &&
+    !(order.orderKind === "DIGITAL" && order.paymentStatus === "PAID");
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);

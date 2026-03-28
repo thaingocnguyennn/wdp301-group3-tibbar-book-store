@@ -5,21 +5,6 @@ import { setRefreshTokenCookie, clearRefreshTokenCookie } from '../utils/tokenHe
 import { HTTP_STATUS, MESSAGES } from '../config/constants.js';
 
 class AuthController {
-  async getCaptcha(req, res, next) {
-    try {
-      const captcha = await authService.getCaptcha();
-
-      return ApiResponse.success(
-        res,
-        HTTP_STATUS.OK,
-        'Captcha generated successfully',
-        captcha
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
-
   async register(req, res, next) {
     try {
       const { email, password, firstName, lastName } = req.body;
@@ -46,13 +31,17 @@ class AuthController {
 
   async login(req, res, next) {
     try {
-      const { email, password, captchaId, captchaAnswer } = req.body;
+      const { email, password, recaptchaToken } = req.body;
+      const requesterIp = req.ip;
+      const clientPlatform = (req.headers['x-client-platform'] || '').toString().toLowerCase();
+      const skipCaptcha = clientPlatform === 'mobile';
 
       const { user, accessToken, refreshToken } = await authService.login(
         email,
         password,
-        captchaId,
-        captchaAnswer
+        recaptchaToken,
+        requesterIp,
+        { skipCaptcha }
       );
 
       setRefreshTokenCookie(res, refreshToken);
