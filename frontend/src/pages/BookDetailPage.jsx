@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { bookApi } from "../api/bookApi";
 import { reviewApi } from "../api/reviewApi";
+import { flashSaleApi } from "../api/flashSaleApi";
 import { useCart } from "../hooks/useCart";
 import { useAuth } from "../hooks/useAuth";
 import BookFeaturePanel from '../components/books/BookFeaturePanel';
@@ -46,6 +47,7 @@ const BookDetailPage = () => {
   const [replySubmittingId, setReplySubmittingId] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
+  const [flashSaleInfo, setFlashSaleInfo] = useState(null);
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
   const resolveImageUrl = (path) => {
@@ -70,7 +72,25 @@ const BookDetailPage = () => {
   useEffect(() => {
     fetchBook();
     fetchReviews(1, selectedRatingFilter);
+    fetchFlashSale();
   }, [id]);
+
+  const fetchFlashSale = async () => {
+    try {
+      const response = await flashSaleApi.getActiveFlashSale();
+      const campaign = response.data?.campaign;
+      if (campaign?.books) {
+        // Find if current book is in flash sale
+        const bookInFlashSale = campaign.books.find(
+          (book) => book._id === id
+        );
+        setFlashSaleInfo(bookInFlashSale || null);
+      }
+    } catch (error) {
+      // No active flash sale, that's fine
+      setFlashSaleInfo(null);
+    }
+  };
 
   useEffect(() => {
     fetchReviews(1, selectedRatingFilter);
@@ -605,9 +625,25 @@ const BookDetailPage = () => {
             )}
 
             <div style={styles.priceSection}>
-              <span style={styles.price}>
-                {book.price.toLocaleString("vi-VN")}₫
-              </span>
+              {flashSaleInfo ? (
+                <div style={styles.flashSalePriceContainer}>
+                  <div style={styles.priceWrapper}>
+                    <span style={styles.originalPrice}>
+                      {book.price.toLocaleString("vi-VN")}₫
+                    </span>
+                    <span style={styles.flashSalePrice}>
+                      {flashSaleInfo.flashSalePrice.toLocaleString("vi-VN")}₫
+                    </span>
+                  </div>
+                  <span style={styles.discountChip}>
+                    -{flashSaleInfo.discountPercent}%
+                  </span>
+                </div>
+              ) : (
+                <span style={styles.price}>
+                  {book.price.toLocaleString("vi-VN")}₫
+                </span>
+              )}
               <p style={styles.priceNote}>
                 Free shipping on orders over 200,000₫
               </p>
@@ -1240,6 +1276,37 @@ const styles = {
     color: "#27ae60",
     margin: "0.5rem 0 0 0",
     fontWeight: "500",
+  },
+  flashSalePriceContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: "1rem",
+    paddingBottom: "0.5rem",
+  },
+  priceWrapper: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.3rem",
+  },
+  originalPrice: {
+    fontSize: "1.1rem",
+    color: "#95a5a6",
+    textDecoration: "line-through",
+    fontWeight: "500",
+  },
+  flashSalePrice: {
+    fontSize: "2rem",
+    fontWeight: "700",
+    color: "#e74c3c",
+  },
+  discountChip: {
+    backgroundColor: "#e74c3c",
+    color: "#fff",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    fontSize: "0.95rem",
+    fontWeight: "700",
+    whiteSpace: "nowrap",
   },
   divider: {
     height: "1px",
