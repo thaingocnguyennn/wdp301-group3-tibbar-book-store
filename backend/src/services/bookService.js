@@ -235,16 +235,30 @@ class BookService {
     return this.sanitizePublicBooks(books);
   }
 
+  // UC-60: Lấy danh sách sách bán chạy nhất (Best selling book)
+  // Luồng xử lý: Aggregate từ collection Order để tính tổng số lượng bán của mỗi sách
+  // Chỉ tính các đơn hàng đã giao thành công (DELIVERED), sau đó sort theo số lượng bán giảm dần
+  // Cuối cùng populate thông tin sách và category, chỉ trả về sách có visibility PUBLIC
   async getBestSellingBooks(limit = 8) {
+    // Giới hạn số lượng sách trả về, tối đa PAGINATION.MAX_LIMIT
     const actualLimit = Math.min(Number(limit) || 8, PAGINATION.MAX_LIMIT);
 
+    // Pipeline aggregate MongoDB để tính toán sách bán chạy
     const bestSellers = await Order.aggregate([
+      // Bước 1: Lọc chỉ lấy các đơn hàng đã giao thành công
+      // Điều kiện: orderStatus phải là "DELIVERED"
       {
         $match: {
           orderStatus: "DELIVERED",
         },
       },
+      // Bước 2: Unwind mảng items để mỗi item thành một document riêng
+      // Điều này cho phép group theo từng sách trong đơn hàng
       { $unwind: "$items" },
+      // Bước 3: Group theo ID sách, tính tổng số lượng bán và doanh thu
+      // _id: ID của sách (items.book)
+      // soldQuantity: Tổng số lượng bán (sum của items.quantity)
+      // soldRevenue: Tổng doanh thu (sum của items.subtotal)
       {
         $group: {
           _id: "$items.book",
@@ -252,8 +266,13 @@ class BookService {
           soldRevenue: { $sum: "$items.subtotal" },
         },
       },
+      // Bước 4: Sort theo số lượng bán giảm dần, sau đó theo doanh thu giảm dần
+      // Ưu tiên sách bán nhiều nhất
       { $sort: { soldQuantity: -1, soldRevenue: -1 } },
+      // Bước 5: Giới hạn số lượng kết quả trả về
       { $limit: actualLimit },
+      // Bước 6: Lookup thông tin sách từ collection "books"
+      // Liên kết theo _id (ID sách) để lấy chi tiết sách
       {
         $lookup: {
           from: "books",
@@ -262,12 +281,17 @@ class BookService {
           as: "book",
         },
       },
+      // Bước 7: Unwind mảng book để chuyển thành object
       { $unwind: "$book" },
+      // Bước 8: Lọc chỉ lấy sách có visibility PUBLIC
+      // Loại bỏ sách ẩn hoặc riêng tư
       {
         $match: {
           "book.visibility": BOOK_VISIBILITY.PUBLIC,
         },
       },
+      // Bước 9: Lookup thông tin category từ collection "categories"
+      // Liên kết theo book.category để lấy tên category
       {
         $lookup: {
           from: "categories",
@@ -276,6 +300,8 @@ class BookService {
           as: "category",
         },
       },
+      // Bước 10: Thêm field category vào book object
+      // Nếu có category thì lấy _id và name, ngược lại null
       {
         $addFields: {
           "book.category": {
@@ -290,6 +316,8 @@ class BookService {
           },
         },
       },
+      // Bước 11: Merge thông tin sách với soldQuantity và soldRevenue
+      // Thay thế root document bằng object kết hợp
       {
         $replaceRoot: {
           newRoot: {
@@ -305,6 +333,7 @@ class BookService {
       },
     ]);
 
+    // Sanitize dữ liệu sách công khai trước khi trả về
     return this.sanitizePublicBooks(bestSellers);
   }
 

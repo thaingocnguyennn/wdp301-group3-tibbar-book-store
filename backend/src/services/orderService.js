@@ -967,42 +967,59 @@ class OrderService {
   }
 
   // Admin: get all orders with filters
+  // UC-61: Lấy tất cả orders cho admin với filter theo status/date
+  // Hỗ trợ filter: status, paymentStatus, search, fromDate, toDate
+  // UC-61: Lấy danh sách tất cả đơn hàng với bộ lọc (Admin order filtering)
+  // Luồng xử lý: Xây dựng filter object dựa trên các tham số đầu vào
+  // Hỗ trợ lọc theo status, paymentStatus, userId, date range, search text
+  // Populate thông tin user, shipper, và items.book để hiển thị chi tiết
+  // Trả về danh sách orders với pagination info
   async getAllOrders({
-    page = 1,
-    limit = 10,
-    status,
-    paymentStatus,
-    search,
-    userId,
-    fromDate,
-    toDate,
+    page = 1,        // Trang hiện tại (mặc định 1)
+    limit = 10,      // Số lượng orders mỗi trang (mặc định 10)
+    status,          // Lọc theo trạng thái đơn hàng
+    paymentStatus,   // Lọc theo trạng thái thanh toán
+    search,          // Tìm kiếm theo orderNumber hoặc thông tin user
+    userId,          // Lọc theo ID user cụ thể
+    fromDate,        // Lọc từ ngày (createdAt >= fromDate)
+    toDate,          // Lọc đến ngày (createdAt <= toDate)
   } = {}) {
+    // Tính toán skip cho pagination
     const skip = (page - 1) * limit;
+
+    // Khởi tạo object filter rỗng
     const filter = {};
 
+    // Lọc theo trạng thái đơn hàng nếu được chỉ định và khác "all"
     if (status && status !== "all") {
       filter.orderStatus = status;
     }
 
+    // Lọc theo trạng thái thanh toán nếu được chỉ định và khác "all"
     if (paymentStatus && paymentStatus !== "all") {
       filter.paymentStatus = paymentStatus;
     }
 
+    // Lọc theo user ID nếu được chỉ định
     if (userId) {
       filter.user = userId;
     }
 
+    // Lọc theo khoảng thời gian tạo đơn hàng
     if (fromDate || toDate) {
       filter.createdAt = {};
 
+      // Nếu có fromDate, lọc từ ngày đó trở đi
       if (fromDate) {
         filter.createdAt.$gte = this.normalizeDateBoundary(fromDate);
       }
 
+      // Nếu có toDate, lọc đến ngày đó trở về trước
       if (toDate) {
         filter.createdAt.$lte = this.normalizeDateBoundary(toDate, true);
       }
 
+      // Validate: fromDate phải <= toDate
       if (
         filter.createdAt.$gte &&
         filter.createdAt.$lte &&
@@ -1014,43 +1031,52 @@ class OrderService {
       }
     }
 
+    // Tìm kiếm theo text (orderNumber hoặc thông tin user)
     if (search && search.trim()) {
+      // Tạo regex case-insensitive cho tìm kiếm
       const searchRegex = new RegExp(search.trim(), "i");
+
+      // Tìm user có email, firstName, hoặc lastName match với search
       const matchedUsers = await User.find({
         $or: [
           { email: searchRegex },
           { firstName: searchRegex },
           { lastName: searchRegex },
         ],
-      }).select("_id");
+      }).select("_id"); // Chỉ lấy _id
 
+      // Lấy danh sách user IDs từ kết quả tìm user
       const userIds = matchedUsers.map((user) => user._id);
 
+      // Tạo điều kiện OR: match orderNumber hoặc user trong danh sách userIds
       filter.$or = [
-        { orderNumber: searchRegex },
-        ...(userIds.length ? [{ user: { $in: userIds } }] : []),
+        { orderNumber: searchRegex }, // Tìm theo mã đơn hàng
+        ...(userIds.length ? [{ user: { $in: userIds } }] : []), // Tìm theo user nếu có
       ];
     }
 
+    // Thực hiện query song song: lấy orders và đếm tổng số
     const [orders, total] = await Promise.all([
+      // Query orders với filter, populate, sort, pagination
       Order.find(filter)
-        .populate("items.book")
-        .populate("user", "email firstName lastName")
-        .populate("shipper", "email firstName lastName")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Order.countDocuments(filter),
+        .populate("items.book") // Populate thông tin sách trong items
+        .populate("user", "email firstName lastName") // Populate thông tin user (chỉ lấy email, tên)
+        .populate("shipper", "email firstName lastName") // Populate thông tin shipper
+        .sort({ createdAt: -1 }) // Sort theo thời gian tạo giảm dần (mới nhất trước)
+        .skip(skip) // Bỏ qua số records theo pagination
+        .limit(limit) // Giới hạn số records trả về
+        .lean(), // Trả về plain object thay vì Mongoose document
+      Order.countDocuments(filter), // Đếm tổng số orders match filter
     ]);
 
+    // Trả về kết quả với orders và thông tin pagination
     return {
       orders,
       pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        total, // Tổng số orders
+        page, // Trang hiện tại
+        limit, // Số orders mỗi trang
+        totalPages: Math.ceil(total / limit), // Tổng số trang
       },
     };
   }

@@ -35,6 +35,7 @@ const OrdersManagement = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusDraft, setStatusDraft] = useState("");
+  // UC-61: State filters cho admin filter orders theo status/date
   const [filters, setFilters] = useState({
     status: "all",
     paymentStatus: "all",
@@ -67,27 +68,49 @@ const OrdersManagement = () => {
     fetchOrders();
   }, [debouncedFilters, page]);
 
+  // UC-61: Fetch orders với filters status/date
+  // UC-61: Fetch danh sách đơn hàng với bộ lọc cho admin
+  // Luồng xử lý:
+  // 1. Set loading state và clear error
+  // 2. Gọi API adminOrderApi.getAllOrders với các tham số filter từ state
+  // 3. Cập nhật state orders và pagination từ response
+  // 4. Nếu có selectedOrder, tìm và cập nhật thông tin order đó (để sync với data mới)
+  // 5. Cập nhật các draft states cho form edit order
+  // 6. Nếu có lỗi, set error message
+  // 7. Finally, set loading false
   const fetchOrders = async () => {
     try {
+      // Bắt đầu loading và clear error cũ
       setLoading(true);
       setError("");
+
+      // Gọi API với các filter parameters từ debouncedFilters
       const response = await adminOrderApi.getAllOrders({
-        page,
-        limit,
-        status: debouncedFilters.status,
-        paymentStatus: debouncedFilters.paymentStatus,
-        search: debouncedFilters.search,
-        fromDate: debouncedFilters.fromDate,
-        toDate: debouncedFilters.toDate,
+        page, // Trang hiện tại
+        limit, // Số orders mỗi trang
+        status: debouncedFilters.status, // Filter theo trạng thái đơn hàng
+        paymentStatus: debouncedFilters.paymentStatus, // Filter theo trạng thái thanh toán
+        search: debouncedFilters.search, // Tìm kiếm theo orderNumber hoặc user info
+        fromDate: debouncedFilters.fromDate, // Filter từ ngày
+        toDate: debouncedFilters.toDate, // Filter đến ngày
       });
+
+      // Cập nhật danh sách orders từ response
       setOrders(response.data.orders);
+
+      // Cập nhật thông tin pagination
       setPagination(response.data.pagination);
+
+      // Nếu có order đang được select, tìm và cập nhật thông tin mới nhất
       if (selectedOrder) {
         const updated = response.data.orders.find(
           (order) => order._id === selectedOrder._id,
         );
         if (updated) {
+          // Cập nhật selectedOrder với data mới
           setSelectedOrder(updated);
+
+          // Cập nhật các draft states cho form edit
           setStatusDraft(updated.orderStatus);
           setSelectedShipper(updated.shipper?._id || "");
           setReturnStatusDraft(
@@ -99,8 +122,10 @@ const OrdersManagement = () => {
         }
       }
     } catch (err) {
+      // Set error message từ response hoặc default
       setError(err.response?.data?.message || "Failed to fetch orders");
     } finally {
+      // Kết thúc loading
       setLoading(false);
     }
   };

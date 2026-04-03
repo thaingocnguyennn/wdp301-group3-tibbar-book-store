@@ -92,8 +92,18 @@ export const orderApi = {
 };
 
 export const adminOrderApi = {
+  // UC-61: Lấy tất cả orders cho admin với filter status/date
+  // UC-61: API lấy danh sách tất cả đơn hàng với bộ lọc (Admin)
+  // Endpoint: GET /api/admin/orders
+  // Query params: page, limit, status, paymentStatus, search, userId, fromDate, toDate
+  // Mô tả: Gọi API backend để lấy danh sách orders với các bộ lọc và pagination
+  // Trả về: { success: true, data: { orders: [...], pagination: {...} } }
   getAllOrders: async (params = {}) => {
+    // Gửi GET request đến endpoint admin/orders với query params
+    // params có thể bao gồm: page, limit, status, paymentStatus, search, userId, fromDate, toDate
     const response = await axiosInstance.get("/admin/orders", { params });
+
+    // Trả về data từ response
     return response.data;
   },
 
