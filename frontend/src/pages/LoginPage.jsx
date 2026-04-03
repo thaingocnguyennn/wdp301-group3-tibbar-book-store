@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import authApi from "../api/authApi";
 import GoogleLoginButton from "../components/common/GoogleLoginButton";
-import ReCAPTCHA from "react-google-recaptcha";
+// import ReCAPTCHA from "react-google-recaptcha";
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const PASSWORD_REGEX = /^.{6,}$/;
@@ -17,9 +17,10 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState("");
-  const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  // CAPTCHA temporarily disabled
+  // const [recaptchaToken, setRecaptchaToken] = useState("");
+  // const [recaptchaWidgetKey, setRecaptchaWidgetKey] = useState(0);
+  // const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   // Forgot password flow states
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -66,29 +67,45 @@ const LoginPage = () => {
       return;
     }
 
-    if (!recaptchaSiteKey) {
-      setError("reCAPTCHA site key is not configured. Please contact support.");
-      return;
-    }
+    // CAPTCHA temporarily disabled
+    // if (!recaptchaSiteKey) {
+    //   setError("reCAPTCHA site key is not configured. Please contact support.");
+    //   return;
+    // }
 
-    if (!recaptchaToken) {
-      setError("Please complete reCAPTCHA before logging in.");
-      return;
-    }
+    // if (!recaptchaToken) {
+    //   setError("Please complete reCAPTCHA before logging in.");
+    //   return;
+    // }
 
     setLoading(true);
 
     try {
+      // CAPTCHA temporarily disabled
+      // await login({
+      //   ...formData,
+      //   recaptchaToken,
+      // });
       await login({
         ...formData,
-        recaptchaToken,
       });
       // Redirect to the page user was trying to access, or home
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
-      setRecaptchaToken("");
-      setRecaptchaWidgetKey((prev) => prev + 1);
+      const apiMessage = err?.response?.data?.message;
+
+      if (apiMessage) {
+        setError(apiMessage);
+      } else if (err?.code === "ERR_NETWORK") {
+        setError(
+          "Cannot reach the server. Please ensure backend is running and CORS is configured.",
+        );
+      } else {
+        setError(err?.message || "Login failed");
+      }
+      // CAPTCHA temporarily disabled
+      // setRecaptchaToken("");
+      // setRecaptchaWidgetKey((prev) => prev + 1);
     } finally {
       setLoading(false);
     }
@@ -290,6 +307,8 @@ const LoginPage = () => {
               </div>
             </div>
 
+            {/* CAPTCHA temporarily disabled */}
+            {/*
             <div style={styles.formGroup}>
               <label style={styles.label}>reCAPTCHA</label>
               {recaptchaSiteKey ? (
@@ -308,10 +327,13 @@ const LoginPage = () => {
                 </div>
               )}
             </div>
+            */}
 
             <button
               type="submit"
-              disabled={loading || !recaptchaToken || !recaptchaSiteKey}
+              // CAPTCHA temporarily disabled
+              // disabled={loading || !recaptchaToken || !recaptchaSiteKey}
+              disabled={loading}
               style={styles.button}
             >
               {loading ? "Logging in..." : "Login"}

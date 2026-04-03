@@ -73,6 +73,15 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // In local development, allow any localhost port to avoid CORS issues
+    // when Vite switches from 5173 to another available port.
+    if (
+      process.env.NODE_ENV === "development" &&
+      /^http:\/\/localhost:\d+$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
+
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
