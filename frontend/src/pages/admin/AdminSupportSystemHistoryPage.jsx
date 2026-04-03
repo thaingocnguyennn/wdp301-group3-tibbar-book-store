@@ -1,26 +1,35 @@
 import { useEffect, useState } from "react";
 import { supportSystemApi } from "../../api/supportSystemApi";
 
+// Dữ liệu trạng thái khi backend chưa trả về danh sách trạng thái.
+// Chúng ta có thể hiển thị nhãn người dùng dễ hiểu thay vì key nội bộ.
 const statusLabelsFallback = {
-  in_progress: "Dang xu ly",
-  resolved_success: "Da xu ly thanh cong",
+  in_progress: "Đang xử lý",
+  resolved_success: "Đã xử lý thành công",
 };
 
 const AdminSupportSystemHistoryPage = () => {
+  // state lưu danh sách ticket lịch sử đã xử lý
   const [tickets, setTickets] = useState([]);
+  // state lưu mapping status -> label hiển thị
   const [statuses, setStatuses] = useState(statusLabelsFallback);
+  // state loading và lỗi cho UI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Khi component mount lên, gọi API lấy lịch sử ticket support cho admin
     const loadHistory = async () => {
       try {
         setLoading(true);
         const response = await supportSystemApi.getAdminTicketHistory();
+
+        // Lưu ticket và trạng thái vào state
         setTickets(response?.data?.tickets || []);
         setStatuses(response?.data?.statuses || statusLabelsFallback);
       } catch (err) {
-        setError(err?.response?.data?.message || "Khong tai duoc Support Inbox History");
+        // Nếu lỗi xảy ra, hiển thị thông báo lỗi
+        setError(err?.response?.data?.message || "Không tải được Support Inbox History");
       } finally {
         setLoading(false);
       }
@@ -36,11 +45,15 @@ const AdminSupportSystemHistoryPage = () => {
 
       {error && <div style={styles.error}>{error}</div>}
 
+      {/* Nếu đang tải thì hiển thị trạng thái loading */}
       {loading ? (
-        <div style={styles.placeholder}>Dang tai lich su...</div>
+        <div style={styles.placeholder}>Đang tải lịch sử...</div>
       ) : tickets.length === 0 ? (
-        <div style={styles.placeholder}>Chua co ticket da xu ly.</div>
+        <>{/* Nếu không có ticket nào đã xử lý thì hiển thị thông báo */}
+          <div style={styles.placeholder}>Chưa có ticket đã xử lý.</div>
+        </>
       ) : (
+        // Hiển thị danh sách ticket lịch sử đã xử lý
         <div style={styles.ticketList}>
           {tickets.map((ticket) => (
             <div key={ticket._id} style={styles.ticketCard}>

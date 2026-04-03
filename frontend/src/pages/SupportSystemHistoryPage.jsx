@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supportSystemApi } from "../api/supportSystemApi";
 
+// SupportSystemHistoryPage: UC-121 (history) + UC-122 (ticket list cho customer)
+// Luồng: customer gọi supportSystemApi.getMyTicketHistory -> hiện ticket list, trạng thái, phản hồi admin
 const statusLabelsFallback = {
   in_progress: "Dang xu ly",
   resolved_success: "Da xu ly thanh cong",

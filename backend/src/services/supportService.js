@@ -3,6 +3,8 @@ import SupportConversation from "../models/SupportConversation.js";
 import SupportMessage from "../models/SupportMessage.js";
 
 class SupportService {
+  // sanitize input message từ request (có thể text hoặc image)
+  // - Dùng chung cho customer và admin
   sanitizeMessageInput(input) {
     const content = typeof input?.content === "string"
       ? input.content.trim()
@@ -22,6 +24,7 @@ class SupportService {
     };
   }
 
+  // Đảm bảo customer có conversation: nếu chưa có thì tạo mới
   async ensureCustomerConversation(customerId) {
     let conversation = await SupportConversation.findOne({ customer: customerId });
 
@@ -32,6 +35,10 @@ class SupportService {
     return conversation;
   }
 
+  // Lấy conversation + messages cho customer. Khi vào trang support:
+  // 1) Tạo mới conversation nếu chưa có
+  // 2) Lấy toàn bộ messages theo conversation
+  // 3) Gán unread admin => read (isReadByCustomer true)
   async getCustomerConversation(customerId) {
     const conversation = await this.ensureCustomerConversation(customerId);
 
@@ -60,6 +67,9 @@ class SupportService {
     };
   }
 
+  // Customer gửi tin nhắn (API /support/messages)
+  // - Lưu message vào support_message
+  // - Cập nhật thông tin conversation (lastMessageAt, lastMessagePreview, unreadForAdmin++)
   async sendCustomerMessage(customerId, content) {
     const messageInput = this.sanitizeMessageInput(content);
     const conversation = await this.ensureCustomerConversation(customerId);
@@ -85,6 +95,7 @@ class SupportService {
     return message;
   }
 
+  // Admin lấy tất cả conversations để hiện inbox (sắp xếp theo unread + last message)
   async getAdminConversations() {
     const conversations = await SupportConversation.find({})
       .sort({ unreadForAdmin: -1, lastMessageAt: -1 })
@@ -128,6 +139,9 @@ class SupportService {
     };
   }
 
+  // Admin reply (UC-120)
+  // - Lưu message admin
+  // - Cập nhật conversation last message + unreadForCustomer++
   async sendAdminMessage(adminId, conversationId, content) {
     const messageInput = this.sanitizeMessageInput(content);
 

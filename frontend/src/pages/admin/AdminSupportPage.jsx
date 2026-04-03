@@ -16,6 +16,12 @@ const getMessagePreview = (message) => {
   return "";
 };
 
+// AdminSupportPage: admin reply support chat (UC-120)
+// Luồng:
+// 1) mount -> supportApi.getAdminConversations -> load inbox
+// 2) chọn conversation -> supportApi.getAdminConversationMessages
+// 3) gửi message text -> socket admin:send-message, hoặc ảnh -> supportApi.sendAdminImage
+// 4) Real-time xử lý bằng socket message:new cho cả admin và customer
 const AdminSupportPage = () => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
