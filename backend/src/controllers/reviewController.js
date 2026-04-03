@@ -25,14 +25,15 @@ const parseStringArray = (rawValue) => {
 };
 
 class ReviewController {
-  // UC-83: Lấy danh sách review của sách với lọc theo sao
+  // UC-59: Lấy danh sách review của sách (View review of the book)
   // GET /reviews/book/:bookId?rating=3&page=1&limit=10
+  // Hiển thị tất cả review, rating, summary cho sách
   async getBookReviews(req, res, next) {
     try {
       const { bookId } = req.params;
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      // rating: lọc theo số sao (optional)
+      // rating: lọc theo số sao (optional) - liên quan UC-83 nhưng cũng dùng cho UC-59
       const rating = req.query.rating;
 
       const result = await reviewService.getBookReviews(bookId, page, limit, {
@@ -97,8 +98,10 @@ class ReviewController {
     }
   }
 
-  // UC-87: Tạo review với upload ảnh
+  // UC-56: Tạo review mới cho sách (Add book review)
+  // UC-57: Bao gồm rating sao (Rate book)
   // POST /reviews/book/:bookId {rating, comment, file: images}
+  // Kiểm tra user đã mua sách, chưa review trước đó
   async createReview(req, res, next) {
     try {
       // Lấy đường dẫn ảnh từ middleware upload
@@ -125,7 +128,9 @@ class ReviewController {
     }
   }
 
-  // Cập nhật review của chính mình (sửa rating/comment/images)
+  // UC-58: Cập nhật review của chính mình (Edit own review)
+  // PUT /reviews/:reviewId {rating, comment, keepExistingImages[], file: images}
+  // Chỉ chủ sở hữu mới có thể sửa, có thể cập nhật rating/comment/images
   async updateOwnReview(req, res, next) {
     try {
       const uploadedImages = (req.files || []).map(

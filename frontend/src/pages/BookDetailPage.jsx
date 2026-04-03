@@ -18,27 +18,28 @@ const BookDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [ebookAccess, setEbookAccess] = useState(null);
-  const [reviews, setReviews] = useState([]);
+  // State cho review (UC-56, UC-57, UC-58, UC-59)
+  const [reviews, setReviews] = useState([]); // Danh sách review hiển thị
   const [reviewSummary, setReviewSummary] = useState({
     averageRating: 0,
     totalReviews: 0,
-  });
+  }); // Tóm tắt rating trung bình và tổng số review
   const [reviewPagination, setReviewPagination] = useState({
     page: 1,
     totalPages: 1,
     total: 0,
     limit: 10,
-  });
+  }); // Thông tin phân trang review
   const [reviewLoading, setReviewLoading] = useState(true);
   const [reviewError, setReviewError] = useState("");
-  const [myReview, setMyReview] = useState(null);
-  const [selectedRatingFilter, setSelectedRatingFilter] = useState("");
-  const [ratingInput, setRatingInput] = useState(5);
-  const [commentInput, setCommentInput] = useState("");
-  const [existingReviewImages, setExistingReviewImages] = useState([]);
-  const [newReviewImages, setNewReviewImages] = useState([]);
-  const [newReviewImagePreviews, setNewReviewImagePreviews] = useState([]);
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [myReview, setMyReview] = useState(null); // Review của user hiện tại (nếu có)
+  const [selectedRatingFilter, setSelectedRatingFilter] = useState(""); // Filter theo sao
+  const [ratingInput, setRatingInput] = useState(5); // Input rating khi tạo/sửa review
+  const [commentInput, setCommentInput] = useState(""); // Input comment
+  const [existingReviewImages, setExistingReviewImages] = useState([]); // Ảnh cũ của review
+  const [newReviewImages, setNewReviewImages] = useState([]); // Ảnh mới upload
+  const [newReviewImagePreviews, setNewReviewImagePreviews] = useState([]); // Preview ảnh mới
+  const [reviewSubmitting, setReviewSubmitting] = useState(false); // Loading khi submit review
   const [ebookActionMessage, setEbookActionMessage] = useState("");
   const [cartNotice, setCartNotice] = useState(null);
   const [reviewDeleting, setReviewDeleting] = useState(false);

@@ -274,7 +274,9 @@ class ReviewService {
     return review;
   }
 
-  // UC-87: Tạo review mới với upload ảnh
+  // UC-56: Tạo review mới cho sách (Add book review)
+  // UC-57: Bao gồm rating sao (Rate book)
+  // Kiểm tra: sách tồn tại, user đã mua sách, chưa review trước đó
   async createReview(userId, bookId, payload) {
     const { rating, comment = "", images = [] } = payload;
 
@@ -301,7 +303,8 @@ class ReviewService {
     return review;
   }
 
-  // Sửa review của chính mình (có thể cập nhật rating, comment, ảnh)
+  // UC-58: Cập nhật review của chính mình (Edit own review)
+  // Kiểm tra ownership, cập nhật rating/comment/images
   async updateOwnReview(userId, reviewId, payload) {
     const {
       rating,
