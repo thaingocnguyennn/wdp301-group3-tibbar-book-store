@@ -128,19 +128,37 @@ const BookDetailPage = () => {
     };
   }, []);
 
+  // UC-15: Fetch thông tin chi tiết sách cho trang book detail
+  // Luồng xử lý:
+  // 1. Set loading state để hiển thị spinner
+  // 2. Gọi bookApi.getBookById(id) với ID từ URL params
+  // 3. Cập nhật state book với dữ liệu từ response
+  // 4. Nếu sách là ebook và user đã đăng nhập, kiểm tra quyền truy cập ebook
+  // 5. Nếu có lỗi, set error message
+  // 6. Set loading false, UI render thông tin sách chi tiết
   const fetchBook = async () => {
     try {
+      // Bắt đầu loading
       setLoading(true);
+
+      // Gọi API lấy thông tin sách theo ID
       const response = await bookApi.getBookById(id);
+
+      // Lấy thông tin sách từ response
       const fetchedBook = response.data.book;
+
+      // Cập nhật state book
       setBook(fetchedBook);
-      // After fetching book, check ebook access if applicable
+
+      // Nếu sách là ebook và user đã đăng nhập, kiểm tra quyền truy cập
       if (fetchedBook?.isEbook && isAuthenticated) {
         fetchEbookAccess(id);
       }
     } catch (err) {
+      // Set error message từ response hoặc default
       setError(err.response?.data?.message || "Book not found");
     } finally {
+      // Kết thúc loading
       setLoading(false);
     }
   };
