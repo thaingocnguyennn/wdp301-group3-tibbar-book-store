@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import ApiError from "../utils/ApiError.js";
 
 class ReviewService {
+  // UC-87: Chuẩn hóa đường dẫn ảnh (xóa backslash, cắt quá 5 ảnh)
   normalizeImagePaths(images = []) {
     if (!Array.isArray(images)) return [];
     return images
@@ -27,6 +28,7 @@ class ReviewService {
       });
   }
 
+  // UC-83: Parse và xác thực filter rating (1-5)
   parseRatingFilter(rating) {
     if (rating === undefined || rating === null || rating === "") {
       return null;
@@ -46,6 +48,7 @@ class ReviewService {
     return normalizedRating;
   }
 
+  // UC-84: Tính tóm tắt phản ứng (bao nhiêu helpful, bao nhiêu dislike)
   getReactionSummary(reactions = []) {
     return reactions.reduce(
       (summary, reaction) => {
@@ -61,6 +64,7 @@ class ReviewService {
     );
   }
 
+  // UC-85: Chuẩn hóa mảng trả lời (trim whitespace)
   normalizeReplies(replies = []) {
     if (!Array.isArray(replies)) return [];
     return replies.map((reply) => ({
@@ -69,6 +73,8 @@ class ReviewService {
     }));
   }
 
+  // UC-83: Lấy review của sách, support lọc theo sao
+  // Trả về: danh sách review, phân trang, tóm tắt rating (TB, tổng, breakdown)
   async getBookReviews(bookId, page = 1, limit = 10, options = {}) {
     const ratingFilter = this.parseRatingFilter(options.rating);
     const skip = (page - 1) * limit;
@@ -76,10 +82,12 @@ class ReviewService {
       book: new mongoose.Types.ObjectId(bookId),
     };
 
+    // Nếu có filter rating, thêm vào query
     if (ratingFilter) {
       match.rating = ratingFilter;
     }
 
+    // Chạy 3 query song song: danh sách review, tổng số, thống kê rating
     const [reviews, total, summaryResult] = await Promise.all([
       Review.find(match)
         .populate("user", "firstName lastName email")
@@ -101,6 +109,7 @@ class ReviewService {
       ]),
     ]);
 
+    // Lấy breakdown: bao nhiêu review cho mỗi sao (1-5)
     const breakdownResult = await Review.aggregate([
       { $match: { book: new mongoose.Types.ObjectId(bookId) } },
       {
@@ -118,6 +127,7 @@ class ReviewService {
 
     const summary = summaryResult[0] || { averageRating: 0, totalReviews: 0 };
 
+    // Chuẩn hóa dữ liệu review trước khi trả về
     const normalizedReviews = reviews.map((review) => ({
       ...review,
       images: this.normalizeImagePaths(review.images || []),
@@ -141,6 +151,7 @@ class ReviewService {
     };
   }
 
+  // Admin: Lấy tất cả review với tìm kiếm, lọc rating, lọc status trả lời
   async getAllReviewsForAdmin({
     page = 1,
     limit = 20,
@@ -156,6 +167,7 @@ class ReviewService {
       match.rating = ratingFilter;
     }
 
+    // Lọc theo status trả lời: all, replied (có trả lời), pending (chưa trả lời)
     if (replyStatus === "replied") {
       match["replies.0"] = { $exists: true };
     }
@@ -164,6 +176,7 @@ class ReviewService {
       match["replies.0"] = { $exists: false };
     }
 
+    // Tìm kiếm trong comment, book title, email/name user
     const trimmedSearch = String(search || "").trim();
     if (trimmedSearch) {
       const regex = new RegExp(trimmedSearch, "i");
@@ -218,6 +231,7 @@ class ReviewService {
     };
   }
 
+  // Lấy review của user hiện tại cho một sách
   async getMyReviewForBook(userId, bookId) {
     const review = await Review.findOne({ user: userId, book: bookId })
       .populate("replies.user", "firstName lastName email role")
@@ -234,6 +248,7 @@ class ReviewService {
     };
   }
 
+  // UC-85: Thêm trả lời vào review
   async addReplyToReview(userId, userRole, reviewId, payload) {
     const comment = String(payload?.comment || "").trim();
     if (!comment) {
@@ -245,6 +260,7 @@ class ReviewService {
       throw ApiError.notFound("Review not found");
     }
 
+    // Thêm reply vào mảng replies của review
     review.replies.push({
       user: userId,
       role: String(userRole || "customer").toLowerCase(),
@@ -258,12 +274,15 @@ class ReviewService {
     return review;
   }
 
+  // UC-87: Tạo review mới với upload ảnh
   async createReview(userId, bookId, payload) {
     const { rating, comment = "", images = [] } = payload;
 
     await this.ensureBookExists(bookId);
+    // Kiểm tra user đã mua sách này chưa trước khi cho review
     await this.ensureUserPurchasedBook(userId, bookId);
 
+    // Ngừng user viết 2 review cho cùng 1 sách
     const existingReview = await Review.findOne({ user: userId, book: bookId });
     if (existingReview) {
       throw ApiError.conflict(
@@ -282,6 +301,7 @@ class ReviewService {
     return review;
   }
 
+  // Sửa review của chính mình (có thể cập nhật rating, comment, ảnh)
   async updateOwnReview(userId, reviewId, payload) {
     const {
       rating,
@@ -295,12 +315,14 @@ class ReviewService {
       throw ApiError.notFound("Review not found");
     }
 
+    // Kiểm tra user có phải chủ sở hữu review không
     if (review.user.toString() !== userId.toString()) {
       throw ApiError.forbidden("You can only edit your own review");
     }
 
     review.rating = rating;
     review.comment = comment;
+    // Gộp ảnh cũ (giữ lại) + ảnh mới upload, tối đa 5 ảnh
     const mergedImages = [
       ...this.normalizeImagePaths(keepExistingImages),
       ...this.normalizeImagePaths(images),
@@ -313,12 +335,14 @@ class ReviewService {
     return review;
   }
 
+  // UC-82: Xóa review của chính mình
   async deleteOwnReview(userId, reviewId) {
     const review = await Review.findById(reviewId);
     if (!review) {
       throw ApiError.notFound("Review not found");
     }
 
+    // Kiểm tra quyền: chỉ chủ sở hữu mới có thể xóa
     if (review.user.toString() !== userId.toString()) {
       throw ApiError.forbidden("You can only delete your own review");
     }
@@ -327,6 +351,7 @@ class ReviewService {
     return true;
   }
 
+  // UC-84: Thêm/cập nhật/xóa phản ứng (helpful/dislike) của user cho review
   async reactToReview(userId, reviewId, type) {
     const normalizedType = String(type || "").toUpperCase();
     if (!["HELPFUL", "DISLIKE"].includes(normalizedType)) {
@@ -338,23 +363,28 @@ class ReviewService {
       throw ApiError.notFound("Review not found");
     }
 
+    // User không được phép phản ứng trên review của chính mình
     if (review.user.toString() === userId.toString()) {
       throw ApiError.badRequest("You cannot react to your own review");
     }
 
+    // Tìm xem user này đã phản ứng chưa
     const existingIndex = review.reactions.findIndex(
       (reaction) => reaction.user.toString() === userId.toString(),
     );
 
     if (existingIndex >= 0) {
       const currentType = review.reactions[existingIndex].type;
+      // Nếu nhấn loại phản ứng cũ, xóa phản ứng đó
       if (currentType === normalizedType) {
         review.reactions.splice(existingIndex, 1);
       } else {
+        // Nếu nhấn loại khác, cập nhật phản ứng
         review.reactions[existingIndex].type = normalizedType;
         review.reactions[existingIndex].createdAt = new Date();
       }
     } else {
+      // Thêm phản ứng mới
       review.reactions.push({
         user: userId,
         type: normalizedType,
@@ -363,6 +393,7 @@ class ReviewService {
 
     await review.save();
 
+    // Trả về reaction summary và phản ứng của user hiện tại
     const reactionSummary = this.getReactionSummary(review.reactions || []);
     const myReaction =
       review.reactions.find(
@@ -383,6 +414,7 @@ class ReviewService {
     }
   }
 
+  // Kiểm tra user đã mua sách này chưa (chỉ user mua sách mới có thể review)
   async ensureUserPurchasedBook(userId, bookId) {
     const purchasedOrder = await Order.findOne({
       user: userId,
