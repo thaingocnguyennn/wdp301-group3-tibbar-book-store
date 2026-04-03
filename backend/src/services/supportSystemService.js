@@ -98,6 +98,10 @@ class SupportSystemService {
     return normalized;
   }
 
+  // Customer tạo ticket mới (UC-122)
+  // 1) Validate issue chọn và mô tả
+  // 2) Tạo đối tượng ticket trong bảng SupportSystemTicket
+  // 3) Lưu ban đầu status = in_progress và history: created
   async createCustomerTicket(customerId, payload = {}) {
     const selectedIssues = this.normalizeIssueSelection(payload.selectedIssueKeys);
     const description = this.normalizeDescription(payload.description);
@@ -157,6 +161,8 @@ class SupportSystemService {
     return this.getAdminTickets({ ...filters, status: "resolved_success" });
   }
 
+  // UC-120: Admin trả lời ticket trong Support System
+  // - push reply vào adminReplies và history
   async addAdminReply(adminId, ticketId, content) {
     const normalizedContent = String(content || "").trim();
     if (!normalizedContent) {
@@ -198,6 +204,9 @@ class SupportSystemService {
     return updated;
   }
 
+  // UC-123: Admin cập nhật trạng thái ticket
+  // - Xác thực trạng thái hợp lệ
+  // - Lưu history sự kiện thay đổi status
   async updateTicketStatus(adminId, ticketId, nextStatus, note = "") {
     if (!["in_progress", "resolved_success"].includes(nextStatus)) {
       throw ApiError.badRequest("Invalid ticket status");

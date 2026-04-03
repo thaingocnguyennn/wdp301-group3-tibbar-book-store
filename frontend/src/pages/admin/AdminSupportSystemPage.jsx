@@ -6,6 +6,8 @@ const statusLabelsFallback = {
   resolved_success: "Da xu ly thanh cong",
 };
 
+// AdminSupportSystemPage: UC-122 (ticket system admin view), UC-120 (reply), UC-123 (status update)
+// Luồng: load ticket inbox -> load active tickets -> reply ticket -> mark resolved
 const AdminSupportSystemPage = () => {
   const [tickets, setTickets] = useState([]);
   const [statuses, setStatuses] = useState(statusLabelsFallback);

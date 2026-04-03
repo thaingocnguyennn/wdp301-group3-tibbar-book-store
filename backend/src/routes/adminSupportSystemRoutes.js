@@ -9,6 +9,7 @@ const router = express.Router();
 router.use(authenticate);
 router.use(authorize(ROLES.ADMIN));
 
+// Admin ticket inbox + lịch sử
 router.get("/tickets", supportSystemController.getAdminTicketInbox);
 router.get("/tickets/history", supportSystemController.getAdminTicketHistory);
 router.post("/tickets/:ticketId/replies", supportSystemController.addAdminReply);

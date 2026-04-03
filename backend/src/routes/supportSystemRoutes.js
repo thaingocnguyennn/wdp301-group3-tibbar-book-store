@@ -4,6 +4,7 @@ import { authenticate } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
+// Public endpoint: danh sách sự cố (customer front-end dùng để chọn issue type)
 router.get("/issues", supportSystemController.getIssueCatalog);
 
 router.use(authenticate);

@@ -10,6 +10,13 @@ const resolveImageUrl = (path) => {
   return path.startsWith("http") ? path : `${serverBaseUrl}${path}`;
 };
 
+// SupportChatPage: customer chat trực tiếp với admin
+// Luồng:
+// 1) component mount -> gọi supportApi.getMyConversation
+// 2) Socket join conversation, lắng nghe message:new
+// 3) Khi customer gửi text -> gọi socket event customer:send-message
+//    Khi gửi ảnh -> gọi supportApi.sendMyImage (HTTP multipart)
+// 4) Tin nhắn mới từ admin sẽ push vào `messages` qua event message:new
 const SupportChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
