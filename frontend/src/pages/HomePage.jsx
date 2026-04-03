@@ -91,18 +91,37 @@ const HomePage = () => {
     fetchBooks();
   }, [filters]);
 
+  // UC-11 & UC-12: Fetch danh sách sách với bộ lọc cho homepage
+  // Luồng xử lý:
+  // 1. Set loading state để hiển thị spinner
+  // 2. Lọc bỏ các filter rỗng khỏi object filters
+  // 3. Gọi bookApi.getPublicBooks() với clean filters
+  // 4. Cập nhật state books và pagination từ response
+  // 5. Nếu có lỗi, log ra console (không hiển thị lỗi cho user)
+  // 6. Set loading false, UI sẽ render danh sách books
   const fetchBooks = async () => {
     try {
+      // Bắt đầu loading
       setLoading(true);
+
+      // Lọc bỏ các filter có giá trị rỗng để tránh gửi query params không cần thiết
       const cleanFilters = Object.fromEntries(
         Object.entries(filters).filter(([_, v]) => v !== ""),
       );
+
+      // Gọi API lấy danh sách sách với filters
       const response = await bookApi.getPublicBooks(cleanFilters);
+
+      // Cập nhật state với danh sách sách từ response
       setBooks(response.data.books);
+
+      // Cập nhật thông tin pagination
       setPagination(response.data.pagination);
     } catch (error) {
+      // Log lỗi ra console để debug, không hiển thị popup lỗi cho user
       console.error("Error fetching books:", error);
     } finally {
+      // Kết thúc loading
       setLoading(false);
     }
   };
@@ -168,21 +187,36 @@ const HomePage = () => {
     }
   };
 
+  // UC-14: Fetch sliders công khai cho homepage carousel
+  // Luồng xử lý:
+  // 1. Gọi sliderApi.getPublicSliders() để lấy danh sách sliders từ backend
+  // 2. Map dữ liệu response thành format phù hợp cho Slider component
+  // 3. Cập nhật state sliders với dữ liệu đã map
+  // 4. Nếu có lỗi, log ra console
+  // 5. Slider component sẽ render carousel dựa trên state này
   const fetchSliders = async () => {
     try {
+      // Gọi API lấy sliders công khai
       const response = await sliderApi.getPublicSliders();
+
+      // Lấy mảng sliders từ response, mặc định là mảng rỗng nếu không có
       const sliderData = response.data.sliders || [];
+
+      // Map dữ liệu từ backend thành format phù hợp cho Slider component
       const mapped = sliderData.map((item) => ({
         backgroundImage: item.imageUrl
-          ? `${serverBaseUrl}${item.imageUrl}`
-          : undefined,
-        title: item.title || "",
-        subtitle: item.subtitle || "",
-        ctaText: item.ctaText || "",
-        ctaLink: item.ctaLink || "",
+          ? `${serverBaseUrl}${item.imageUrl}`  // Thêm base URL cho image
+          : undefined,                           // Undefined nếu không có image
+        title: item.title || "",                 // Title của slider
+        subtitle: item.subtitle || "",           // Subtitle của slider
+        ctaText: item.ctaText || "",             // Text cho call-to-action button
+        ctaLink: item.ctaLink || "",             // Link cho call-to-action
       }));
+
+      // Cập nhật state sliders với dữ liệu đã map
       setSliders(mapped);
     } catch (error) {
+      // Log lỗi ra console để debug
       console.error("Error fetching sliders:", error);
     }
   };
