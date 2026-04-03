@@ -42,16 +42,18 @@ const CheckoutPage = () => {
   const [coinDiscount, setCoinDiscount] = useState(0);
   const [acceptedReturnPolicy, setAcceptedReturnPolicy] = useState(false);
 
-  // Flash sale state
+  // State cho flash sale - Lưu bản đồ giảm giá: { bookId -> { discountPercent, flashSalePrice } }
+  // Dùng để tính giá checkout khi sách có flash sale
   const [flashSaleMap, setFlashSaleMap] = useState({});
 
-  // Fetch flash sale data
+  // Lấy dữ liệu flash sale từ backend để áp dụng giảm giá vào giỏ hàng
   useEffect(() => {
     const fetchFlashSale = async () => {
       try {
         const response = await flashSaleApi.getActiveFlashSale();
         const campaign = response.data?.campaign;
         if (campaign?.books) {
+          // Tạo bản đồ: bookId -> { discountPercent, flashSalePrice }
           const map = {};
           campaign.books.forEach((book) => {
             map[book._id] = {
@@ -62,7 +64,7 @@ const CheckoutPage = () => {
           setFlashSaleMap(map);
         }
       } catch (error) {
-        // Flash sale might not exist, that's fine
+        // Flash sale có thể không tồn tại, đó là bình thường
         setFlashSaleMap({});
       }
     };
@@ -147,13 +149,14 @@ const CheckoutPage = () => {
     fetchCoinStatus();
   }, [isAuthenticated]);
 
-  // Get price for an item (flash sale price if available, otherwise original price)
+  // Lấy giá của một sản phẩm (áp dụng flash sale nếu có)
+  // Nếu sách đang flash sale, dùng giá flash sale, ngược lại dùng giá gốc
   const getItemPrice = (item) => {
     const bookId = item.book?._id;
     if (flashSaleMap[bookId]) {
-      return flashSaleMap[bookId].flashSalePrice;
+      return flashSaleMap[bookId].flashSalePrice; // Giá đã giảm
     }
-    return item.book?.price || 0;
+    return item.book?.price || 0; // Giá gốc
   };
 
   const hasEbookInCart = useMemo(() => {
@@ -167,14 +170,15 @@ const CheckoutPage = () => {
   const isDigitalCart = hasEbookInCart && !hasPhysicalInCart;
   const isMixedCart = hasEbookInCart && hasPhysicalInCart;
 
-  // Calculate totals
+  // Tính toán tổng tiền (subtotal, shipping, total)
+  // Con số này áp dụng đủ flash sale discount nếu sách có flash sale
   const baseTotals = useMemo(() => {
     const subtotal = (cart.items || []).reduce((sum, item) => {
-      const price = getItemPrice(item);
+      const price = getItemPrice(item); // Lấy giá (kể flash sale)
       return sum + price * item.quantity;
     }, 0);
 
-    // Free shipping if subtotal > 200,000 VND
+    // Tính phí vận chuyển (miễn phí nếu subtotal > 200,000 VND hoặc ebook)
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
     const shippingFee = isDigitalCart

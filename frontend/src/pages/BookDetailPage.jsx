@@ -47,6 +47,8 @@ const BookDetailPage = () => {
   const [replySubmittingId, setReplySubmittingId] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
+  // State lưu trữ thông tin flash sale của sách hiện tại (nếu có)
+  // Dùng để hiển thị badge "Đang giảm giá" hoặc giá flash sale trên trang chi tiết
   const [flashSaleInfo, setFlashSaleInfo] = useState(null);
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
   const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
@@ -72,22 +74,24 @@ const BookDetailPage = () => {
   useEffect(() => {
     fetchBook();
     fetchReviews(1, selectedRatingFilter);
-    fetchFlashSale();
+    fetchFlashSale(); // Lấy thông tin flash sale khi tải trang chi tiết sách
   }, [id]);
 
+  // Lấy thông tin flash sale của sách hiện tại từ backend
+  // Kiểm tra xem sách có đang trong chiến dịch flash sale không
   const fetchFlashSale = async () => {
     try {
       const response = await flashSaleApi.getActiveFlashSale();
       const campaign = response.data?.campaign;
       if (campaign?.books) {
-        // Find if current book is in flash sale
+        // Tìm xem sách hiện tại có trong flash sale không
         const bookInFlashSale = campaign.books.find(
           (book) => book._id === id
         );
-        setFlashSaleInfo(bookInFlashSale || null);
+        setFlashSaleInfo(bookInFlashSale || null); // Lưu thông tin flash sale (nếu có)
       }
     } catch (error) {
-      // No active flash sale, that's fine
+      // Không có flash sale đang hoạt động, đó là bình thường
       setFlashSaleInfo(null);
     }
   };
