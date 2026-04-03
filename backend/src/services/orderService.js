@@ -11,7 +11,7 @@ import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
 import notificationService from "./notificationService.js";
 import flashSaleService from "./flashSaleService.js";
-const MAX_ORDERS = 20;//
+const MAX_ORDERS = 20; //
 const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
 const ORDER_KINDS = {
@@ -118,12 +118,17 @@ class OrderService {
       return order.orderKind;
     }
 
-    const itemBooks = Array.isArray(order?.items) ? order.items.map((item) => item.book) : [];
+    const itemBooks = Array.isArray(order?.items)
+      ? order.items.map((item) => item.book)
+      : [];
     const populatedBooks = itemBooks.filter(
       (book) => typeof book === "object" && book !== null && "isEbook" in book,
     );
 
-    if (populatedBooks.length === itemBooks.length && populatedBooks.length > 0) {
+    if (
+      populatedBooks.length === itemBooks.length &&
+      populatedBooks.length > 0
+    ) {
       return this.determineOrderKindFromBooks(populatedBooks);
     }
 
@@ -135,7 +140,9 @@ class OrderService {
       return ORDER_KINDS.PHYSICAL;
     }
 
-    const books = await Book.find({ _id: { $in: bookIds } }).select("isEbook").lean();
+    const books = await Book.find({ _id: { $in: bookIds } })
+      .select("isEbook")
+      .lean();
     return this.determineOrderKindFromBooks(books);
   }
 
@@ -468,10 +475,12 @@ class OrderService {
   ) {
     const subtotal = items.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -625,17 +634,21 @@ class OrderService {
       throw ApiError.badRequest("Voucher code is required");
     }
 
-    const { validItems, orderKind } = await this.validateCartForCheckout(userId);
+    const { validItems, orderKind } =
+      await this.validateCartForCheckout(userId);
 
     // Get flash sale discount map for calculating prices
-    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+    const flashSaleDiscountMap =
+      await flashSaleService.getFlashSaleDiscountMap();
 
     const subtotal = validItems.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -737,15 +750,18 @@ class OrderService {
     }
 
     // Get flash sale discount map for calculating prices
-    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+    const flashSaleDiscountMap =
+      await flashSaleService.getFlashSaleDiscountMap();
 
     // Calculate subtotal first (with flash sale prices if applicable)
     const subtotal = validItems.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -791,10 +807,12 @@ class OrderService {
     // Prepare order items with snapshot of book data (using flash sale prices if applicable)
     const orderItems = validItems.map((item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const finalPrice = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const finalPrice =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
 
       return {
         book: item.book._id,
@@ -1143,10 +1161,7 @@ class OrderService {
       previousOrder.paymentMethod ||
       (orderKind === ORDER_KINDS.DIGITAL ? "VNPAY" : "COD");
 
-    if (
-      orderKind === ORDER_KINDS.DIGITAL &&
-      paymentMethodToUse !== "VNPAY"
-    ) {
+    if (orderKind === ORDER_KINDS.DIGITAL && paymentMethodToUse !== "VNPAY") {
       throw ApiError.badRequest(
         "E-book orders only support online payment via VNPay",
       );
@@ -1215,9 +1230,9 @@ class OrderService {
         author: book.author,
         price: book.price,
         quantity: book.isEbook ? 1 : item.quantity,
-        subtotal: Math.round(
-          book.price * (book.isEbook ? 1 : item.quantity) * 100,
-        ) / 100,
+        subtotal:
+          Math.round(book.price * (book.isEbook ? 1 : item.quantity) * 100) /
+          100,
       });
     }
 
@@ -1608,7 +1623,10 @@ class OrderService {
       return true;
     });
 
-    const totalRevenue = eligibleOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalRevenue = eligibleOrders.reduce(
+      (sum, order) => sum + order.total,
+      0,
+    );
     const chartMap = {};
 
     eligibleOrders.forEach((order) => {
@@ -1662,18 +1680,31 @@ class OrderService {
     }
 
     if ((await this.resolveOrderKind(order)) === ORDER_KINDS.DIGITAL) {
-      throw ApiError.badRequest("Digital orders cannot be assigned to shippers");
+      throw ApiError.badRequest(
+        "Digital orders cannot be assigned to shippers",
+      );
     }
 
     if (!["PENDING", "PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Order can only be assigned while in PENDING or PROCESSING status"
+        "Order can only be assigned while in PENDING or PROCESSING status",
       );
     }
 
     // ⭐ THÊM ĐOẠN NÀY
+    
     const { province, district } = order.shippingAddress || {};
+    console.log("order shippingAddress:", order.shippingAddress);
 
+    console.log("shipper:", {
+      id: shipper?._id?.toString(),
+      role: shipper?.role,
+      isOnline: shipper?.isOnline,
+      isActive: shipper?.isActive,
+      addresses: shipper?.addresses,
+    });
+
+    console.log("order.shippingAddress:", order.shippingAddress);
     const matchAddress = shipper.addresses?.some(
       (addr) =>
         addr.province?.trim() === province?.trim() &&
@@ -1693,7 +1724,7 @@ class OrderService {
     const rejected = order.assignmentHistory?.some(
       (h) =>
         h.shipper.toString() === shipperId.toString() &&
-        h.status === "REJECTED"
+        h.status === "REJECTED",
     );
 
     if (rejected) {
@@ -1730,7 +1761,6 @@ class OrderService {
     this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
 
-
     return order;
   }
   // Lấy số lượng đơn hàng đang được giao (SHIPPED hoặc PROCESSING) của shipper để kiểm tra giới hạn 20 đơn hàng
@@ -1761,7 +1791,7 @@ class OrderService {
 
     if (!allowedStatuses.includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Auto assign only works for PENDING or PROCESSING orders"
+        "Auto assign only works for PENDING or PROCESSING orders",
       );
     }
     const { province, district } = order.shippingAddress || {};
@@ -2047,7 +2077,7 @@ class OrderService {
       orders,
     };
   }
-  // 
+  //
   async handleAssignmentTimeout(orderId, shipperId) {
     setTimeout(async () => {
       try {

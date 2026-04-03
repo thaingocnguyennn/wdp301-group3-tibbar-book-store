@@ -4,7 +4,7 @@ import { bookApi } from "../api/bookApi";
 import { categoryApi } from "../api/categoryApi";
 import { sliderApi } from "../api/sliderApi";
 import { newsApi } from "../api/newsApi";
-import { flashSaleApi } from "../api/flashSaleApi";
+import { flashSaleApi } from "../api/flashSaleApi"; // Import flash sale API
 import BookCard from "../components/books/BookCard";
 import Slider from "../components/common/Slider";
 import { useAuth } from "../hooks/useAuth";
@@ -26,9 +26,12 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState([]);
   const [homepageNews, setHomepageNews] = useState([]);
-  const [flashSaleCampaign, setFlashSaleCampaign] = useState(null);
-  const [flashSaleRemainingMs, setFlashSaleRemainingMs] = useState(0);
-  const [flashSaleLoading, setFlashSaleLoading] = useState(true);
+  
+  // State cho flash sale (UC-118 + UC-119: Hiển thị flash sale trên homepage)
+  const [flashSaleCampaign, setFlashSaleCampaign] = useState(null); // Chiến dịch flash sale đang hoạt động
+  const [flashSaleRemainingMs, setFlashSaleRemainingMs] = useState(0); // Thời gian còn lại (ms)
+  const [flashSaleLoading, setFlashSaleLoading] = useState(true); // Trạng thái tải flash sale
+  
   const [filters, setFilters] = useState({
     category: "",
     minPrice: "",
@@ -43,14 +46,16 @@ const HomePage = () => {
     return api.replace(/\/api\/?$/, "");
   }, []);
 
+  // Khôi động dữ liệu trang chủ: categories, sliders, news, best sellers, flash sale, books cá nhân hóa
   useEffect(() => {
     fetchCategories();
     fetchSliders();
     fetchHomepageNews();
     fetchBestSellingBooks();
-    fetchFlashSaleCampaign();
+    fetchFlashSaleCampaign(); // Lấy flash sale hiện tại
   }, []);
 
+  // Cập nhật flash sale mỗi 30 giây (kiểm tra xem có chiến dịch mới không)
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchFlashSaleCampaign();
@@ -59,6 +64,8 @@ const HomePage = () => {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Cập nhật bộ đếm thời gian còn lại của flash sale mỗi 1 giây
+  // Khi hết hạn, tự động vô hiệu hóa flash sale
   useEffect(() => {
     if (!flashSaleCampaign?.endsAt) return undefined;
 
@@ -66,7 +73,7 @@ const HomePage = () => {
       setFlashSaleRemainingMs((prev) => {
         if (prev <= 1000) {
           clearInterval(intervalId);
-          setFlashSaleCampaign(null);
+          setFlashSaleCampaign(null); // Xóa flash sale khi hết hạn
           return 0;
         }
         return prev - 1000;
@@ -177,14 +184,17 @@ const HomePage = () => {
     }
   };
 
+  // Lấy dữ liệu chiến dịch flash sale đang hoạt động từ backend
   const fetchFlashSaleCampaign = async () => {
     try {
       setFlashSaleLoading(true);
-      const response = await flashSaleApi.getActiveFlashSale();
+      const response = await flashSaleApi.getActiveFlashSale(); // Gọi API
       const campaign = response?.data?.campaign || null;
 
+      // Lưu trữ thông tin chiến dịch
       setFlashSaleCampaign(campaign);
 
+      // Lưu trữ thời gian còn lại
       if (campaign?.remainingMs) {
         setFlashSaleRemainingMs(Number(campaign.remainingMs));
       } else {
@@ -199,6 +209,8 @@ const HomePage = () => {
     }
   };
 
+  // Định dạng thời gian dán mù từ milliseconds thành HH:MM:SS
+  // Dùng để hiển thị countdown trên flash sale
   const formatCountdown = (remainingMs) => {
     const totalSeconds = Math.max(0, Math.floor(Number(remainingMs || 0) / 1000));
     const hours = Math.floor(totalSeconds / 3600);
@@ -390,13 +402,15 @@ const HomePage = () => {
         )}
       </section>
 
-      {/* Flash Sale (UC-118 + UC-119) */}
+      {/* Flash Sale (UC-118 + UC-119): Hiển thị chiến dịch flash sale trên homepage */}
       <section style={styles.section}>
+        {/* Header: Tiêu đề "Flash Sale" và bộ đếm ngược */}
         <div style={styles.flashSaleHeader}>
           <div>
             <h2 style={styles.flashSaleTitle}>⚡ Flash Sale</h2>
             <p style={styles.flashSaleSubtitle}>Limited-time discounts for selected books</p>
           </div>
+          {/* Hiển thị bộ đếm ngược nếu có chiến dịch flash sale đang hoạt động */}
           {flashSaleCampaign && (
             <div style={styles.countdownBadge}>
               <span style={styles.countdownLabel}>Ends in</span>
@@ -407,6 +421,7 @@ const HomePage = () => {
           )}
         </div>
 
+        {/* Hiển thị trạng thái: đang tải, không có chiến dịch, hoặc danh sách sách flash sale */}
         {flashSaleLoading ? (
           <div style={styles.empty}>
             <p>Loading flash sale campaign...</p>
@@ -417,10 +432,14 @@ const HomePage = () => {
             <p style={styles.emptySmall}>Come back soon for limited-time deals.</p>
           </div>
         ) : (
+          // Hiển thị danh sách sách trong flash sale
           <div style={styles.flashSaleGrid}>
             {flashSaleCampaign.books.map((book) => (
               <article key={book._id} style={styles.flashSaleCard}>
+                {/* Badge: Hiển thị % giảm giá */}
                 <span style={styles.discountChip}>-{book.discountPercent}%</span>
+                
+                {/* Hình ảnh sách */}
                 <Link to={`/books/${book._id}`} style={styles.flashSaleImageLink}>
                   {resolveBookImage(book.imageUrl) ? (
                     <img
@@ -433,12 +452,14 @@ const HomePage = () => {
                   )}
                 </Link>
 
+                {/* Nội dung: Tiêu đề, tác giả, giá */}
                 <div style={styles.flashSaleContent}>
                   <Link to={`/books/${book._id}`} style={styles.flashSaleBookTitle}>
                     {book.title}
                   </Link>
                   <p style={styles.flashSaleAuthor}>by {book.author}</p>
 
+                  {/* Hiển thị giá flash sale và giá gốc */}
                   <div style={styles.flashSalePriceRow}>
                     <span style={styles.flashSalePrice}>
                       {Number(book.flashSalePrice || 0).toLocaleString("vi-VN")}₫
@@ -448,6 +469,7 @@ const HomePage = () => {
                     </span>
                   </div>
 
+                  {/* Nút: Xem chi tiết sách */}
                   <Link to={`/books/${book._id}`} style={styles.flashSaleButton}>
                     View Deal
                   </Link>

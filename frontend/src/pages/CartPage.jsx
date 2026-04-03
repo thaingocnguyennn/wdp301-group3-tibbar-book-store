@@ -19,15 +19,18 @@ const CartPage = () => {
   const isDigitalCart = containsEbook && !containsPhysical;
   const isMixedCart = containsEbook && containsPhysical;
 
-  const [flashSaleMap, setFlashSaleMap] = useState({});
+  const [flashSaleMap, setFlashSaleMap] = useState({}); // Lưu bản đồ flash sale: { bookId -> discountInfo }
 
+  // Lấy thông tin flash sale từ backend
+  // Dùng để tính giá sách trong giỏ hàng (áp dụng giảm giá flash sale nếu có)
   useEffect(() => {
     const fetchFlashSale = async () => {
       try {
         const response = await flashSaleApi.getActiveFlashSale();
         const campaign = response.data?.campaign;
         if (campaign?.books) {
-          // Create map of bookId -> discount info
+          // Tạo bản đồ: bookId -> { discountPercent, flashSalePrice }
+          // Dùng để tìm kiếm nhanh thông tin giảm giá
           const map = {};
           campaign.books.forEach((book) => {
             map[book._id] = {
@@ -38,7 +41,7 @@ const CartPage = () => {
           setFlashSaleMap(map);
         }
       } catch (error) {
-        // Flash sale might not exist, that's fine
+        // Flash sale có thể không tồn tại, đó là bình thường
         console.log("No active flash sale");
       }
     };
@@ -46,17 +49,20 @@ const CartPage = () => {
   }, []);
 
   const totals = useMemo(() => {
+    // Tính toán subtotal từ các sản phẩm trong giỏ
+    // Nếu sách đang trong flash sale, dùng giá flash sale, ngược lại dùng giá gốc
     const subtotal = (cart.items || []).reduce((sum, item) => {
       const bookId = item.book?._id;
       const originalPrice = item.book?.price || 0;
       const isOnFlashSale = flashSaleMap[bookId];
       
-      // Use flash sale price if available, otherwise use original price
+      // Sử dụng giá flash sale nếu có, nếu không dùng giá gốc
       const price = isOnFlashSale ? flashSaleMap[bookId].flashSalePrice : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
-    // Free shipping if subtotal > 200,000 VND
+    // Tính phí vận chuyển
+    // Miễn phí vận chuyển nếu: là ebook hoặc subtotal > 200,000 VND
     const SHIPPING_FEE = 30000;
     const FREE_SHIPPING_THRESHOLD = 200000;
     const shippingFee = isDigitalCart
