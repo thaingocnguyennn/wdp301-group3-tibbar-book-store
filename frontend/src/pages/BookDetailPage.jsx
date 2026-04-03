@@ -173,6 +173,8 @@ const BookDetailPage = () => {
     setEbookActionMessage("⚠️ Please complete payment to read this e-book.");
   };
 
+  // UC-83: Lấy review của sách với lọc theo rating
+  // rating: có thể là "" (tất cả), hoặc "1"-"5" (lọc theo sao)
   const fetchReviews = async (page = 1, rating = "") => {
     try {
       setReviewLoading(true);
@@ -197,6 +199,7 @@ const BookDetailPage = () => {
     }
   };
 
+  // Lấy review của chính user hiện tại cho sách này (để hiển thị form sửa)
   const fetchMyReview = async () => {
     try {
       const response = await reviewApi.getMyReviewForBook(id);
@@ -220,6 +223,8 @@ const BookDetailPage = () => {
     }
   };
 
+  // UC-87: Xử lý chọn ảnh mới để upload
+  // Giới hạn tối đa 5 ảnh (gộp ảnh cũ + ảnh mới)
   const handleSelectNewReviewImages = (event) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -238,6 +243,7 @@ const BookDetailPage = () => {
     setNewReviewImagePreviews((prev) => [...prev, ...previews]);
   };
 
+  // Xóa ảnh mới (chưa upload) khỏi preview
   const removeNewImageAt = (index) => {
     setNewReviewImages((prev) =>
       prev.filter((_, itemIndex) => itemIndex !== index),
@@ -251,6 +257,7 @@ const BookDetailPage = () => {
     });
   };
 
+  // Xóa ảnh cũ (đã upload) khỏi review
   const removeExistingImageAt = (index) => {
     setExistingReviewImages((prev) =>
       prev.filter((_, itemIndex) => itemIndex !== index),
@@ -323,6 +330,7 @@ const BookDetailPage = () => {
     }
   };
 
+  // UC-87: Gửi review (tạo mới hoặc sửa) với upload ảnh
   const handleSubmitReview = async () => {
     if (!isAuthenticated) {
       alert("Please login to write a review");
@@ -338,26 +346,31 @@ const BookDetailPage = () => {
       payload.append("rating", String(Number(ratingInput)));
       payload.append("comment", commentInput.trim());
 
+      // Ghi lại đường dẫn ảnh cũ (để backend biết giữ lại nào)
       existingReviewImages.forEach((imagePath) => {
         payload.append("keepExistingImages", imagePath);
       });
 
+      // Thêm file ảnh mới
       newReviewImages.forEach((file) => {
         payload.append("images", file);
       });
 
+      // Nếu đã có review, sửa; nếu chưa có, tạo mới
       if (myReview?._id) {
         await reviewApi.updateReview(myReview._id, payload, true);
       } else {
         await reviewApi.createReview(id, payload, true);
       }
 
+      // Reset form sau khi submit thành công
       setNewReviewImages([]);
       setNewReviewImagePreviews((prev) => {
         prev.forEach((url) => URL.revokeObjectURL(url));
         return [];
       });
 
+      // Tải lại review list để hiển thị review vừa tạo/sửa
       await Promise.all([
         fetchReviews(1, selectedRatingFilter),
         fetchMyReview(),
@@ -369,6 +382,7 @@ const BookDetailPage = () => {
     }
   };
 
+  // UC-82: Xóa review của chính mình
   const handleDeleteMyReview = async () => {
     if (!myReview?._id || reviewDeleting) {
       return;
@@ -384,7 +398,10 @@ const BookDetailPage = () => {
     try {
       setReviewDeleting(true);
       setReviewError("");
+      // Gọi API xóa review
       await reviewApi.deleteReview(myReview._id);
+      
+      // Reset form sau khi xóa thành công
       setMyReview(null);
       setRatingInput(5);
       setCommentInput("");
@@ -394,6 +411,8 @@ const BookDetailPage = () => {
         prev.forEach((url) => URL.revokeObjectURL(url));
         return [];
       });
+      
+      // Tải lại review list
       await fetchReviews(1, selectedRatingFilter);
     } catch (err) {
       setReviewError(err.response?.data?.message || "Failed to delete review");
@@ -402,6 +421,7 @@ const BookDetailPage = () => {
     }
   };
 
+  // UC-84: Phản ứng vào review (helpful/dislike) từ user khác
   const handleReviewReaction = async (reviewId, type) => {
     if (!isAuthenticated) {
       navigate("/login", { state: { from: `/books/${id}` } });
@@ -410,7 +430,9 @@ const BookDetailPage = () => {
 
     try {
       setReactionSubmittingId(reviewId);
+      // Gọi API thêm/cập nhật/xóa phản ứng
       await reviewApi.reactToReview(reviewId, type);
+      // Tải lại review list để cập nhật badge phản ứng
       await fetchReviews(reviewPagination.page, selectedRatingFilter);
     } catch (err) {
       setReviewError(
@@ -421,6 +443,7 @@ const BookDetailPage = () => {
     }
   };
 
+  // Cập nhật input trả lời cho từng review ID
   const handleReplyInputChange = (reviewId, value) => {
     setReplyInputs((prev) => ({
       ...prev,
@@ -428,6 +451,7 @@ const BookDetailPage = () => {
     }));
   };
 
+  // UC-85: Gửi trả lời vào review
   const handleReplyToReview = async (reviewId) => {
     if (!isAuthenticated) {
       navigate("/login", { state: { from: `/books/${id}` } });
@@ -443,8 +467,11 @@ const BookDetailPage = () => {
     try {
       setReplySubmittingId(reviewId);
       setReviewError("");
+      // Gọi API thêm reply vào review
       await reviewApi.replyToReview(reviewId, comment);
+      // Clear input sau khi submit thành công
       setReplyInputs((prev) => ({ ...prev, [reviewId]: "" }));
+      // Tải lại review list để hiển thị reply
       await fetchReviews(reviewPagination.page, selectedRatingFilter);
     } catch (err) {
       setReviewError(err.response?.data?.message || "Failed to submit reply");

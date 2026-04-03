@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { reviewApi } from "../../api/reviewApi";
 
+// Trang Admin quản lý reply review (UC-85: Reply review)
 const ReviewRepliesManagementPage = () => {
+  // Danh sách review
   const [reviews, setReviews] = useState([]);
+  // Thông tin phân trang
   const [pagination, setPagination] = useState({
     page: 1,
     totalPages: 1,
@@ -11,12 +14,18 @@ const ReviewRepliesManagementPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
+  // Các filter: tìm kiếm, lọc sao, lọc status trả lời
   const [search, setSearch] = useState("");
   const [rating, setRating] = useState("");
   const [replyStatus, setReplyStatus] = useState("all");
+  
+  // Trữ input text trả lời cho mỗi review (key: reviewId, value: comment text)
   const [replyInputs, setReplyInputs] = useState({});
+  // ID review đang gửi trả lời
   const [replyingReviewId, setReplyingReviewId] = useState("");
 
+  // Fetch review cho admin: hỗ trợ lọc rating, tìm kiếm, filter status trả lời (UC-83, UC-85)
   const fetchAdminReviews = async (nextPage = 1) => {
     try {
       setLoading(true);
@@ -44,10 +53,12 @@ const ReviewRepliesManagementPage = () => {
     }
   };
 
+  // Tải review lần đầu
   useEffect(() => {
     fetchAdminReviews(1);
   }, []);
 
+  // UC-85: Gửi trả lời vào review
   const handleReply = async (reviewId) => {
     const comment = String(replyInputs[reviewId] || "").trim();
     if (!comment) {
@@ -58,8 +69,11 @@ const ReviewRepliesManagementPage = () => {
     try {
       setReplyingReviewId(reviewId);
       setError("");
+      // Gọi API thêm reply vào review
       await reviewApi.replyToReview(reviewId, comment);
+      // Clear input sau khi submit thành công
       setReplyInputs((prev) => ({ ...prev, [reviewId]: "" }));
+      // Reload list replies
       await fetchAdminReviews(pagination.page || 1);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to submit reply");
@@ -68,6 +82,8 @@ const ReviewRepliesManagementPage = () => {
     }
   };
 
+  // Áp dụng filter: lọc rating, tìm kiếm, status trả lời
+  // Reset về trang 1 khi apply filter
   const handleApplyFilters = () => {
     fetchAdminReviews(1);
   };
