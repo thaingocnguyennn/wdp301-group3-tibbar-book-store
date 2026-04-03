@@ -116,11 +116,23 @@ const HomePage = () => {
     }
   };
 
+  // UC-60: Lấy sách bán chạy nhất hiển thị trên homepage
+  // UC-60: Fetch sách bán chạy nhất cho homepage
+  // Luồng xử lý:
+  // 1. Gọi API bookApi.getBestSellingBooks(8) để lấy 8 sách bán chạy nhất
+  // 2. Cập nhật state bestSellingBooks với dữ liệu từ response
+  // 3. Nếu có lỗi, log error và không cập nhật state (giữ nguyên giá trị cũ)
+  // 4. Component BestSellingSection sẽ render dựa trên state này
   const fetchBestSellingBooks = async () => {
     try {
+      // Gọi API lấy 8 sách bán chạy nhất
       const response = await bookApi.getBestSellingBooks(8);
+
+      // Cập nhật state với danh sách sách từ response.data.books
+      // Nếu không có data, set thành mảng rỗng
       setBestSellingBooks(response.data.books || []);
     } catch (error) {
+      // Log lỗi ra console để debug, không throw error để tránh crash UI
       console.error("Error fetching best-selling books:", error);
     }
   };

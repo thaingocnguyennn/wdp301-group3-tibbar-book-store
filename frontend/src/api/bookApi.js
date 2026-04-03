@@ -13,10 +13,18 @@ export const bookApi = {
     return response.data;
   },
 
+  // UC-60: Lấy sách bán chạy nhất cho homepage
+  // UC-60: API lấy danh sách sách bán chạy nhất
+  // Endpoint: GET /api/books/best-selling?limit=8
+  // Mô tả: Gọi API backend để lấy sách bán chạy nhất cho homepage
+  // Tham số: limit - số lượng sách trả về (mặc định 8)
+  // Trả về: { success: true, message: "...", data: { books: [...] } }
   getBestSellingBooks: async (limit = 8) => {
+    // Gửi GET request đến endpoint best-selling với query param limit
     const response = await axiosInstance.get("/books/best-selling", {
       params: { limit },
     });
+    // Trả về data từ response (đã được xử lý bởi axiosInstance)
     return response.data;
   },
 

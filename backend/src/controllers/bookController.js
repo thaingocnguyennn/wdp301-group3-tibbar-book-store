@@ -69,15 +69,27 @@ class BookController {
     }
   }
 
+  // UC-60: Lấy sách bán chạy nhất cho homepage
+  // Endpoint: GET /books/best-selling?limit=8
+  // Luồng xử lý:
+  // 1. Nhận query parameter limit (mặc định 8)
+  // 2. Gọi bookService.getBestSellingBooks() để lấy dữ liệu từ DB
+  // 3. Trả về response thành công với danh sách sách
+  // 4. Nếu có lỗi, chuyển cho error handler
   async getBestSellingBooks(req, res, next) {
     try {
+      // Lấy limit từ query params, mặc định 8 sách
       const limit = req.query.limit ? parseInt(req.query.limit) : 8;
+
+      // Gọi service để lấy danh sách sách bán chạy
       const books = await bookService.getBestSellingBooks(limit);
 
+      // Trả về response thành công với dữ liệu sách
       return ApiResponse.success(res, HTTP_STATUS.OK, MESSAGES.BOOKS_FETCHED, {
         books,
       });
     } catch (error) {
+      // Chuyển lỗi cho middleware error handler
       next(error);
     }
   }
