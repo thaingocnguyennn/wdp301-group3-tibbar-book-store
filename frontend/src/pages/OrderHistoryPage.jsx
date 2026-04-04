@@ -71,6 +71,7 @@ const OrderHistoryPage = () => {
 
   const handleCancelOrder = async (orderId) => {
     try {
+      // UC-46: Bắt đầu luồng hủy đơn ở màn hình lịch sử (chỉ cho đơn PENDING).
       // B1: Đánh dấu đơn đang xử lý để tránh bấm nhiều lần.
       setActionLoadingId(orderId);
       setError("");
@@ -100,6 +101,7 @@ const OrderHistoryPage = () => {
 
   // Chỉ cho hủy khi đơn đang PENDING.
   // Riêng đơn số (DIGITAL) đã PAID thì không cho hủy tại đây.
+  // UC-46: Rule nghiệp vụ hủy đơn phía giao diện trước khi gọi API.
   const canCancel = (order) =>
     order.orderStatus === "PENDING" &&
     !(order.orderKind === "DIGITAL" && order.paymentStatus === "PAID");
@@ -289,7 +291,7 @@ const OrderHistoryPage = () => {
                             type="button"
                             style={styles.cancelButton}
                             disabled={actionLoadingId === order._id}
-                            // Hủy đơn trực tiếp ngay tại card.
+                            // UC-46: Hủy đơn trực tiếp ngay tại card lịch sử đơn hàng.
                             onClick={() => handleCancelOrder(order._id)}
                           >
                             {actionLoadingId === order._id

@@ -47,12 +47,16 @@ export const orderApi = {
 
   // Cancel order
   cancelOrder: async (orderId) => {
+    // UC-46: Hủy đơn hàng chỉ khi đơn còn trạng thái PENDING.
+    // Endpoint thực tế: PATCH /api/orders/:id/cancel
     const response = await axiosInstance.patch(`/orders/${orderId}/cancel`);
     return response.data;
   },
 
   // Reorder from a previous order
   reorderOrder: async (orderId, payload = {}) => {
+    // UC-88: Đặt lại đơn dựa trên đơn cũ, backend sẽ kiểm tra tồn kho/địa chỉ/thanh toán.
+    // Endpoint thực tế: POST /api/orders/:id/reorder
     const response = await axiosInstance.post(
       `/orders/${orderId}/reorder`,
       payload,
@@ -62,6 +66,8 @@ export const orderApi = {
 
   // Download invoice (returns HTML blob)
   downloadInvoice: async (orderId, download = true) => {
+    // UC-89: Tải hoặc in hóa đơn (download=true => tải file, false => mở để in).
+    // Endpoint thực tế: GET /api/orders/:id/invoice?download=true|false
     const response = await axiosInstance.get(`/orders/${orderId}/invoice`, {
       params: { download },
       responseType: "blob",
@@ -71,6 +77,8 @@ export const orderApi = {
 
   // Submit return / refund request
   submitReturnRefundRequest: async (orderId, payload) => {
+    // UC-90: Gửi yêu cầu trả hàng/hoàn tiền trong thời hạn cho phép sau khi đã giao.
+    // Endpoint thực tế: POST /api/orders/:id/return-refund
     const response = await axiosInstance.post(
       `/orders/${orderId}/return-refund`,
       payload,

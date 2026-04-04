@@ -28,20 +28,20 @@ router.get("/", orderController.getUserOrders);
 // Get order by order number
 router.get("/number/:orderNumber", orderController.getOrderByNumber);
 
-// Đặt lại đơn hàng từ đơn cũ
+// UC-88: Đặt lại đơn hàng từ đơn cũ (order again).
 router.post("/:id/reorder", orderController.reorderOrder);
 
-// Tải hoặc in hóa đơn của đơn đã giao
+// UC-89: Tải hoặc in hóa đơn của đơn đã giao.
 router.get("/:id/invoice", orderController.downloadInvoice);
 
-// Gửi yêu cầu trả hàng / hoàn tiền
+// UC-90: Gửi yêu cầu trả hàng / hoàn tiền.
 router.post("/:id/return-refund", orderController.submitReturnRefundRequest);
 
 // Get single order by ID
 // UC-45: API xem chi tiết một đơn hàng cụ thể.
 router.get("/:id", orderController.getOrderById);
 
-// Cancel order
+// UC-46: Hủy đơn hàng (chỉ áp dụng khi đơn đang PENDING).
 router.patch("/:id/cancel", orderController.cancelOrder);
 
 router.get(

@@ -122,7 +122,7 @@ app.use("/api/admin/vouchers", adminVoucherRoutes);
 app.use("/api/vouchers", voucherRoutes);
 // UC-27 + UC-28: Mount route giỏ hàng (thêm sách, cập nhật số lượng, xóa item).
 app.use("/api/cart", cartRoutes);
-// UC-44 + UC-45: Mount route đơn hàng (xem lịch sử + xem chi tiết đơn hàng).
+// UC-44 + UC-45 + UC-46 + UC-88 + UC-89 + UC-90: Mount route order management cho user.
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes); // User address management routes
