@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { sliderApi } from "../../api/sliderApi";
 
 const SlidersManagement = () => {
-  // UC-25 + UC-26 (Màn hình quản trị slider):
+  // UC-23 + UC-24 + UC-25 + UC-26 (Màn hình quản trị slider):
   // File này là nơi admin thao tác trực tiếp trên giao diện (pages/admin).
+  // - UC-23: Xem danh sách slider hiện có để quản lý
+  // - UC-24: Tạo slider mới từ form (upload ảnh + chọn visibility)
   // - UC-25: Sửa slider hiện có (nút Edit -> submit form)
   // - UC-26: Bật/tắt hiển thị slider (nút Hide/Show)
   const [sliders, setSliders] = useState([]);
@@ -26,7 +28,7 @@ const SlidersManagement = () => {
 
   const fetchSliders = async () => {
     try {
-      // Lấy danh sách slider (bao gồm cả public/hidden) để admin quản lý trên màn hình này.
+      // UC-23: Lấy danh sách slider (bao gồm cả public/hidden) để admin xem và quản lý.
       const res = await sliderApi.getAllSlidersAdmin();
       setSliders(res.data.sliders || []);
     } catch (error) {
@@ -66,7 +68,7 @@ const SlidersManagement = () => {
         await sliderApi.updateSlider(editingSlider._id, payload);
         setMessage("Slider updated successfully");
       } else {
-        // Trường hợp không có editingSlider thì đây là luồng tạo mới.
+        // UC-24: Không có editingSlider tức là luồng tạo slider mới.
         await sliderApi.createSlider(payload);
         setMessage("Slider created successfully");
       }

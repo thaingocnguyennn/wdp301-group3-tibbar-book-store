@@ -5,6 +5,7 @@ import { HTTP_STATUS } from "../config/constants.js";
 class AdminSliderController {
   async getAllSliders(req, res, next) {
     try {
+      // UC-23 (Admin view): Trả danh sách toàn bộ slider để màn hình quản trị hiển thị.
       const sliders = await sliderService.getAllSliders();
       return ApiResponse.success(res, HTTP_STATUS.OK, "Sliders fetched", {
         sliders,
@@ -16,6 +17,7 @@ class AdminSliderController {
 
   async createSlider(req, res, next) {
     try {
+      // UC-24: Tạo slider mới, bắt buộc có file ảnh upload từ admin.
       if (!req.file) {
         return ApiResponse.error(
           res,
@@ -25,9 +27,11 @@ class AdminSliderController {
       }
 
       const payload = {
+        // Lưu admin thực hiện thao tác để phục vụ audit/trace.
         adminId: req.user?._id || req.user?.userId || undefined,
+        // imageUrl trỏ về file vừa được middleware multer lưu ở uploads/sliders.
         imageUrl: `/uploads/sliders/${req.file.filename}`,
-       
+        // Cho phép admin quyết định slider hiển thị ngay hay ẩn.
         visibility: req.body.visibility || "public",
       };
 

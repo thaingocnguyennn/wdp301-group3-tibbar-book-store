@@ -110,7 +110,7 @@ const deliveryUploadsDir = path.join(uploadsRoot, "delivery-proofs");
   }
 });
 export const sliderUpload = multer({
-  // UC-25: Middleware upload ảnh khi admin tạo/sửa slider.
+  // UC-24 + UC-25: Middleware upload ảnh khi admin tạo mới hoặc sửa slider.
   storage: createStorage(sliderUploadsDir),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },

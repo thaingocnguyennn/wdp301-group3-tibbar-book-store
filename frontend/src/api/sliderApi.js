@@ -1,9 +1,9 @@
 import axiosInstance from "./axios.js";
 
 export const sliderApi = {
-  // UC-14: API lấy sliders công khai cho homepage
+  // UC-23: API lấy sliders công khai cho homepage
   // Endpoint: GET /api/sliders
-  // Mô tả: Gọi API backend để lấy danh sách sliders hiển thị trên carousel homepage
+  // Mô tả: Gọi API backend để lấy danh sách slider public hiển thị trên homepage carousel
   // Trả về: { success: true, message: "...", data: { sliders: [...] } }
   getPublicSliders: async () => {
     // Gửi GET request đến endpoint /sliders để lấy sliders công khai
@@ -13,12 +13,13 @@ export const sliderApi = {
   },
 
   getAllSlidersAdmin: async () => {
-    // API cho trang admin: lấy toàn bộ slider để hiển thị danh sách quản trị.
+    // UC-23 (Admin view): lấy toàn bộ slider để hiển thị danh sách quản trị.
     const response = await axiosInstance.get("/admin/sliders");
     return response.data;
   },
 
   createSlider: async (formData) => {
+    // UC-24: Tạo slider mới từ màn hình admin, payload có thể chứa ảnh upload.
     // Tạo slider mới, dùng multipart/form-data để gửi ảnh.
     const response = await axiosInstance.post("/admin/sliders", formData, {
       headers: { "Content-Type": "multipart/form-data" },

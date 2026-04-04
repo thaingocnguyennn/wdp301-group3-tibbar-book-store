@@ -187,7 +187,7 @@ const HomePage = () => {
     }
   };
 
-  // UC-14: Fetch sliders công khai cho homepage carousel
+  // UC-23: View Slider (người dùng xem slider công khai trên trang chủ)
   // Luồng xử lý:
   // 1. Gọi sliderApi.getPublicSliders() để lấy danh sách sliders từ backend
   // 2. Map dữ liệu response thành format phù hợp cho Slider component
@@ -196,7 +196,7 @@ const HomePage = () => {
   // 5. Slider component sẽ render carousel dựa trên state này
   const fetchSliders = async () => {
     try {
-      // Gọi API lấy sliders công khai
+      // Gọi API UC-23 để lấy các slider có visibility = public.
       const response = await sliderApi.getPublicSliders();
 
       // Lấy mảng sliders từ response, mặc định là mảng rỗng nếu không có
