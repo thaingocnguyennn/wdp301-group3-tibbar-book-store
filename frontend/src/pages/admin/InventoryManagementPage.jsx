@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getInventoryStockApi } from "../../api/adminInventoryApi";
 
 export default function InventoryManagementPage() {
+  // UC-126: Màn hình Inventory Management cho admin xem tổng số lượng còn lại theo từng đầu sách.
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState({
     page: 1,
@@ -13,17 +14,22 @@ export default function InventoryManagementPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  // Chuẩn hóa base URL để ghép đường dẫn ảnh bìa khi backend trả imageUrl dạng tương đối.
   const serverBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
   const loadData = async (page = 1, query = q) => {
     try {
+      // B1: bật loading + xóa lỗi cũ trước mỗi lần gọi API.
       setLoading(true);
       setErr("");
 
+      // B2: gọi API tồn kho admin, truyền page/limit/query để phân trang + tìm kiếm.
       const res = await getInventoryStockApi({ page, limit: meta.limit, q: query });
+      // B3: tách phần data và meta theo format response của backend.
       const payload = res?.data?.data ?? res?.data ?? [];
       const metaPayload = res?.data?.meta ?? {};
 
+      // B4: cập nhật danh sách đầu sách và metadata tổng tồn kho.
       setRows(Array.isArray(payload) ? payload : []);
       setMeta((prev) => ({
         ...prev,
@@ -31,20 +37,25 @@ export default function InventoryManagementPage() {
         page: Number(metaPayload.page || page),
       }));
     } catch (e) {
+      // B5: nếu lỗi, làm rỗng bảng và hiển thị thông báo lỗi thân thiện.
       setRows([]);
       setErr(e?.response?.data?.message || "Không tải được dữ liệu tồn kho");
     } finally {
+      // B6: luôn tắt loading sau khi request hoàn tất.
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Khi vào màn hình lần đầu, tải trang 1 và chưa lọc theo từ khóa.
     loadData(1, "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSearch = (e) => {
+    // Chặn submit mặc định để tránh reload trang.
     e.preventDefault();
+    // Khi search, luôn quay về page 1 để kết quả nhất quán.
     loadData(1, q.trim());
   };
 
@@ -64,6 +75,7 @@ export default function InventoryManagementPage() {
   };
 
   const resolveImageUrl = (path) => {
+    // Hỗ trợ cả URL tuyệt đối và đường dẫn tương đối từ backend.
     if (!path) return "";
     return path.startsWith("http") ? path : `${serverBaseUrl}/${String(path).replace(/^\/+/, "")}`;
   };
@@ -76,10 +88,12 @@ export default function InventoryManagementPage() {
 
       <div style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
+          {/* UC-126: Tổng số đầu sách hiện có trong kết quả lọc. */}
           <div style={styles.summaryLabel}>Total Book Types</div>
           <div style={styles.summaryValue}>{meta.totalTypes}</div>
         </div>
         <div style={styles.summaryCard}>
+          {/* UC-126: Tổng số lượng sách còn lại trong kho (cộng stock toàn bộ đầu sách). */}
           <div style={styles.summaryLabel}>Total Remaining Stock</div>
           <div style={styles.summaryValue}>{Number(meta.totalRemaining || 0).toLocaleString("en-US")}</div>
         </div>
@@ -140,6 +154,7 @@ export default function InventoryManagementPage() {
                     <td style={styles.td}>{r.category || "-"}</td>
                     <td style={styles.tdQty}>{stock}</td>
                     <td style={styles.td}>
+                      {/* UC-126: Badge trực quan trạng thái tồn kho của từng đầu sách. */}
                       <span style={{ ...styles.stockBadge, ...badge.style }}>{badge.text}</span>
                     </td>
                   </tr>

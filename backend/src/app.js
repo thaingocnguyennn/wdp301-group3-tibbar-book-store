@@ -139,6 +139,7 @@ app.use("/api/admin/support-system", adminSupportSystemRoutes);
 app.use("/api/notifications", notificationRoutes);
 // UC-124 + UC-125 + UC-127: Mount API cảnh báo tồn kho, back-stock alert và so sánh sách.
 app.use("/api/book-features", bookFeatureRoutes);
+// UC-126: Mount route inventory admin để xem tổng tồn kho theo từng đầu sách.
 app.use("/api/admin/inventory", adminInventoryRoutes);
 app.use("/api/flash-sale", flashSaleRoutes);
 app.use("/api/admin/flash-sale", adminFlashSaleRoutes);
