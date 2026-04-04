@@ -363,10 +363,30 @@ class BookService {
     return this.sanitizePublicBooks(bestSellers);
   }
 
+  // UC-86: Lấy danh sách sách cá nhân hóa dựa vào lịch sử giỏ hàng (Personalized books)
+  // ============================================================================
+  // Luồng xử lý: HomePage gọi fetchPersonalizedBooks() → bookApi.getPersonalizedBooks()
+  // → backend GET /books/personalized → service getPersonalizedBooks()
+  // 
+  // Chiến lược recommend (3 cấp độ):
+  // 1. GUEST (không login): Fallback → Hiển thị sách mới nhất (fallback-newest)
+  // 2. AUTHENTICATED RỖNG (login nhưng giỏ rỗng): Fallback → Hiển thị sách mới nhất (fallback-newest)
+  // 3. CÓ GIỎ HÀNG: Primary → Recommend sách cùng tác giả + danh mục từ giỏ (cart-author-category)
+  //
+  // Scoring Logic (Khi có giỏ):
+  // - Tìm kiếm sách NOT IN giỏ nhưng có author/category MATCH
+  // - Author match: +8 điểm, Category match: +6 điểm, Freshness: +0 đến +4 điểm
+  // - Sort by: matchLevel (2=author+cat > 1=one > 0=none) → score cao nhất → createdAt mới nhất
+  // - Nếu chưa đủ 8 sách: fallback thêm sách mới nhất
   async getPersonalizedBooks(userId, options = {}) {
+    // Xác định giới hạn số lượng sách trả về (mặc định 8, tối đa PAGINATION.MAX_LIMIT)
     const actualLimit = Math.min(Number(options.limit) || 8, PAGINATION.MAX_LIMIT);
 
+    // Hàm chuẩn hóa tên tác giả: trim khoảng trắng đầu cuối
     const normalizeAuthor = (value = "") => String(value).trim();
+    
+    // Hàm loại bỏ trùng lặp tác giả (case-insensitive)
+    // Ví dụ: ["Ngô Thế Phương", "ngô thế phương", "NGÔ THẾ PHƯƠNG"] → ["Ngô Thế Phương"]
     const dedupeAuthorsCaseInsensitive = (authors = []) => {
       const seen = new Set();
       const uniqueAuthors = [];
@@ -385,6 +405,8 @@ class BookService {
       return uniqueAuthors;
     };
 
+    // Hàm loại bỏ trùng lặp ID (MongoDB ObjectId)
+    // Chuyển tất cả thành string, loại bỏ null/undefined, sau đó unique
     const dedupeIds = (values = []) => [
       ...new Set(
         values
@@ -393,48 +415,57 @@ class BookService {
       ),
     ];
 
+    // Hàm fallback: Khi không có dữ liệu để recommend cá nhân hóa
+    // Trả về sách mới nhất làm recommend thay thế
     const newestFallback = async (strategy = "fallback-newest", signals = {}) => {
+      // Query sách công khai (PUBLIC), sort theo createdAt giảm dần (mới nhất trước)
       const books = await Book.find({ visibility: BOOK_VISIBILITY.PUBLIC })
-        .populate("category", "name")
-        .select("-ebookFile")
-        .sort({ createdAt: -1 })
-        .limit(actualLimit)
-        .lean();
+        .populate("category", "name")  // Populate thông tin category
+        .select("-ebookFile")          // Loại bỏ file ebook lớn
+        .sort({ createdAt: -1 })       // Sách mới nhất trước
+        .limit(actualLimit)            // Giới hạn số lượng
+        .lean();                       // Trả về plain object (hiệu suất tốt hơn)
 
+      // Trả về kết quả với metadata strategy và signals để frontend biết đã dùng fallback
       return { books: this.sanitizePublicBooks(books), strategy, signals };
     };
 
-    // Guest users: Recommend For You behaves like Newest.
+    // ========== CHIẾN LƯỢC #1: GUEST USER (Không login) ==========
+    // Nếu userId = null → User chưa login
+    // Hành động: Hiển thị sách mới nhất (fallback)
     if (!userId) {
       return newestFallback("fallback-newest", {
-        hasRecentlyViewed: false,
-        hasCartHistory: false,
-        hasPurchaseHistory: false,
-        hasWishlist: false,
-        hasAuthorInterest: false,
-        hasCategoryInterest: false,
+        hasRecentlyViewed: false,      // Chưa có lịch sử xem
+        hasCartHistory: false,         // Chưa có giỏ hàng
+        hasPurchaseHistory: false,     // Chưa có lịch sử mua
+        hasWishlist: false,            // Chưa có wish list
+        hasAuthorInterest: false,      // Chưa biết tác giả yêu thích
+        hasCategoryInterest: false,    // Chưa biết danh mục yêu thích
         language: options.language || null,
         platform: options.platform || null,
         location: options.location || null,
       });
     }
 
+    // ========== CHIẾN LƯỢC #2: LOGGED-IN USERS WITH EMPTY CART ==========
+    // Query song song: Lấy user + cart của user
     const [user, cart] = await Promise.all([
-      User.findById(userId)
-        .select("updatedAt")
-        .lean(),
+      User.findById(userId).select("updatedAt").lean(),
       Cart.findOne({ user: userId }).select("items.book updatedAt").lean(),
     ]);
 
+    // Trích xuất danh sách ID sách trong giỏ hàng
+    // Nếu cart = null hoặc items = [] → cartBookIds = []
     const cartBookIds = Array.isArray(cart?.items)
       ? cart.items.map((item) => item.book?.toString()).filter(Boolean)
       : [];
 
-    // Logged-in users without cart history: fallback to newest.
+    // Nếu giỏ hàng rỗng → Fallback về sách mới nhất
+    // Lý do: Không có dữ liệu để suy đoán sở thích người dùng
     if (!cartBookIds.length) {
       return newestFallback("fallback-newest", {
         hasRecentlyViewed: false,
-        hasCartHistory: false,
+        hasCartHistory: false,        // Giỏ hàng rỗng
         hasPurchaseHistory: false,
         hasWishlist: false,
         hasAuthorInterest: false,
@@ -446,31 +477,45 @@ class BookService {
       });
     }
 
+    // ========== CHIẾN LƯỢC #3: LOGGED-IN USERS WITH CART ITEMS ==========
+    // Bước 1: Lấy thông tin sách trong giỏ hàng (chỉ cần author + category)
+    // Ví dụ: Giỏ có 2 sách → Lấy author + category của 2 sách này
     const cartBooks = await Book.find({
       _id: { $in: cartBookIds },
       visibility: BOOK_VISIBILITY.PUBLIC,
     })
-      .select("author category")
+      .select("author category")  // Chỉ lấy author + category (không cần title, price, etc.)
       .lean();
 
+    // Hàm escape special characters trong regex
+    // Ví dụ: "O'Reilly" → "O\'Reilly" để dùng trong RegExp an toàn
     const escapeRegex = (value) =>
       String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+    // Bước 2: Trích xuất danh sách tác giả yêu thích từ giỏ (loại trùng, case-insensitive)
+    // Ví dụ: Giỏ có sách của "Ngô Thế Phương" (2 cuốn), "Lê Văn A" (1 cuốn)
+    // → preferredAuthors = ["Ngô Thế Phương", "Lê Văn A"]
     const preferredAuthors = dedupeAuthorsCaseInsensitive([
       ...cartBooks.map((book) => book.author),
     ]);
 
+    // Bước 3: Trích xuất danh sách category yêu thích từ giỏ (loại trùng)
+    // Ví dụ: Giỏ có sách của category IT (2 cuốn), Sales (1 cuốn)
+    // → preferredCategoryIds = ["6408a1b2c3d4e5f6g7h8i9j0", "550e8400-e29b-41d4-a716-446655440000"]
     const preferredCategoryIds = dedupeIds([
       ...cartBooks.map((book) => book.category),
     ]);
 
+    // Bước 4: Kiểm tra xem có tác giả hoặc danh mục yêu thích không
+    // Nếu không → Fallback về sách mới nhất
+    // Lý do: Không thể áp dụng chiến lược cart-author-category
     if (!preferredAuthors.length && !preferredCategoryIds.length) {
       return newestFallback("fallback-newest-relaxed", {
         hasRecentlyViewed: false,
-        hasCartHistory: cartBookIds.length > 0,
+        hasCartHistory: cartBookIds.length > 0,  // ✓ Có giỏ hàng
         hasPurchaseHistory: false,
         hasWishlist: false,
-        hasAuthorInterest: false,
+        hasAuthorInterest: false,                // ✗ Nhưng không có tác giả/danh mục
         hasCategoryInterest: false,
         language: options.language || null,
         platform: options.platform || null,
@@ -479,8 +524,11 @@ class BookService {
       });
     }
 
+    // Bước 5: Xây dựng điều kiện tìm kiếm (author OR category)
     const matchConditions = [];
 
+    // Nếu có tác giả yêu thích → Tìm kiếm sách có author MATCH case-insensitive
+    // Ví dụ: preferredAuthors = ["Ngô Thế Phương"] → Tìm $regex "^Ngô Thế Phương$" (case-insensitive)
     if (preferredAuthors.length) {
       const authorRegex = preferredAuthors.map(
         (author) => new RegExp(`^${escapeRegex(author)}$`, "i"),
@@ -488,84 +536,129 @@ class BookService {
       matchConditions.push({ author: { $in: authorRegex } });
     }
 
+    // Nếu có danh mục yêu thích → Thêm điều kiện tìm category match
     if (preferredCategoryIds.length) {
       matchConditions.push({ category: { $in: preferredCategoryIds } });
     }
 
+    // Bước 6: Tìm kiếm sách candidate
+    // Điều kiện: PUBLIC + NOT IN giỏ hàng + (author MATCH OR category MATCH)
+    // Limit lên 6x actualLimit để có sẵn dữ liệu scoring sau đó
     let candidates = [];
     if (matchConditions.length) {
       candidates = await Book.find({
         visibility: BOOK_VISIBILITY.PUBLIC,
-        _id: { $nin: cartBookIds },
-        $or: matchConditions,
+        _id: { $nin: cartBookIds },          // Không lấy sách đã có trong giỏ
+        $or: matchConditions,                 // Author MATCH OR Category MATCH
       })
         .populate("category", "name")
         .select("-ebookFile")
         .sort({ createdAt: -1 })
-        .limit(actualLimit * 6)
+        .limit(actualLimit * 6)               // Lấy 6x để có sẵn khi scoring
         .lean();
     }
 
+    // Bước 7: Pre-compute match sets để O(1) lookup khi scoring
+    // Set này dùng cho .has() check nhanh hơn Array.includes()
     const authorMatchSet = new Set(preferredAuthors.map((author) => author.toLowerCase()));
     const categoryMatchSet = new Set(preferredCategoryIds.map((id) => id.toString()));
 
+    // Bước 8: SCORING - Chấm điểm từng sách candidate
+    // Mục đích: Xếp thứ tự sách dựa trên độ phù hợp (relevance)
     const scoredCandidates = candidates
       .map((book) => {
+        // Chuẩn hóa tác giả: "Ngô Thế Phương  " → "ngô thế phương"
         const normalizedAuthor = String(book.author || "").trim().toLowerCase();
+        // Lấy ID category của sách này
         const categoryId = book.category?._id?.toString?.() || book.category?.toString?.();
+        
+        // Kiểm tra sách có match tác giả yêu thích không
         const matchesAuthor = authorMatchSet.has(normalizedAuthor);
+        // Kiểm tra sách có match category yêu thích không
         const matchesCategory = categoryMatchSet.has(String(categoryId || ""));
 
+        // Tính SCORE ĐIỂM
+        // Authors score: +8 điểm (ưu tiên cao - nếu user thích sách của tác giả này)
+        // Category score: +6 điểm (ưu tiên trung - nếu user thích category này)
+        // Ví dụ:
+        //   - Cùng author + category: 8 + 6 = 14 điểm
+        //   - Cùng author: 8 điểm
+        //   - Cùng category: 6 điểm
         let score = 0;
         if (matchesAuthor) score += 8;
         if (matchesCategory) score += 6;
 
-        // Match priority for ordering inside Recommend For You:
-        // 2 = same author + same category, 1 = one of them, 0 = none.
+        // Tính MATCH LEVEL (mức độ match)
+        // 2 = Match cả author + category (rất phù hợp)
+        // 1 = Match một trong hai (phù hợp)
+        // 0 = Match không (không phù hợp, không nên xuất hiện)
+        // Dùng để sort trước, score sau
         const matchLevel = matchesAuthor && matchesCategory ? 2 : matchesAuthor || matchesCategory ? 1 : 0;
 
+        // Tính FRESHNESS SCORE (điểm độ mới)
+        // Sách càng mới → Điểm càng cao (0-4 điểm)
+        // Nếu sách là hôm nay: +4 điểm
+        // Nếu sách 1 tháng tuổi: +0 điểm
+        // Công thức: 4 - (ngày hiện tại - ngày tạo) / (30 ngày)
         const freshnessScore = Math.max(
           0,
           4 -
             (Date.now() - new Date(book.createdAt).getTime()) /
-              (1000 * 60 * 60 * 24 * 30),
+              (1000 * 60 * 60 * 24 * 30),  // Chia cho 30 ngày = 2,592,000,000 ms
         );
 
+        // Trả về sách kèm metadata scoring
         return {
           ...book,
           __matchLevel: matchLevel,
-          __score: score + freshnessScore,
+          __score: score + freshnessScore,  // Tổng score = author/category + freshness
         };
       })
+      // SORT LOGIC
+      // Ưu tiên 1: matchLevel cao nhất (2 > 1 > 0)
+      // Ưu tiên 2: score cao nhất
+      // Ưu tiên 3: sách mới nhất (createdAt giảm dần)
+      // Kết quả: Sách phù hợp nhất nằm đầu
       .sort((a, b) => {
         if (b.__matchLevel !== a.__matchLevel) return b.__matchLevel - a.__matchLevel;
         if (b.__score !== a.__score) return b.__score - a.__score;
         return new Date(b.createdAt) - new Date(a.createdAt);
       })
+      // Loại bỏ metadata scoring (__matchLevel, __score) khỏi kết quả
+      // Chỉ giữ lại dữ liệu sách
       .map(({ __matchLevel, __score, ...book }) => book)
+      // Cắt lấy top actualLimit (8 sách)
       .slice(0, actualLimit);
 
+    // Bước 9: Fallback nếu chưa đủ sách
+    // Nếu scoredCandidates có < 8 sách → thêm sách mới nhất để đủ 8
+    // Ví dụ: Chỉ tìm được 3 sách cùng tác giả → Thêm 5 sách mới nhất khác
     if (scoredCandidates.length > 0 && scoredCandidates.length < actualLimit) {
+      // Lấy danh sách ID sách đã được recommend
       const candidateIds = scoredCandidates.map((book) => book._id?.toString());
+      // Query sách mới nhất (không nằm trong giỏ + không nằm trong recommended)
       const fallbackBooks = await Book.find({
         visibility: BOOK_VISIBILITY.PUBLIC,
         _id: {
-          $nin: [...cartBookIds, ...candidateIds].filter(Boolean),
+          $nin: [...cartBookIds, ...candidateIds].filter(Boolean),  // Loại trừ giỏ + recommended
         },
       })
         .populate("category", "name")
         .select("-ebookFile")
         .sort({ createdAt: -1 })
-        .limit(actualLimit - scoredCandidates.length)
+        .limit(actualLimit - scoredCandidates.length)  // Chỉ lấy số cần thiết để đủ 8
         .lean();
 
+      // Thêm fallback books vào kết quả
       scoredCandidates.push(...fallbackBooks);
     }
 
+    // Bước 10: Kiểm tra kết quả cuối cùng
+    // Nếu sau fallback vẫn 0 sách → Fallback về sách mới nhất toàn bộ
     if (!scoredCandidates.length) {
       return newestFallback("fallback-newest-relaxed", {
         hasRecentlyViewed: false,
-        hasCartHistory: cartBookIds.length > 0,
+        hasCartHistory: cartBookIds.length > 0,        // ✓ Có giỏ
         hasPurchaseHistory: false,
         hasWishlist: false,
         hasAuthorInterest: preferredAuthors.length > 0,
@@ -577,16 +670,18 @@ class BookService {
       });
     }
 
+    // Bước 11: Trả về kết quả thành công
+    // Gồm: list books đã recommend + strategy metadata + signals (cho frontend debug)
     return {
-      books: scoredCandidates,
-      strategy: "cart-author-category",
-      signals: {
+      books: scoredCandidates,  // 8 sách đã recommend (scored + fallback)
+      strategy: "cart-author-category",  // Chiến lược sử dụng (cho frontend biết)
+      signals: {  // Metadata cho frontend hiển thị (debug/analytics)
         hasRecentlyViewed: false,
-        hasCartHistory: cartBookIds.length > 0,
+        hasCartHistory: cartBookIds.length > 0,        // ✓ User có giỏ hàng
         hasPurchaseHistory: false,
         hasWishlist: false,
-        hasAuthorInterest: preferredAuthors.length > 0,
-        hasCategoryInterest: preferredCategoryIds.length > 0,
+        hasAuthorInterest: preferredAuthors.length > 0,  // ✓ Tìm được tác giả match
+        hasCategoryInterest: preferredCategoryIds.length > 0,  // ✓ Tìm được category match
         language: options.language || null,
         platform: options.platform || null,
         location: options.location || null,

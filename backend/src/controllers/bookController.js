@@ -116,31 +116,60 @@ class BookController {
     }
   }
 
+  // UC-86: API endpoint lấy danh sách sách cá nhân hóa
+  // ===================================================
+  // Endpoint: GET /books/personalized?limit=8
+  // Frontend: bookApi.getPersonalizedBooks(8) → HomePage.jsx fetchPersonalizedBooks()
+  // 
+  // Luồng xử lý:
+  // 1. Trích xuất userId từ request.user (null nếu guest)
+  // 2. Trích xuất query params: limit, searchHistory, searchTerms
+  // 3. Trích xuất metadata từ headers: language, platform, location
+  // 4. Gọi bookService.getPersonalizedBooks(userId, options)
+  // 5. Trả về response với books + strategy + signals cho frontend
   async getPersonalizedBooks(req, res, next) {
     try {
+      // Bước 1: Lấy limit từ query params, mặc định 8 sách, tối đa PAGINATION.MAX_LIMIT
+      // Ví dụ: GET /books/personalized?limit=10 → limit = 10
       const limit = req.query.limit ? parseInt(req.query.limit) : 8;
+      
+      // Bước 2: Lấy userId từ authenticated user (req.user._id)
+      // Nếu user chưa login → userId = null (guest)
       const userId = req.user?._id || null;
+      
+      // Bước 3: Lấy search terms từ query params (nếu có)
+      // Có thể là searchHistory hoặc searchTerms, split bằng dấu phẩy
       const rawSearch = req.query.searchHistory || req.query.searchTerms || "";
       const searchTerms = String(rawSearch)
-        .split(",")
-        .map((term) => term.trim())
-        .filter(Boolean);
+        .split(",")  // Split bằng dấu phẩy
+        .map((term) => term.trim())  // Trim whitespace
+        .filter(Boolean);  // Loại bỏ empty strings
 
+      // Bước 4: Trích xuất metadata từ request headers (cho personalization algorithm)
+      // Accept-Language header: Lấy language preference của user (VD: "vi-VN,vi;q=0.9")
       const acceptLanguage = req.headers["accept-language"];
       const language = acceptLanguage
-        ? String(acceptLanguage).split(",")[0]?.trim() || null
+        ? String(acceptLanguage).split(",")[0]?.trim() || null  // Lấy language đầu tiên
         : null;
+      
+      // Platform header: Lấy device type (desktop, mobile, tablet)
+      // Có thể từ sec-ch-ua-platform header hoặc x-platform custom header
       const platform =
         req.headers["sec-ch-ua-platform"] ||
         req.headers["x-platform"] ||
         req.headers["user-agent"] ||
         null;
+      
+      // Location header: Lấy vị trí địa lý của user (Cloudflare hoặc custom header)
+      // Dùng để personalize theo region (VD: Vietnam, USA)
       const location =
         req.headers["x-country-code"] ||
         req.headers["cf-ipcountry"] ||
         req.headers["x-geo-country"] ||
         null;
 
+      // Bước 5: Gọi service để lấy danh sách sách cá nhân hóa
+      // Service sẽ apply recommendation algorithm dựa trên userId + cart + metadata
       const result = await bookService.getPersonalizedBooks(userId, {
         limit,
         searchTerms,
@@ -149,13 +178,19 @@ class BookController {
         location,
       });
 
+      // Bước 6: Trả về response thành công với kết quả
+      // Response gồm:
+      // - books: Mảng 8 sách recommend
+      // - strategy: "cart-author-category" hoặc "fallback-newest"
+      // - signals: Metadata để frontend debug/analytics
       return ApiResponse.success(
         res,
         HTTP_STATUS.OK,
-        "Personalized books fetched",
-        result,
+        "Personalized books fetched",  // Message thành công
+        result,  // Data: { books, strategy, signals }
       );
     } catch (error) {
+      // Nếu có lỗi → Chuyển cho error handler middleware
       next(error);
     }
   }
