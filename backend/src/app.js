@@ -123,7 +123,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes); // User address management routes
 app.use("/api/shipper", shipperRoutes);
-app.use("/api/coins", coinRoutes);
+app.use("/api/coins", coinRoutes); // Coin system routes (check-in, status, transactions, admin adjustments)
 app.use("/api/news", newsRoutes); // Public news routes
 app.use("/api/admin/news", adminNewsRoutes); // Admin news routes
 app.use("/api/support", supportRoutes);

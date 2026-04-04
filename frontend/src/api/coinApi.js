@@ -21,26 +21,6 @@ export const coinApi = {
       params: { page, limit }
     });
     return response.data;
-  },
-
-  // Admin: Add coins to user
-  adminAddCoins: async (userId, amount, description) => {
-    const response = await axiosInstance.post(`${BASE_URL}/admin/add`, {
-      userId,
-      amount,
-      description
-    });
-    return response.data;
-  },
-
-  // Admin: Deduct coins from user
-  adminDeductCoins: async (userId, amount, description) => {
-    const response = await axiosInstance.post(`${BASE_URL}/admin/deduct`, {
-      userId,
-      amount,
-      description
-    });
-    return response.data;
   }
 };
 
