@@ -427,6 +427,7 @@ function AppContent() {
       </Routes>
       {!isReaderRoute && <SupportSystemWidget />}
       {/* Chatbot hiển thị dạng widget nổi ở mọi trang (trừ reader route). */}
+      {/* UC-128: Widget chatbot tự động gợi ý thông tin/yêu cầu cơ bản cho khách hàng. */}
       {!isReaderRoute && <ChatbotWidget />}
       {!isReaderRoute && <Footer />}
     </div>

@@ -139,7 +139,7 @@ app.use("/api/book-features", bookFeatureRoutes);
 app.use("/api/admin/inventory", adminInventoryRoutes);
 app.use("/api/flash-sale", flashSaleRoutes);
 app.use("/api/admin/flash-sale", adminFlashSaleRoutes);
-// Mount API chatbot để frontend widget gọi endpoint /api/chatbot/ask.
+// UC-128: Mount API chatbot để frontend widget gọi endpoint /api/chatbot/ask.
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/cvs", cvRoutes);
 app.use("/api/admin/cvs", adminCvRoutes);

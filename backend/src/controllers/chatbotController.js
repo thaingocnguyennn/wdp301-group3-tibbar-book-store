@@ -5,7 +5,7 @@ import { HTTP_STATUS } from "../config/constants.js";
 class ChatbotController {
   async ask(req, res, next) {
     try {
-      // UC-45 (Chatbot): nhận câu hỏi, ngữ cảnh trang và trả lời hướng dẫn xem chi tiết đơn.
+      // UC-128: nhận câu hỏi + ngữ cảnh để bot tự động gợi ý thông tin/yêu cầu cơ bản.
       // Input từ frontend: message (câu hỏi), messages (lịch sử), context (metadata).
       const { message, messages, context } = req.body;
 
