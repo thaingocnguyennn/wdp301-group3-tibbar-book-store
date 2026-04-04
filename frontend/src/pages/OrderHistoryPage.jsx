@@ -24,6 +24,8 @@ const PAYMENT_METHOD_LABELS = {
 };
 
 const OrderHistoryPage = () => {
+  // UC-44: Trang hiển thị lịch sử đơn hàng của người dùng.
+  // Bao gồm đơn đang xử lý + đơn đã hoàn tất/hủy trong quá khứ.
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [pagination, setPagination] = useState({
@@ -34,18 +36,24 @@ const OrderHistoryPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Lưu orderId đang thao tác (ví dụ đang bấm Cancel) để disable đúng nút.
   const [actionLoadingId, setActionLoadingId] = useState("");
 
   useEffect(() => {
+    // Khi mở trang lần đầu, tải dữ liệu trang 1.
     fetchOrders(1);
   }, []);
 
   const fetchOrders = async (page = 1) => {
     try {
+      // B1: Bật loading và xóa lỗi cũ trước mỗi lần gọi API.
       setLoading(true);
       setError("");
+      // B2: Gọi API lấy orders theo trang hiện tại + giới hạn mỗi trang.
       const response = await orderApi.getUserOrders(page, pagination.limit);
+      // B3: Cập nhật danh sách đơn để render card.
       setOrders(response.data.orders || []);
+      // B4: Cập nhật thông tin phân trang (page/totalPages/total/limit).
       setPagination(
         response.data.pagination || {
           page: 1,
@@ -63,9 +71,12 @@ const OrderHistoryPage = () => {
 
   const handleCancelOrder = async (orderId) => {
     try {
+      // B1: Đánh dấu đơn đang xử lý để tránh bấm nhiều lần.
       setActionLoadingId(orderId);
       setError("");
+      // B2: Gọi API hủy đơn.
       await orderApi.cancelOrder(orderId);
+      // B3: Cập nhật state cục bộ để phản ánh ngay trạng thái CANCELLED.
       setOrders((prev) =>
         prev.map((order) =>
           order._id === orderId
@@ -81,14 +92,19 @@ const OrderHistoryPage = () => {
   };
 
   const goToPage = (newPage) => {
+    // Chặn chuyển trang vượt phạm vi hợp lệ.
     if (newPage < 1 || newPage > (pagination.totalPages || 1)) return;
+    // Tải dữ liệu của trang mới khi người dùng bấm nút phân trang.
     fetchOrders(newPage);
   };
 
+  // Chỉ cho hủy khi đơn đang PENDING.
+  // Riêng đơn số (DIGITAL) đã PAID thì không cho hủy tại đây.
   const canCancel = (order) =>
     order.orderStatus === "PENDING" &&
     !(order.orderKind === "DIGITAL" && order.paymentStatus === "PAID");
 
+  // Định dạng ngày theo chuẩn hiển thị tiếng Việt.
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString("vi-VN", {
@@ -98,6 +114,7 @@ const OrderHistoryPage = () => {
     });
   };
 
+  // Định dạng giờ theo chuẩn hiển thị tiếng Việt.
   const formatTime = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleTimeString("vi-VN", {
@@ -107,6 +124,7 @@ const OrderHistoryPage = () => {
   };
 
   if (loading) {
+    // Trạng thái loading toàn trang khi đang tải danh sách đơn hàng.
     return (
       <div style={styles.container}>
         <div style={styles.pageHeader}>
@@ -142,6 +160,7 @@ const OrderHistoryPage = () => {
       )}
 
       {orders.length === 0 ? (
+        // Trạng thái empty khi user chưa có đơn nào.
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>📋</div>
           <h2 style={styles.emptyTitle}>No orders yet</h2>
@@ -154,10 +173,12 @@ const OrderHistoryPage = () => {
         </div>
       ) : (
         <>
-          {/* Order List */}
+          {/* Danh sách đơn hàng: mỗi card tương ứng một order */}
           <div style={styles.orderList}>
             {orders.map((order) => {
+              // Mapping cấu hình màu/icon cho badge trạng thái đơn.
               const statusConfig = ORDER_STATUS_CONFIG[order.orderStatus] || ORDER_STATUS_CONFIG.PENDING;
+              // Mapping cấu hình màu/icon cho badge trạng thái thanh toán.
               const paymentConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.PENDING;
 
               return (
@@ -165,9 +186,10 @@ const OrderHistoryPage = () => {
                   key={order._id}
                   style={styles.orderCard}
                   className="order-card"
+                  // Click card để mở trang chi tiết đơn.
                   onClick={() => navigate(`/orders/${order._id}`)}
                 >
-                  {/* Card top color strip */}
+                  {/* Thanh màu đầu card để nhận diện nhanh trạng thái đơn */}
                   <div
                     style={{
                       ...styles.cardStrip,
@@ -176,7 +198,7 @@ const OrderHistoryPage = () => {
                   />
 
                   <div style={styles.cardBody}>
-                    {/* Row 1: Order number + date */}
+                    {/* Hàng 1: Mã đơn + ngày giờ tạo đơn */}
                     <div style={styles.cardTopRow}>
                       <div style={styles.orderIdGroup}>
                         <span style={styles.orderLabel}>Order</span>
@@ -188,7 +210,7 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
-                    {/* Row 2: Payment method + total */}
+                    {/* Hàng 2: Phương thức thanh toán + tổng tiền đơn */}
                     <div style={styles.cardMiddleRow}>
                       <div style={styles.paymentMethodTag}>
                         <span style={styles.paymentMethodIcon}>
@@ -203,7 +225,7 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
-                    {/* Row 2.5: Price Breakdown (if discount or coins used) */}
+                    {/* Hàng 2.5: Chi tiết giảm giá/coins nếu có áp dụng */}
                     {(order.discount > 0 || order.coinsUsed > 0) && (
                       <div style={styles.priceBreakdown}>
                         {order.discount > 0 && (
@@ -226,7 +248,7 @@ const OrderHistoryPage = () => {
                       </div>
                     )}
 
-                    {/* Row 3: Status badges + actions */}
+                    {/* Hàng 3: Badge trạng thái + các nút thao tác */}
                     <div style={styles.cardBottomRow}>
                       <div style={styles.badgeGroup}>
                         <span
@@ -257,6 +279,7 @@ const OrderHistoryPage = () => {
                         <button
                           type="button"
                           style={styles.viewButton}
+                          // Điều hướng tới trang chi tiết đơn.
                           onClick={() => navigate(`/orders/${order._id}`)}
                         >
                           View Details →
@@ -266,6 +289,7 @@ const OrderHistoryPage = () => {
                             type="button"
                             style={styles.cancelButton}
                             disabled={actionLoadingId === order._id}
+                            // Hủy đơn trực tiếp ngay tại card.
                             onClick={() => handleCancelOrder(order._id)}
                           >
                             {actionLoadingId === order._id

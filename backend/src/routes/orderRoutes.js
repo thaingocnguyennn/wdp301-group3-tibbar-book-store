@@ -22,6 +22,7 @@ router.post("/voucher/validate", orderController.validateVoucher);
 router.post("/", orderController.createOrder);
 
 // Get user's orders
+// UC-44: API xem lịch sử đơn hàng của người dùng (đơn cũ + đơn hiện tại).
 router.get("/", orderController.getUserOrders);
 
 // Get order by order number

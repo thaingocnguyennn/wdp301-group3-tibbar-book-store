@@ -46,6 +46,7 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // UC-44: Dữ liệu lịch sử đơn hàng được đọc từ bảng Order theo user này.
     items: [orderItemSchema],
     shipper: {
       type: mongoose.Schema.Types.ObjectId,

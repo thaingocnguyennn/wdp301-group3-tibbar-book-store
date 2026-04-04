@@ -23,6 +23,8 @@ export const orderApi = {
 
   // Get user's orders
   getUserOrders: async (page = 1, limit = 10) => {
+    // UC-44: Lấy lịch sử đơn hàng (đơn cũ + đơn hiện tại) của user theo phân trang.
+    // Endpoint thực tế: GET /api/orders?page=&limit=
     const response = await axiosInstance.get("/orders", {
       params: { page, limit },
     });

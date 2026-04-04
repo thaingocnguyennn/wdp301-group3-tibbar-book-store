@@ -73,10 +73,13 @@ class OrderController {
   // Get user's orders
   async getUserOrders(req, res, next) {
     try {
+      // UC-44: Controller nhận request xem lịch sử đơn hàng của user hiện tại.
       const userId = req.user._id;
+      // Đọc tham số phân trang từ query string.
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
 
+      // Gọi service lấy danh sách đơn + thông tin pagination.
       const result = await orderService.getUserOrders(userId, page, limit);
 
       return ApiResponse.success(

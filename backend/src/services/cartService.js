@@ -100,19 +100,24 @@ class CartService {
   }
 
   async updateItem(userId, bookId, quantity) {
+    // UC-28: Logic cập nhật số lượng item trong giỏ nằm ở đây.
+    // Nếu quantity <= 0 thì chuyển sang luồng xóa item.
     if (quantity <= 0) {
       return this.removeItem(userId, bookId);
     }
 
+    // B1: Kiểm tra sách còn tồn tại.
     const book = await Book.findById(bookId);
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
 
+    // B2: Với sách giấy, quantity mới không được vượt quá tồn kho.
     if (!book.isEbook && book.stock < quantity) {
       throw ApiError.badRequest("Not enough stock");
     }
 
+    // B3: Lấy cart của user và tìm item cần cập nhật.
     const cart = await Cart.findOne({ user: userId });
     if (!cart) {
       throw ApiError.notFound("Cart not found");
@@ -123,6 +128,7 @@ class CartService {
       throw ApiError.notFound("Cart item not found");
     }
 
+    // Ebook luôn cố định số lượng = 1, sách giấy nhận quantity người dùng nhập.
     item.quantity = book.isEbook ? 1 : quantity;
 
     await cart.save();
@@ -132,11 +138,13 @@ class CartService {
   }
 
   async removeItem(userId, bookId) {
+    // UC-28: Logic xóa item khỏi giỏ hàng nằm ở đây.
     const cart = await Cart.findOne({ user: userId });
     if (!cart) {
       return { user: userId, items: [] };
     }
 
+    // Loại item có bookId tương ứng ra khỏi mảng items.
     cart.items = cart.items.filter((item) => item.book.toString() !== bookId);
     await cart.save();
     await cart.populate("items.book");

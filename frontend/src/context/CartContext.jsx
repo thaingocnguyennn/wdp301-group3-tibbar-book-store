@@ -31,11 +31,13 @@ export const CartProvider = ({ children }) => {
   };
 
   const update = async (bookId, quantity) => {
+    // UC-28: Cập nhật số lượng item trong giỏ rồi tải lại dữ liệu mới nhất.
     await cartApi.updateCartItem(bookId, quantity);
     fetchCart();
   };
 
   const remove = async (bookId) => {
+    // UC-28: Xóa item khỏi giỏ rồi tải lại danh sách item còn lại.
     await cartApi.removeCartItem(bookId);
     fetchCart();
   };
