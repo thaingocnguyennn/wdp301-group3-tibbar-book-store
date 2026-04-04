@@ -14,6 +14,10 @@ const getStatusColor = (status) => {
 };
 
 const MyVouchersPage = () => {
+  // UC-91 + UC-92 + UC-93 (góc nhìn customer):
+  // - UC-91: Hiển thị trạng thái sử dụng voucher (usageCount/status, có usedAt trong payload).
+  // - UC-92: Voucher hết hạn được backend tự đồng bộ trạng thái EXPIRED trước khi trả về.
+  // - UC-93: Trang này hiển thị voucher được gán riêng cho user hiện tại.
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,6 +26,7 @@ const MyVouchersPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Gọi API ví voucher cá nhân (đã lọc theo user đăng nhập).
         const response = await voucherApi.getMyVouchers();
         setVouchers(response.data?.vouchers || []);
       } catch (err) {
@@ -83,6 +88,7 @@ const MyVouchersPage = () => {
                   {Number(voucher.minOrderValue || 0).toLocaleString("vi-VN")}d
                 </div>
                 <div style={styles.line}>
+                  {/* UC-91: Số lần đã dùng / số lần được phép dùng của voucher. */}
                   Usage: {item.usageCount}/{item.maxUsage}
                 </div>
                 <div style={styles.line}>

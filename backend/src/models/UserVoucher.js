@@ -17,11 +17,13 @@ const userVoucherSchema = new mongoose.Schema(
       default: Date.now,
     },
     status: {
+      // UC-91 + UC-92: Trạng thái sử dụng của voucher trong ví user (UNUSED/USED/EXPIRED).
       type: String,
       enum: ["UNUSED", "USED", "EXPIRED"],
       default: "UNUSED",
     },
     usedAt: {
+      // UC-91: Thời điểm voucher được sử dụng.
       type: Date,
       default: null,
     },
@@ -36,6 +38,7 @@ const userVoucherSchema = new mongoose.Schema(
       min: 1,
     },
     expiresAt: {
+      // UC-92: Thời điểm assignment hết hạn (đồng bộ với expiryDate voucher hoặc rule riêng).
       type: Date,
       default: null,
     },

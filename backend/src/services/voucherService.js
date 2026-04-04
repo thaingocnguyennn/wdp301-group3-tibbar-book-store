@@ -15,7 +15,9 @@ const SEGMENT_TYPES = {
 
 class VoucherService {
   async syncExpiredVouchers(now = new Date()) {
+    // UC-92: Tự động vô hiệu hóa voucher khi quá hạn (lazy sync mỗi lần API voucher được gọi).
     // Đồng bộ trạng thái hết hạn theo kiểu lazy: chạy mỗi khi có API voucher được gọi.
+    // B1: tìm voucher global đang active nhưng đã quá hạn.
     const expiredVouchers = await Voucher.find({
       isActive: true,
       expiryDate: { $ne: null, $lte: now },
@@ -37,6 +39,7 @@ class VoucherService {
 
     const expiredVoucherIds = expiredVouchers.map((item) => item._id);
 
+    // B2: cập nhật đồng thời voucher global và ví voucher của user về trạng thái hết hạn.
     await Promise.all([
       // Tắt toàn bộ voucher đã hết hạn.
       Voucher.updateMany(
@@ -70,15 +73,18 @@ class VoucherService {
   }
 
   async getAllVouchers() {
+    // UC-47: Trả danh sách tất cả voucher cho trang admin view.
     await this.syncExpiredVouchers();
     return Voucher.find({}).sort({ createdAt: -1 }).lean();
   }
 
   async getAvailableVouchers(subtotal = 0, userId = null) {
+    // UC-92 + UC-93: trả danh sách voucher khả dụng theo subtotal và theo user (nếu đăng nhập).
     await this.syncExpiredVouchers();
     const now = new Date();
     const normalizedSubtotal = Number(subtotal) || 0;
 
+    // B1: lấy voucher PUBLIC còn hiệu lực và thỏa điều kiện giá trị đơn hàng tối thiểu.
     const publicVouchers = await Voucher.find({
       isActive: true,
       audienceType: "PUBLIC",
@@ -93,9 +99,11 @@ class VoucherService {
       .lean();
 
     if (!userId) {
+      // Người dùng chưa đăng nhập: chỉ trả voucher public.
       return publicVouchers;
     }
 
+    // B2: lấy voucher ASSIGNED của user còn lượt dùng và chưa hết hạn assignment.
     const assignedRecords = await UserVoucher.find({
       user: userId,
       status: { $ne: "EXPIRED" },
@@ -112,6 +120,7 @@ class VoucherService {
 
     const assignedVouchers = assignedRecords
       .filter((record) => {
+        // B3: lọc kỹ từng voucher assigned để đảm bảo usable tại thời điểm checkout.
         const voucher = record.voucher;
         if (!voucher) return false;
         if (!voucher.isActive) return false;
@@ -128,12 +137,16 @@ class VoucherService {
         assignedStatus: record.status,
       }));
 
+    // B4: gộp voucher assigned và public để frontend hiển thị chung danh sách chọn voucher.
     return [...assignedVouchers, ...publicVouchers];
   }
 
   async createVoucher(payload) {
+    // UC-48: Validate + tạo voucher mới trong hệ thống.
+    // B1: validate toàn bộ rule đầu vào trước khi ghi DB.
     this.validateVoucherPayload(payload, true);
 
+    // B2: chặn trùng mã voucher (code unique).
     const existingVoucher = await Voucher.findOne({
       code: String(payload.code).trim().toUpperCase(),
     });
@@ -142,6 +155,7 @@ class VoucherService {
       throw ApiError.conflict("Voucher code already exists");
     }
 
+    // B3: chuẩn hóa code uppercase rồi tạo mới voucher.
     const voucher = await Voucher.create({
       ...payload,
       code: String(payload.code).trim().toUpperCase(),
@@ -197,6 +211,8 @@ class VoucherService {
   }
 
   async getUserVoucherWallet(userId) {
+    // UC-91: Trả lịch sử/trạng thái sử dụng voucher trong ví user (usedAt, usageCount, status).
+    // Lưu ý: discount amount theo từng lần dùng voucher nằm ở Order.discount và liên kết Order.voucher.
     await this.syncExpiredVouchers();
     const records = await UserVoucher.find({ user: userId })
       .populate("voucher")
@@ -209,6 +225,7 @@ class VoucherService {
     const items = records
       .filter((record) => !!record.voucher)
       .map((record) => {
+        // B1: tính lại trạng thái thực tế dựa trên hạn dùng + số lượt đã dùng.
         const voucher = record.voucher;
         const voucherExpired = this.isVoucherExpired(voucher, now);
         const assignmentExpired = this.isUserVoucherExpired(record, now);
@@ -237,6 +254,7 @@ class VoucherService {
       });
 
     if (expiredIds.length > 0) {
+      // B2: đồng bộ lại DB cho các record vừa xác định là EXPIRED.
       await UserVoucher.updateMany(
         { _id: { $in: expiredIds }, status: { $ne: "EXPIRED" } },
         { $set: { status: "EXPIRED" } },
@@ -350,15 +368,19 @@ class VoucherService {
   }
 
   async assignVoucherToUsers(voucherId, payload = {}) {
+    // UC-93: Gán voucher cho người dùng cụ thể hoặc theo segment điều kiện.
+    // B1: xác nhận voucher đích tồn tại.
     const voucher = await Voucher.findById(voucherId);
     if (!voucher) {
       throw ApiError.notFound("Voucher not found");
     }
 
+    // B2: chuẩn hóa userIds thủ công hợp lệ ObjectId.
     const manualUserIds = Array.isArray(payload.userIds)
       ? payload.userIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
       : [];
 
+    // B3: gom thêm user từ các segment rule.
     const segmentUserIds = await this.collectSegmentUserIds(
       payload.segments,
       payload.segmentRules,
@@ -374,6 +396,7 @@ class VoucherService {
       throw ApiError.badRequest("No eligible users selected for assignment");
     }
 
+    // B4: lấy danh sách customer active thật sự để tránh gán sai role/user không tồn tại.
     const users = await User.find({
       _id: { $in: Array.from(finalIds) },
       role: "customer",
@@ -389,6 +412,7 @@ class VoucherService {
     const maxUsage = Number(voucher.maxUsagePerUser || 1);
     const expiresAt = voucher.expiryDate || null;
 
+    // B5: upsert UserVoucher theo từng user mục tiêu.
     const bulkOps = users.map((user) => ({
       updateOne: {
         filter: {
@@ -416,6 +440,7 @@ class VoucherService {
       ordered: false,
     });
 
+    // B6: đánh dấu audienceType của voucher là ASSIGNED sau khi gán.
     await Voucher.findByIdAndUpdate(voucher._id, {
       $set: {
         // Khi đã gán riêng cho user thì voucher được phân loại ASSIGNED.

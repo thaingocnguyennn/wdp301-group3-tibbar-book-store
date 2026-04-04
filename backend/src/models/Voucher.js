@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const voucherSchema = new mongoose.Schema(
   {
     code: {
+      // UC-47 + UC-48: Mã voucher hiển thị ở màn hình admin và dùng để tạo mới/tra cứu.
       type: String,
       required: [true, "Voucher code is required"],
       unique: true,
@@ -31,6 +32,7 @@ const voucherSchema = new mongoose.Schema(
       min: [0, "Max discount value cannot be negative"],
     },
     expiryDate: {
+      // UC-92: Mốc hết hạn để service tự động chuyển voucher sang trạng thái inactive.
       type: Date,
       required: [true, "Expiry date is required"],
     },
@@ -45,6 +47,7 @@ const voucherSchema = new mongoose.Schema(
       default: true,
     },
     audienceType: {
+      // UC-93: PUBLIC = dùng chung, ASSIGNED = chỉ user được chỉ định mới thấy/dùng.
       type: String,
       enum: ["PUBLIC", "ASSIGNED"],
       default: "PUBLIC",

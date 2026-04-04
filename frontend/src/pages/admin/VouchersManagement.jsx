@@ -33,6 +33,10 @@ const initialAssignState = {
 };
 
 const VouchersManagement = () => {
+  // UC-47 + UC-48 + UC-93 (Admin Voucher Management):
+  // - UC-47: Xem danh sách voucher hiện có trong hệ thống.
+  // - UC-48: Tạo voucher mới (code, discount, điều kiện, expiry...).
+  // - UC-93: Gán voucher cho user cụ thể hoặc theo segment.
   const [vouchers, setVouchers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,28 +49,38 @@ const VouchersManagement = () => {
   const [assignState, setAssignState] = useState(initialAssignState);
 
   useEffect(() => {
+    // Khi mở trang admin voucher lần đầu: tải danh sách voucher + danh sách khách hàng.
     fetchVouchers();
     fetchCustomers();
   }, []);
 
   const fetchVouchers = async () => {
     try {
+      // UC-47: Tải toàn bộ voucher để render bảng quản trị.
+      // B1: bật loading để UI hiển thị trạng thái đang tải.
       setLoading(true);
+      // B2: gọi API admin voucher lấy toàn bộ danh sách.
       const response = await voucherApi.getAllVouchers();
+      // B3: cập nhật state vouchers, fallback mảng rỗng nếu API không trả data.
       setVouchers(response.data.vouchers || []);
     } catch (err) {
+      // B4: lưu thông báo lỗi để hiển thị trên UI.
       setError(err.response?.data?.message || "Failed to load vouchers");
     } finally {
+      // B5: luôn tắt loading dù thành công hay thất bại.
       setLoading(false);
     }
   };
 
   const fetchCustomers = async () => {
     try {
+      // UC-93: Tải danh sách customer active để admin chọn gán voucher thủ công.
+      // Chỉ lấy role customer + trạng thái active để tránh gán nhầm admin/shipper/inactive.
       const response = await adminUserApi.getAllUsers({
         role: "customer",
         status: "active",
       });
+      // Lưu danh sách khách hàng vào state để render checklist gán voucher.
       setCustomers(response.data?.users || []);
     } catch (err) {
       console.error("Failed to fetch customers for assignment:", err);
@@ -74,19 +88,23 @@ const VouchersManagement = () => {
   };
 
   const resetForm = () => {
+    // Đưa form create/update về trạng thái mặc định sau khi submit/cancel.
     setFormData(initialFormData);
     setEditingVoucher(null);
     setShowForm(false);
   };
 
   const resetAssignState = () => {
+    // Đóng panel assign và xóa toàn bộ lựa chọn user/segment tạm thời.
     setAssignState(initialAssignState);
     setShowAssignPanel(false);
   };
 
   const openEditForm = (voucher) => {
+    // UC-47/48: Khi bấm Edit ở bảng voucher, map dữ liệu voucher hiện tại lên form.
     setEditingVoucher(voucher);
     setFormData({
+      // code khóa chỉnh sửa khi edit để tránh đổi mã và gây nhầm lịch sử sử dụng.
       code: voucher.code || "",
       discountType: voucher.discountType || "PERCENT",
       discountValue: String(voucher.discountValue ?? ""),
@@ -104,10 +122,12 @@ const VouchersManagement = () => {
       audienceType: voucher.audienceType || "PUBLIC",
       maxUsagePerUser: String(voucher.maxUsagePerUser || 1),
     });
+    // Bật form để admin chỉnh sửa trực tiếp.
     setShowForm(true);
   };
 
   const openAssignPanel = (voucher) => {
+    // UC-93: Chọn voucher mục tiêu để gán, sau đó mở panel assign.
     setAssignState({
       ...initialAssignState,
       voucherId: voucher._id,
@@ -118,14 +138,17 @@ const VouchersManagement = () => {
   };
 
   const handleInputChange = (event) => {
+    // Handler dùng chung cho form create/update voucher.
     const { name, value, type, checked } = event.target;
     setFormData((prev) => ({
       ...prev,
+      // Checkbox lấy checked, input/select lấy value.
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleAssignInputChange = (event) => {
+    // Handler cho các rule segment (vipMinSpent, inactiveDays, minOrderCount).
     const { name, value } = event.target;
     setAssignState((prev) => ({
       ...prev,
@@ -134,10 +157,12 @@ const VouchersManagement = () => {
   };
 
   const toggleAssignUser = (userId) => {
+    // UC-93: Toggle user trong danh sách chọn thủ công.
     setAssignState((prev) => {
       const exists = prev.selectedUserIds.includes(userId);
       return {
         ...prev,
+        // Nếu đã có thì bỏ chọn, chưa có thì thêm vào.
         selectedUserIds: exists
           ? prev.selectedUserIds.filter((id) => id !== userId)
           : [...prev.selectedUserIds, userId],
@@ -146,6 +171,7 @@ const VouchersManagement = () => {
   };
 
   const toggleSegment = (segment) => {
+    // UC-93: Toggle segment khách hàng mục tiêu.
     setAssignState((prev) => {
       const exists = prev.selectedSegments.includes(segment);
       return {
@@ -158,6 +184,8 @@ const VouchersManagement = () => {
   };
 
   const buildPayload = () => ({
+    // Chuẩn hóa payload trước khi gửi create/update voucher lên backend.
+    // Code luôn uppercase để thống nhất lookup theo mã voucher.
     code: formData.code.trim().toUpperCase(),
     discountType: formData.discountType,
     discountValue: Number(formData.discountValue),
@@ -174,21 +202,27 @@ const VouchersManagement = () => {
   });
 
   const handleSubmit = async (event) => {
+    // Chặn browser submit mặc định (reload trang).
     event.preventDefault();
+    // Xóa thông báo cũ trước khi gọi request mới.
     setError("");
     setMessage("");
 
     try {
+      // UC-48: Submit tạo voucher mới hoặc cập nhật voucher đang edit.
       const payload = buildPayload();
 
       if (editingVoucher) {
+        // Luồng update voucher hiện có.
         await voucherApi.updateVoucher(editingVoucher._id, payload);
         setMessage("Voucher updated successfully");
       } else {
+        // Luồng create voucher mới.
         await voucherApi.createVoucher(payload);
         setMessage("Voucher created successfully");
       }
 
+      // Reset form + tải lại bảng để thấy dữ liệu mới ngay.
       resetForm();
       await fetchVouchers();
     } catch (err) {
@@ -197,11 +231,14 @@ const VouchersManagement = () => {
   };
 
   const handleAssignVoucher = async (event) => {
+    // Chặn submit mặc định của form assign.
     event.preventDefault();
+    // Reset thông báo cũ để tránh hiển thị lẫn trạng thái.
     setError("");
     setMessage("");
 
     try {
+      // UC-93: Validate phải có voucher mục tiêu trước khi gán.
       if (!assignState.voucherId) {
         setError("Please select a voucher to assign");
         return;
@@ -218,7 +255,9 @@ const VouchersManagement = () => {
       const response = await voucherApi.assignVoucherToUsers(
         assignState.voucherId,
         {
+          // userIds: danh sách user chọn thủ công.
           userIds: assignState.selectedUserIds,
+          // segments: danh sách tập người dùng động.
           segments: assignState.selectedSegments,
           segmentRules: {
             vipMinSpent: Number(assignState.vipMinSpent || 3000000),
@@ -229,9 +268,11 @@ const VouchersManagement = () => {
       );
 
       const data = response.data || {};
+      // Hiển thị số lượng gán mới và số lượng đã được gán trước đó.
       setMessage(
         `Assigned successfully. New assignments: ${data.assignedCount || 0}, already assigned: ${data.alreadyAssignedCount || 0}`,
       );
+      // Đóng panel assign và refresh bảng voucher.
       resetAssignState();
       await fetchVouchers();
     } catch (err) {
@@ -412,6 +453,7 @@ const VouchersManagement = () => {
             <div>
               <h4 style={styles.blockTitle}>Manual users</h4>
               <div style={styles.usersList}>
+                {/* Danh sách customer để admin tick thủ công các user cần gán voucher. */}
                 {customers.map((customer) => {
                   const fullName = [customer.firstName, customer.lastName]
                     .filter(Boolean)
@@ -439,6 +481,7 @@ const VouchersManagement = () => {
             <div>
               <h4 style={styles.blockTitle}>Target segments</h4>
               <div style={styles.segmentList}>
+                {/* Danh sách segment động để gán voucher theo nhóm người dùng. */}
                 {SEGMENT_OPTIONS.map((segment) => (
                   <label key={segment.value} style={styles.userRow}>
                     <input
@@ -505,6 +548,7 @@ const VouchersManagement = () => {
       ) : vouchers.length === 0 ? (
         <div style={styles.empty}>No vouchers found.</div>
       ) : (
+        // UC-47: Bảng voucher trung tâm cho admin theo dõi/chỉnh sửa/gán voucher.
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
@@ -561,6 +605,7 @@ const VouchersManagement = () => {
                       <button
                         type="button"
                         style={styles.assignButton}
+                        // UC-93: Mở panel gán voucher theo user hoặc segment.
                         onClick={() => {
                           openAssignPanel(voucher);
                           setShowForm(false);
