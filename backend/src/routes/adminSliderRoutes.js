@@ -12,7 +12,9 @@ router.use(authenticate);
 // Bắt buộc quyền admin cho toàn bộ endpoint bên dưới.
 router.use(authorize(ROLES.ADMIN));
 
+// UC-23 (Admin view): Lấy toàn bộ slider để quản trị viên xem danh sách.
 router.get("/", adminSliderController.getAllSliders);
+// UC-24: Tạo slider mới, có thể upload ảnh bằng field "image".
 router.post(
   "/",
   sliderUpload.single("image"),

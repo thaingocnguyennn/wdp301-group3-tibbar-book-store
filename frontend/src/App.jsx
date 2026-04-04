@@ -309,7 +309,7 @@ function AppContent() {
           }
         />
 
-        {/* UC-25 + UC-26: Route màn hình admin quản lý/sửa slider và bật tắt hiển thị slider. */}
+        {/* UC-23 + UC-24 + UC-25 + UC-26: Route màn hình admin xem/tạo/sửa/bật-tắt slider. */}
         <Route
           path="/admin/sliders"
           element={

@@ -3,15 +3,15 @@ import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 class SliderController {
-  // UC-14: Controller xử lý request lấy sliders công khai
-  // Endpoint: GET /api/sliders/public
+  // UC-23: Controller xử lý request lấy slider công khai cho homepage.
+  // Endpoint: GET /api/sliders
   // Luồng xử lý:
   // 1. Gọi sliderService.getPublicSliders() để lấy danh sách sliders
   // 2. Trả về response thành công với data sliders
   // 3. Nếu có lỗi, chuyển cho error handler middleware
   async getPublicSliders(req, res, next) {
     try {
-      // Lấy danh sách sliders công khai từ service
+      // Lấy danh sách sliders public từ service để trả cho frontend homepage.
       const sliders = await sliderService.getPublicSliders();
 
       // Trả về response thành công với dữ liệu sliders

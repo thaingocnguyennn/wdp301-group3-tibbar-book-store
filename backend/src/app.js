@@ -113,8 +113,9 @@ app.use("/api/admin/books", adminBookRoutes); // Admin book management routes (C
 app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/categories", categoryRoutes); // Admin categories (same routes, protected)
 app.use("/api/wishlist", wishlistRoutes);
+// UC-23: Mount route slider public để homepage lấy danh sách slider hiển thị.
 app.use("/api/sliders", sliderRoutes);
-// UC-25 + UC-26: Mount route quản trị slider (sửa slider, bật/tắt visibility).
+// UC-23 + UC-24 + UC-25 + UC-26: Mount route quản trị slider (xem/tạo/sửa/bật-tắt visibility).
 app.use("/api/admin/sliders", adminSliderRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/vouchers", adminVoucherRoutes);

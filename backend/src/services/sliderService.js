@@ -5,7 +5,7 @@ import { BOOK_VISIBILITY } from "../config/constants.js";
 const MAX_SLIDERS = 5;
 
 class SliderService {
-  // UC-14: Hiển thị slider công khai trên homepage (View slider)
+  // UC-23: Hiển thị slider công khai trên homepage (View slider)
   // Luồng xử lý: Hiển thị carousel sách nổi bật trên trang chủ
   // Bắt đầu: HomePage gọi fetchSliders() trong useEffect
   // Xử lý chính: Query MongoDB lấy sliders có visibility PUBLIC, sort theo thời gian tạo mới nhất
@@ -19,6 +19,7 @@ class SliderService {
   }
 
   async getAllSliders() {
+    // UC-23 (Admin view): Truy vấn toàn bộ slider, kể cả hidden, để admin quản trị.
     return Slider.find({})
       .populate("adminId", "email firstName lastName role")
       .sort({ createdAt: -1 })
@@ -26,11 +27,13 @@ class SliderService {
   }
 
   async createSlider(data) {
+    // UC-24: Giới hạn tối đa số lượng slider để tránh homepage quá tải.
     const total = await Slider.countDocuments();
     if (total >= MAX_SLIDERS) {
       throw ApiError.badRequest(`Slider limit reached (max ${MAX_SLIDERS})`);
     }
 
+    // Tạo slider mới trong MongoDB từ payload đã được controller chuẩn hóa.
     const slider = await Slider.create(data);
     return slider;
   }

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 
 const Slider = ({ images = [] }) => {
+  // UC-23: Component hiển thị slider ở homepage (view carousel).
+  // currentSlide lưu vị trí slide đang hiển thị để điều khiển chuyển trang.
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Default promotional images/slides if none provided
+  // Dữ liệu fallback khi backend chưa có slider public hoặc API lỗi.
   const defaultSlides = [
     {
       id: 1,
@@ -38,6 +40,7 @@ const Slider = ({ images = [] }) => {
   const slides = images.length > 0 ? images : defaultSlides;
 
   useEffect(() => {
+    // Tự động chuyển slide mỗi 5 giây để tạo hiệu ứng carousel liên tục.
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000); // Change slide every 5 seconds
@@ -46,14 +49,17 @@ const Slider = ({ images = [] }) => {
   }, [slides.length]);
 
   const goToSlide = (index) => {
+    // Cho phép người dùng nhảy thẳng đến slide theo dot index.
     setCurrentSlide(index);
   };
 
   const goToPrevious = () => {
+    // Lùi về slide trước đó, vòng về cuối nếu đang ở slide đầu.
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
   };
 
   const goToNext = () => {
+    // Tiến sang slide kế tiếp, quay lại đầu nếu đang ở slide cuối.
     setCurrentSlide((prev) => (prev + 1) % slides.length);
   };
 
