@@ -130,12 +130,14 @@ export const bookApi = {
     return response.data;
   },
 
-  // Admin endpoints
+  //-------------------------------
+  //API quản lý sách cho admin - lấy danh sách tất cả sách với bộ lọc
   getAllBooksAdmin: async (params) => {
     const response = await axiosInstance.get("/admin/books", { params });
     return response.data;
   },
 
+  //API quản lý sách cho admin - tạo mới một cuốn sách
   createBook: async (bookData) => {
     const isFormData = bookData instanceof FormData;
     const response = await axiosInstance.post(
@@ -148,6 +150,7 @@ export const bookApi = {
     return response.data;
   },
 
+  //API quản lý sách cho admin - cập nhật thông tin một cuốn sách
   updateBook: async (id, bookData) => {
     const isFormData = bookData instanceof FormData;
     const response = await axiosInstance.put(
@@ -160,6 +163,7 @@ export const bookApi = {
     return response.data;
   },
 
+  //API quản lý sách cho admin - cập nhật trạng thái hiển thị của một cuốn sách
   updateVisibility: async (id, visibility) => {
     const response = await axiosInstance.patch(
       `/admin/books/${id}/visibility`,
@@ -168,6 +172,7 @@ export const bookApi = {
     return response.data;
   },
 
+  //API quản lý sách cho admin - tải lên preview cho một cuốn sách
   uploadBookPreview: async (id, previewData) => {
     const response = await axiosInstance.post(
       `/admin/books/${id}/preview`,
@@ -177,6 +182,7 @@ export const bookApi = {
     return response.data;
   },
 
+  //API quản lý sách cho admin - cập nhật một trang preview cụ thể của một cuốn sách
   updateBookPreview: async (id, previewData) => {
     const response = await axiosInstance.put(
       `/admin/books/${id}/preview`,
@@ -186,6 +192,8 @@ export const bookApi = {
     return response.data;
   },
 
+  //ham manageBookPreviewPage để quản lý trang preview của sách, có thể dùng để thêm mới, 
+  // thay thế hoặc xóa một trang preview cụ thể trong danh sách trang preview của sách
   manageBookPreviewPage: async (id, payload) => {
     const response = await axiosInstance.patch(
       `/admin/books/${id}/preview/manage`,
@@ -195,6 +203,7 @@ export const bookApi = {
     return response.data;
   },
 
+  //API quản lý sách cho admin - xóa một cuốn sách
   deleteBook: async (id) => {
     const response = await axiosInstance.delete(`/admin/books/${id}`);
     return response.data;
