@@ -158,31 +158,65 @@ const HomePage = () => {
 
   const fetchPersonalizedBooks = async () => {
     try {
+      // Bước 1: Set loading state để hiển thị spinner
+      // Cho biết component đang tải dữ liệu personalized books
       setPersonalizedLoading(true);
+      
+      // Bước 2: Gọi API lấy danh sách sách cá nhân hóa (GET /books/personalized?limit=8)
+      // Response gồm: { books, strategy, signals }
+      // - books: Mảng 8 sách recommend
+      // - strategy: "cart-author-category", "fallback-newest", "fallback-newest-relaxed"
+      // - signals: Metadata { hasCartHistory, hasAuthorInterest, hasCategoryInterest, ... }
       const response = await bookApi.getPersonalizedBooks(8);
+      
+      // Trích xuất danh sách sách từ response
+      // Nếu response không có books → personalizedList = []
       const personalizedList = response?.data?.books || [];
 
+      // Bước 3: Cập nhật state personalizedBooks
+      // Nếu API trả về sách → Set dữ liệu sách
+      // Nếu API trả về empty list → Fallback sang getNewestBooks() dưới đây
       if (personalizedList.length > 0) {
+        // ✓ Có sách recommend từ API → Set dữ liệu
         setPersonalizedBooks(personalizedList);
       } else {
-        // UI safety net: keep section populated if personalized API returns empty.
+        // ✗ API trả về empty array → Fallback sang sách mới nhất
+        // Đây là safety net: Nếu personalization fail, vẫn hiển thị sách mới nhất
+        // Thay vì hiển thị blank "Recommended For You" section
         const newestResponse = await bookApi.getNewestBooks(8);
         setPersonalizedBooks(newestResponse?.data?.books || []);
       }
 
+      // Bước 4: Cập nhật state recommendationMeta (metadata của recommendation)
+      // Metadata này dùng để:
+      // - Hiển thị subtitle khác nhau tùy strategy (VD: "Dựa trên lịch sử mua hàng"...)
+      // - Debug/analytics theo signals
       setRecommendationMeta({
+        // strategy: Loại chiến lược recommendation sử dụng
+        // VD: "cart-author-category" = Recommend sách cùng tác giả/danh mục từ giỏ
+        // VD: "fallback-newest" = Fallback sang sách mới nhất (guest/empty cart)
         strategy:
           response?.data?.strategy ||
           (personalizedList.length === 0 ? "fallback-newest-relaxed" : null),
+        // signals: Metadata để hiết user có cart history, purchase history, etc.
+        // Frontend dùng để hiển thị subtitle phù hợp hoặc analytics
         signals: response?.data?.signals || {
           hasRecentlyViewed: false,
           hasPurchaseHistory: false,
         },
       });
     } catch (error) {
+      // Nếu có lỗi (network error, server error, etc.):
+      // - Log lỗi ra console cho debug
+      // - Không throw error (tránh crash UI)
+      // - Giữ nguyên state personalizedBooks (không update)
+      // - User sẽ thấy loading spinner mãi hoặc section trống
       console.error("Error fetching personalized books:", error);
+      // Optional: Fallback sang getNewestBooks() ở đây nếu muốn UX tốt hơn
       setPersonalizedBooks([]);
     } finally {
+      // Bước 5: Kết thúc loading (dù success hay error)
+      // Set loading = false để ẩn spinner, hiển thị content
       setPersonalizedLoading(false);
     }
   };
@@ -404,11 +438,25 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Best Selling Books */}
+      {/* UC-86: Section "Recommended For You" - Hiển thị sách cá nhân hóa */}
+      {/* ============================================================ */}
+      {/* Luồng render:
+          1. fetchPersonalizedBooks() được gọi khi component mount hoặc user login
+          2. Gọi bookApi.getPersonalizedBooks(8) → Backend API
+          3. Backend trả về books + strategy + signals
+          4. Cập nhật state: personalizedBooks, personalizedLoading, recommendationMeta
+          5. Render 3 states:
+             - Đang tải: Hiển thị spinner + "Building your personalized recommendations..."
+             - Không có dữ liệu: Hiển thị "No personalized recommendations yet"
+             - Có dữ liệu: Hiển thị grid sách + subtitle theo strategy
+      */}
       <section style={styles.section}>
         <div style={styles.sectionHeader}>
           <h2 style={styles.sectionTitle}>✨ Recommended For You</h2>
           <div style={styles.titleUnderline}></div>
+          
+          {/* Hiển thị subtitle khác nhau tùy theo recommendation strategy */}
+          {/* Nếu dùng chiến lược cart-author-category (có dữ liệu từ giỏ) */}
           {(recommendationMeta.strategy === "multi-signal-personalization" ||
             recommendationMeta.strategy === "direct-interaction-priority" ||
             recommendationMeta.strategy === "interaction-author-category" ||
@@ -419,12 +467,14 @@ const HomePage = () => {
           )}
         </div>
 
+        {/* STATE #1: Đang tải (personalizedLoading = true) */}
         {personalizedLoading ? (
           <div style={styles.loading}>
             <div style={styles.spinner}></div>
             <p>Building your personalized recommendations...</p>
           </div>
-        ) : personalizedBooks.length === 0 ? (
+        ) : personalizedBooks.length === 0 ? {
+          /* STATE #2: Không có dữ liệu (personalizedLoading = false, personalizedBooks = []) */}
           <div style={styles.empty}>
             <p>No personalized recommendations yet</p>
             <p style={styles.emptySmall}>
@@ -432,12 +482,16 @@ const HomePage = () => {
             </p>
           </div>
         ) : (
+          /* STATE #3: Có dữ liệu (personalizedLoading = false, personalizedBooks.length > 0) */}
           <>
+            {/* Render grid sách recommend dùng BookCard component */}
             <div style={styles.grid}>
               {personalizedBooks.map((book) => (
                 <BookCard key={book._id} book={book} />
               ))}
             </div>
+            
+            {/* Hiển thị subtitle fallback nếu dùng sách mới nhất */}
             {(recommendationMeta.strategy === "fallback-newest" ||
               recommendationMeta.strategy === "fallback-newest-relaxed") && (
               <p style={styles.sectionHint}>

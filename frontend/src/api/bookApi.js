@@ -42,10 +42,44 @@ export const bookApi = {
     return response.data;
   },
 
+  // UC-86: API lấy danh sách sách cá nhân hóa dựa trên giỏ hàng
+  // Endpoint: GET /api/books/personalized?limit=8
+  // Mô tả: 
+  // - Guest users (không login): Hiển thị sách mới nhất (fallback-newest)
+  // - Authenticated users với giỏ hàng: 
+  //   Recommend sách cùng tác giả + danh mục từ items trong giỏ (cart-author-category)
+  //   Scoring logic: Author match (+8) > Category match (+6) > Freshness (+0-4)
+  // - Fallback: Nếu không tìm được → Hiển thị sách mới nhất (fallback-newest-relaxed)
+  //
+  // Response: { success: true, data: { 
+  //   books: [...],                    // Mảng 8 sách recommend
+  //   strategy: "cart-author-category", // Loại recommendation dùng
+  //   signals: {                         // Metadata để frontend debug
+  //     hasCartHistory: true,
+  //     hasAuthorInterest: true,
+  //     hasCategoryInterest: false
+  //   }
+  // }}
+  //
+  // Tham số:
+  // - limit: Số lượng sách trả về (mặc định 8)
+  //
+  // Ví dụ cụ thể:
+  // User's Cart: [
+  //   { book: "Python 101", author: "Ngô Thế Phương", category: "IT" },
+  //   { book: "Data Science", author: "Lê Văn A", category: "IT" }
+  // ]
+  // → API tìm kiếm sách NOT IN cart nhưng có author MATCH ("Ngô Thế Phương" hoặc "Lê Văn A")
+  //   HOẶC category MATCH ("IT")
+  // → Recommend: [Sách khác của "Ngô Thế Phương" (score: 8), Sách IT khác (score: 6), ...]
   getPersonalizedBooks: async (limit = 8) => {
+    // Gửi GET request đến endpoint /books/personalized với query param limit
+    // Ví dụ: GET /api/books/personalized?limit=8
     const response = await axiosInstance.get("/books/personalized", {
-      params: { limit },
+      params: { limit },  // Query params: { limit: 8 }
     });
+    // Trả về data từ response (đã được xử lý bởi axiosInstance response interceptor)
+    // Response format: { success: true, message, data: { books, strategy, signals } }
     return response.data;
   },
 
