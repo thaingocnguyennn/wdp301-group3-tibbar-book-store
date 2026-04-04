@@ -9,6 +9,8 @@
  *  - loading   : boolean — show skeleton while fetching
  */
 const AvailableVouchers = ({ vouchers = [], onSelect, loading = false }) => {
+  // UC-92: Danh sách vouchers ở đây đã được backend loại hết hạn trước khi trả về.
+  // UC-93: Có thể bao gồm cả voucher PUBLIC và ASSIGNED cho user hiện tại.
   if (loading) {
     return (
       <div style={styles.listWrapper}>
@@ -70,6 +72,7 @@ const AvailableVouchers = ({ vouchers = [], onSelect, loading = false }) => {
           <button
             type="button"
             style={styles.selectBtn}
+            // Chọn nhanh mã voucher để apply vào checkout.
             onClick={() => onSelect(v.code)}
           >
             Select

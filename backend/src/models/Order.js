@@ -65,6 +65,7 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
     discount: {
+      // UC-91: Giá trị giảm giá áp dụng cho đơn hàng khi dùng voucher.
       type: Number,
       default: 0,
     },
@@ -141,7 +142,7 @@ const orderSchema = new mongoose.Schema(
      
     },
 
-    // Voucher (placeholder for future module)
+    // UC-91: Liên kết voucher đã dùng cho đơn để truy vết lịch sử sử dụng theo order.
     voucher: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Voucher",

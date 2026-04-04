@@ -555,6 +555,7 @@ class OrderService {
   }
 
   async consumeAssignedVoucherUsage(userVoucherId) {
+    // UC-91: Ghi nhận lịch sử sử dụng voucher (tăng usageCount + cập nhật usedAt).
     const assignedVoucher = await UserVoucher.findById(userVoucherId);
     if (!assignedVoucher) {
       return;

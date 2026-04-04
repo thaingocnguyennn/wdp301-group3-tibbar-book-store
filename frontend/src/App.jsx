@@ -137,6 +137,7 @@ function AppContent() {
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
+              {/* UC-47 + UC-48 + UC-93: Trang admin xem voucher, tạo voucher mới và gán voucher theo user/segment. */}
         {/* UC-27 + UC-124 + UC-125 + UC-127: Book Detail (add cart, stock alert, back-stock, compare). */}
         <Route path="/books/:id" element={<BookDetailPage />} />
         <Route
@@ -206,6 +207,7 @@ function AppContent() {
           path="/my-vouchers"
           element={
             <ProtectedRoute>
+              {/* UC-91 + UC-93: Trang ví voucher cá nhân (usage status + voucher được gán). */}
               <MyVouchersPage />
             </ProtectedRoute>
           }
@@ -348,6 +350,7 @@ function AppContent() {
           path="/admin/vouchers"
           element={
             <ProtectedRoute adminOnly>
+              {/* UC-47 + UC-48 + UC-93: Admin xem/tạo voucher và gán voucher cho user cụ thể. */}
               <VouchersManagement />
             </ProtectedRoute>
           }

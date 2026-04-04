@@ -118,7 +118,9 @@ app.use("/api/sliders", sliderRoutes);
 // UC-23 + UC-24 + UC-25 + UC-26: Mount route quản trị slider (xem/tạo/sửa/bật-tắt visibility).
 app.use("/api/admin/sliders", adminSliderRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
+// UC-47 + UC-48 + UC-93: Mount route admin voucher (xem, tạo, gán voucher theo user/segment).
 app.use("/api/admin/vouchers", adminVoucherRoutes);
+// UC-91 + UC-92 + UC-93: Mount route voucher phía người dùng (ví voucher, voucher khả dụng).
 app.use("/api/vouchers", voucherRoutes);
 // UC-27 + UC-28: Mount route giỏ hàng (thêm sách, cập nhật số lượng, xóa item).
 app.use("/api/cart", cartRoutes);
