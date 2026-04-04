@@ -154,6 +154,7 @@ class OrderController {
   // Cancel order
   async cancelOrder(req, res, next) {
     try {
+      // UC-46: Controller xử lý yêu cầu hủy đơn của chính user đang đăng nhập.
       const userId = req.user._id;
       const orderId = req.params.id;
 
@@ -173,6 +174,7 @@ class OrderController {
   // Reorder from a previous order
   async reorderOrder(req, res, next) {
     try {
+      // UC-88: Controller nhận yêu cầu order again dựa trên orderId cũ.
       // userId lấy từ JWT sau middleware authenticate.
       const userId = req.user._id;
       const orderId = req.params.id;
@@ -203,6 +205,7 @@ class OrderController {
   // Download or print invoice for delivered order
   async downloadInvoice(req, res, next) {
     try {
+      // UC-89: Controller trả nội dung hóa đơn HTML để tải file hoặc in trực tiếp.
       const userId = req.user._id;
       const orderId = req.params.id;
       // true: tải file, false: mở inline để in.
@@ -229,6 +232,7 @@ class OrderController {
   // Submit return / refund request
   async submitReturnRefundRequest(req, res, next) {
     try {
+      // UC-90: Controller tiếp nhận form trả hàng/hoàn tiền từ khách hàng.
       const userId = req.user._id;
       const orderId = req.params.id;
       // type: RETURN | REFUND, reason bắt buộc, details tùy chọn.

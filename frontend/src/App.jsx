@@ -188,7 +188,7 @@ function AppContent() {
           path="/orders"
           element={
             <ProtectedRoute>
-              {/* UC-44: Màn hình hiển thị danh sách đơn hàng đã/đang xử lý của người dùng. */}
+              {/* UC-44 + UC-46: Màn hình lịch sử đơn + thao tác hủy đơn pending ngay trên danh sách. */}
               <OrderHistoryPage />
             </ProtectedRoute>
           }
@@ -197,7 +197,7 @@ function AppContent() {
           path="/orders/:id"
           element={
             <ProtectedRoute>
-              {/* UC-45: Màn hình hiển thị chi tiết một đơn hàng cụ thể của khách hàng. */}
+              {/* UC-45 + UC-46 + UC-88 + UC-89 + UC-90: Chi tiết đơn + hủy pending + order again + invoice + return/refund. */}
               <OrderDetailPage />
             </ProtectedRoute>
           }

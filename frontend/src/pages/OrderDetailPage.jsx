@@ -81,8 +81,8 @@ const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
 
 const OrderDetailPage = () => {
-  // UC-45 (Chatbot - View order detail):
-  // Trang này hiển thị chi tiết một đơn hàng cụ thể theo orderId trên URL.
+  // UC-45: Trang hiển thị chi tiết một đơn hàng theo orderId trên URL.
+  // Các UC đi kèm tại trang này: UC-46 (cancel pending), UC-88 (reorder), UC-89 (invoice), UC-90 (return/refund).
   const { id } = useParams();
   const navigate = useNavigate();
   const [rating, setRating] = useState(0);
@@ -125,12 +125,13 @@ const OrderDetailPage = () => {
   };
 
   const handleCancelOrder = async () => {
-    // Chỉ cho hủy khi đơn còn ở trạng thái PENDING.
+    // UC-46: Chỉ cho hủy khi đơn còn ở trạng thái PENDING.
     if (!order || order.orderStatus !== "PENDING") return;
 
     try {
       setIsCancelling(true);
       setError("");
+      // Gọi API hủy đơn, backend sẽ kiểm tra quyền sở hữu đơn và điều kiện pending-only.
       const response = await orderApi.cancelOrder(order._id);
       setOrder(response.data.order);
     } catch (err) {
@@ -162,6 +163,7 @@ const OrderDetailPage = () => {
   };
 
   const createBlobDownload = (blob, fileName) => {
+    // UC-89: Tạo liên kết tạm để tải file hóa đơn HTML về máy người dùng.
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -173,6 +175,7 @@ const OrderDetailPage = () => {
   };
 
   const handleReorder = async () => {
+    // UC-88: Đặt lại đơn từ đơn cũ, dùng lại paymentMethod hiện tại của đơn gốc (có thể được backend override nếu cần).
     if (!order) return;
 
     try {
@@ -181,7 +184,7 @@ const OrderDetailPage = () => {
       const response = await orderApi.reorderOrder(order._id, {
         paymentMethod: order.paymentMethod,
       });
-      // lay du lieu tra ve
+      // Lấy dữ liệu đơn mới và thông tin thanh toán trả về sau khi reorder.
       const reorderedOrder = response.data?.order;
       const payment = response.data?.payment;
 
@@ -204,6 +207,7 @@ const OrderDetailPage = () => {
   };
 
   const handleDownloadInvoice = async () => {
+    // UC-89: Luồng tải hóa đơn (download=true) cho đơn đã giao.
     if (!order) return;
 
     try {
@@ -220,6 +224,7 @@ const OrderDetailPage = () => {
   };
 
   const handlePrintInvoice = async () => {
+    // UC-89: Luồng in hóa đơn (download=false), mở tab mới và gọi window.print().
     if (!order) return;
 
     try {
@@ -254,6 +259,7 @@ const OrderDetailPage = () => {
   };
 
   const handleSubmitReturnRefund = async () => {
+    // UC-90: Gửi yêu cầu trả hàng/hoàn tiền từ form trên trang chi tiết đơn.
     if (!order) return;
 
     try {
@@ -327,6 +333,7 @@ const OrderDetailPage = () => {
     !order.returnRequest?.requestedAt &&
     returnRequestExpiresAt &&
     returnRequestExpiresAt.getTime() >= Date.now();
+  // UC-46: Điều kiện hiển thị nút hủy đơn.
   const canCancelOrder =
     order.orderStatus === "PENDING" &&
     !(isDigitalOrder && order.paymentStatus === "PAID");
@@ -724,6 +731,7 @@ const OrderDetailPage = () => {
               type="button"
               style={styles.secondaryActionButton}
               disabled={actionLoading.reorder}
+              // UC-88: Nút Order Again tạo đơn mới từ dữ liệu đơn cũ.
               onClick={handleReorder}
             >
               {actionLoading.reorder ? "Reordering..." : "Order Again"}
@@ -736,6 +744,7 @@ const OrderDetailPage = () => {
                 type="button"
                 style={styles.secondaryActionButton}
                 disabled={actionLoading.invoiceDownload}
+                // UC-89: Tải hóa đơn dưới dạng file HTML.
                 onClick={handleDownloadInvoice}
               >
                 {actionLoading.invoiceDownload
@@ -746,6 +755,7 @@ const OrderDetailPage = () => {
                 type="button"
                 style={styles.secondaryActionButton}
                 disabled={actionLoading.invoicePrint}
+                // UC-89: Mở hóa đơn và gọi lệnh in.
                 onClick={handlePrintInvoice}
               >
                 {actionLoading.invoicePrint ? "Opening..." : "Print Invoice"}
@@ -761,6 +771,7 @@ const OrderDetailPage = () => {
             <span style={styles.sectionIcon}>↩</span>
             Return / Refund Request
           </h3>
+          {/* UC-90: Khu vực theo dõi trạng thái và gửi yêu cầu return/refund. */}
 
           {returnRequestStatusConfig && (
             <div
@@ -853,6 +864,7 @@ const OrderDetailPage = () => {
                 disabled={
                   !returnRefundForm.reason.trim() || actionLoading.returnRefund
                 }
+                // UC-90: Nút submit yêu cầu trả hàng/hoàn tiền.
                 onClick={handleSubmitReturnRefund}
               >
                 {actionLoading.returnRefund
@@ -877,6 +889,7 @@ const OrderDetailPage = () => {
           <button
             type="button"
             style={styles.cancelOrderButton}
+            // UC-46: Nút hủy đơn chỉ xuất hiện khi đơn còn pending.
             onClick={handleCancelOrder}
             disabled={isCancelling}
           >

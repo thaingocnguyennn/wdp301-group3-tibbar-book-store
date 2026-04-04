@@ -14,7 +14,7 @@ const buildRequestUser = (user) => ({
 
 export const authenticate = async (req, res, next) => {
   try {
-    // Áp dụng cho UC-24/25/26/27: bắt buộc người dùng đăng nhập trước khi gọi route bảo vệ.
+    // Áp dụng cho UC-24/25/26/27/44/45/46/88/89/90: bắt buộc đăng nhập trước khi gọi route bảo vệ.
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

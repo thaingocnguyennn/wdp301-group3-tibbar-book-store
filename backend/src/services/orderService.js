@@ -243,6 +243,7 @@ class OrderService {
   }
 
   buildInvoiceHtml(order) {
+    // UC-89: Dựng HTML invoice tĩnh để trình duyệt có thể tải hoặc in trực tiếp.
     // Sinh HTML tĩnh để trình duyệt có thể tải hoặc in trực tiếp.
     const rowsHtml = order.items
       .map((item) => {
@@ -1153,12 +1154,14 @@ class OrderService {
   }
 
   async reorderOrder(orderId, userId, options = {}) {
+    // UC-88: Tạo đơn mới từ đơn cũ (order again) với kiểm tra tồn kho và tính hợp lệ thanh toán.
     const {
       paymentMethod = null,
       notes = "",
       ipAddress = "127.0.0.1",
     } = options;
 
+    // B1: Lấy đơn cũ và xác thực quyền sở hữu của người dùng.
     const previousOrder = await Order.findById(orderId).lean();
     if (!previousOrder) {
       throw ApiError.notFound("Order not found");
@@ -1173,6 +1176,7 @@ class OrderService {
       throw ApiError.notFound("User not found");
     }
 
+    // B2: Lấy danh sách sách hiện còn tồn tại từ các item của đơn cũ.
     const requestedBookIds = previousOrder.items
       .map((item) => item.book?.toString())
       .filter(Boolean);
@@ -1231,6 +1235,7 @@ class OrderService {
       );
     }
 
+    // B3: Validate từng item (còn sách, đủ tồn kho), đồng thời dựng orderItems mới.
     const validationErrors = [];
     const orderItems = [];
 
@@ -1270,6 +1275,7 @@ class OrderService {
       });
     }
 
+    // B4: Tính tổng tiền đơn mới và chống tạo đơn trùng trong khoảng thời gian ngắn.
     const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
     const shippingFee =
       orderKind === ORDER_KINDS.DIGITAL
@@ -1294,6 +1300,7 @@ class OrderService {
     let paymentResult = null;
 
     try {
+      // B5: Reserve tồn kho (đơn physical), tạo payment và tạo order mới.
       if (orderKind === ORDER_KINDS.PHYSICAL) {
         stockReservations = await this.reserveStockForOrderItems(orderItems);
       }
@@ -1329,6 +1336,7 @@ class OrderService {
         payment: paymentResult,
       };
     } catch (error) {
+      // Nếu lỗi ở bất kỳ bước nào, rollback để tránh lệch tồn kho/dữ liệu đơn.
       await this.rollbackOrderCreation({
         order,
         userId,
@@ -1339,6 +1347,7 @@ class OrderService {
   }
 
   async getInvoiceHtml(orderId, userId) {
+    // UC-89: Sinh nội dung hóa đơn HTML cho đơn đã giao để download/print.
     const order = await Order.findById(orderId)
       .populate("user", "email firstName lastName")
       .lean();
@@ -1366,6 +1375,7 @@ class OrderService {
   }
 
   async submitReturnRefundRequest(orderId, userId, payload = {}) {
+    // UC-90: Ghi nhận yêu cầu trả hàng/hoàn tiền của khách hàng trong thời hạn cho phép.
     const { type = "REFUND", reason = "", details = "" } = payload;
     const normalizedType = String(type || "")
       .trim()
@@ -1412,6 +1422,7 @@ class OrderService {
       );
     }
 
+    // Lưu snapshot yêu cầu để admin xử lý ở luồng duyệt sau đó.
     order.returnRequest = {
       // Trạng thái khởi tạo luôn là PENDING, chờ admin xử lý.
       type: normalizedType,
@@ -1589,6 +1600,7 @@ class OrderService {
 
   // Cancel order (user can cancel only if order is PENDING)
   async cancelOrder(orderId, userId) {
+    // UC-46: Hủy đơn pending, kiểm tra quyền sở hữu và hoàn kho nếu là sách vật lý.
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -1608,11 +1620,13 @@ class OrderService {
       throw ApiError.badRequest("Paid e-book orders cannot be cancelled");
     }
 
+    // Chuyển trạng thái đơn sang CANCELLED trước khi xử lý hoàn kho.
     order.orderStatus = "CANCELLED";
     order.orderKind = orderKind;
     await order.save();
 
     if (orderKind === ORDER_KINDS.PHYSICAL) {
+      // Hoàn lại số lượng tồn kho cho từng item của đơn physical đã hủy.
       for (const item of order.items) {
         await Book.findByIdAndUpdate(item.book, {
           $inc: { stock: item.quantity },

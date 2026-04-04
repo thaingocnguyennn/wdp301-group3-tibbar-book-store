@@ -95,6 +95,7 @@ const orderSchema = new mongoose.Schema(
 
     // Order status
     orderStatus: {
+      // UC-46: Quy tắc hủy đơn phụ thuộc vào trạng thái này (chỉ hủy khi PENDING).
       type: String,
       enum: [
         "PENDING",
@@ -155,12 +156,14 @@ const orderSchema = new mongoose.Schema(
 
     // Notes
     notes: {
+      // UC-88: Ghi chú có thể được mang sang đơn mới khi đặt lại đơn (order again).
       type: String,
       default: "",
     },
 
     // Customer return / refund request
     returnRequest: {
+      // UC-90: Snapshot yêu cầu trả hàng/hoàn tiền do khách hàng gửi.
       type: {
         type: String,
         enum: ["RETURN", "REFUND"],
