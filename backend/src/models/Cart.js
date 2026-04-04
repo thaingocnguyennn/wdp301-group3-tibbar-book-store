@@ -24,6 +24,7 @@ const cartSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    // UC-27: Dữ liệu giỏ hàng được lưu dạng mảng item { book, quantity } theo từng user.
     items: [cartItemSchema],
   },
   {

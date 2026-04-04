@@ -137,6 +137,7 @@ function AppContent() {
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
+        {/* UC-27: Trang chi tiết sách hiển thị nút Add to Cart cho người dùng. */}
         <Route path="/books/:id" element={<BookDetailPage />} />
         <Route
           path="/books/:id/read"
@@ -305,6 +306,7 @@ function AppContent() {
           }
         />
 
+        {/* UC-25 + UC-26: Route màn hình admin quản lý/sửa slider và bật tắt hiển thị slider. */}
         <Route
           path="/admin/sliders"
           element={

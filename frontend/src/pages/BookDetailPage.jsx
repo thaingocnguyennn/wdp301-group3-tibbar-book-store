@@ -283,8 +283,12 @@ const BookDetailPage = () => {
     );
   };
 
+  // UC-27 (Book Detail):
+  // Đây là logic xử lý chính của nút Add to Cart trên màn hình chi tiết sách.
+  // Luồng: kiểm tra đăng nhập -> gọi hook add() -> hiển thị thông báo thành công/thất bại.
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
+      // Chưa đăng nhập: hiển thị notice yêu cầu login, không gọi API add cart.
       setCartNotice({
         tone: "info",
         title: "Login Required",
@@ -298,10 +302,13 @@ const BookDetailPage = () => {
     }
 
     try {
+      // Gọi context/hook cart để đẩy sách hiện tại vào giỏ với số lượng mặc định = 1.
       await add(book._id, 1);
       if (cartNoticeTimerRef.current) {
+        // Nếu đang có timer cũ thì hủy để tránh chồng thông báo.
         window.clearTimeout(cartNoticeTimerRef.current);
       }
+      // Hiển thị thông báo thành công và cho phép đi nhanh đến trang cart.
       setCartNotice({
         tone: "success",
         title: isDigitalBook ? "E-Book Added to Cart" : "Added to Cart",
@@ -313,10 +320,12 @@ const BookDetailPage = () => {
       });
 
       cartNoticeTimerRef.current = window.setTimeout(() => {
+        // Tự đóng notice sau 3.5 giây để UI gọn gàng.
         setCartNotice(null);
         cartNoticeTimerRef.current = null;
       }, 3500);
     } catch (err) {
+      // Nếu backend trả lỗi (hết hàng/quy tắc giỏ hàng...), hiển thị message lỗi cho user.
       setCartNotice({
         tone: "error",
         title: "Unable to Add Item",
@@ -730,6 +739,7 @@ const BookDetailPage = () => {
             <div style={styles.divider}></div>
 
             <div style={styles.actions}>
+              {/* UC-27: Nút chức năng hiển thị trực tiếp trên trang BookDetailPage (khối actions). */}
               <button
                 disabled={!canPurchaseBook}
                 onClick={handleAddToCart}

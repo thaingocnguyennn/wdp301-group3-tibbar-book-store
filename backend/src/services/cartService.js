@@ -31,29 +31,37 @@ class CartService {
   }
 
   async addToCart(userId, bookId, quantity = 1) {
+    // UC-27: Logic thật sự của Add to Cart nằm ở service này.
+    // Kiểm tra sách tồn tại, kiểm tra tồn kho, rồi cập nhật giỏ hàng của user.
+    // B1: Tìm sách theo bookId.
     const book = await Book.findById(bookId);
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
 
+    // B2: Sách giấy phải kiểm tra tồn kho trước khi thêm.
     if (!book.isEbook && book.stock < quantity) {
       throw ApiError.badRequest("Not enough stock");
     }
 
+    // B3: Lấy giỏ hàng hiện tại; nếu chưa có thì tạo mới.
     let cart = await Cart.findOne({ user: userId });
     if (!cart) {
       cart = await Cart.create({ user: userId, items: [] });
     }
 
     await cart.populate("items.book");
+    // Không cho trộn ebook và sách giấy trong cùng một giỏ.
     this.ensureCartKindCompatibility(cart.items, book);
 
+    // B4: Kiểm tra sách đã tồn tại trong giỏ chưa.
     const existingItem = cart.items.find(
       (item) =>
         item.book?._id?.toString?.() === bookId ||
         item.book?.toString?.() === bookId,
     );
 
+    // B5a: Luồng ebook - luôn giữ quantity = 1.
     if (book.isEbook) {
       if (existingItem) {
         existingItem.quantity = 1;
@@ -61,20 +69,24 @@ class CartService {
         cart.items.push({ book: bookId, quantity: 1 });
       }
 
+      // Lưu và populate lại để trả về dữ liệu đầy đủ cho frontend.
       await cart.save();
       await cart.populate("items.book");
 
       return cart;
     }
 
+    // B5b: Luồng sách giấy - cộng dồn số lượng với item cũ (nếu có).
     const newQuantity = existingItem
       ? existingItem.quantity + quantity
       : quantity;
 
+    // B6: Chặn trường hợp số lượng mới vượt tồn kho.
     if (newQuantity > book.stock) {
       throw ApiError.badRequest("Not enough stock");
     }
 
+    // B7: Cập nhật item hiện có hoặc thêm item mới.
     if (existingItem) {
       existingItem.quantity = newQuantity;
     } else {

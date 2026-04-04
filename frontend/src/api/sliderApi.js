@@ -13,25 +13,35 @@ export const sliderApi = {
   },
 
   getAllSlidersAdmin: async () => {
+    // API cho trang admin: lấy toàn bộ slider để hiển thị danh sách quản trị.
     const response = await axiosInstance.get("/admin/sliders");
     return response.data;
   },
 
   createSlider: async (formData) => {
+    // Tạo slider mới, dùng multipart/form-data để gửi ảnh.
     const response = await axiosInstance.post("/admin/sliders", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
 
+  // UC-25: API sửa slider.
+  // Frontend gọi từ màn hình SlidersManagement để cập nhật ảnh/thuộc tính slider hiện có.
+  // Endpoint thực tế: PUT /api/admin/sliders/:id
   updateSlider: async (id, formData) => {
+    // id: slider cần sửa; formData: dữ liệu mới (có thể có ảnh mới).
     const response = await axiosInstance.put(`/admin/sliders/${id}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
 
+  // UC-26: API đổi trạng thái hiển thị slider.
+  // Dùng cho thao tác Hide/Show của admin ngay trên danh sách slider.
+  // Endpoint thực tế: PATCH /api/admin/sliders/:id/visibility
   updateVisibility: async (id, visibility) => {
+    // Chỉ gửi trường visibility, backend sẽ cập nhật riêng field này.
     const response = await axiosInstance.patch(
       `/admin/sliders/${id}/visibility`,
       {
