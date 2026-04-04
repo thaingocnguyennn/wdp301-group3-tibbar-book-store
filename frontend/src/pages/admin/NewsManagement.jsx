@@ -13,22 +13,23 @@ const NewsManagement = () => {
     content: "",
   });
 
-  //api goi toi backend
+  //ham lay url server tu bien moi truong va loai bo /api neu co
   const serverBaseUrl = useMemo(() => {
     const api = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
     return api.replace(/\/api\/?$/, "");
   }, []);
 
-  //load du lieu
+  //load du lieu goi ham fetchnews khi component duoc render lan dau tien
   useEffect(() => {
     fetchNews();
   }, []);
 
-  //ham load du lieu
+  //ham lay danh sach news tu backend
   const fetchNews = async () => {
     try {
       //goi ham getallnewsadmin de lay danh sach news
       const response = await newsApi.getAllNewsAdmin();
+      //luu danh sach news vao state
       setNewsList(response.data.news || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load news");
@@ -55,6 +56,7 @@ const NewsManagement = () => {
     payload.append("title", formData.title);
     payload.append("content", formData.content);
 
+    //neu co file anh duoc upload thi them vao payload
     if (selectedFile) {
       payload.append("image", selectedFile);
     }
@@ -62,6 +64,7 @@ const NewsManagement = () => {
     try {
       //neu edit thi goi ham update
       if (editingNews) {
+        //goi ham update va truyen id va payload vao
         await newsApi.updateNews(editingNews._id, payload);
         setMessage("News updated successfully");
         //nguoc lai thi goi ham create
