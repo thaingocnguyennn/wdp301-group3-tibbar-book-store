@@ -8,14 +8,20 @@ import {
 
 const router = express.Router();
 
-// Low stock alert (admin dùng)
+// UC-124: Low Stock Alert
+// API public để lấy danh sách sách low-stock theo threshold.
+// Middleware: KHÔNG yêu cầu login/admin, KHÔNG upload file.
 router.get('/low-stock', getLowStockBooks);
 
-// Back stock alert (customer đăng ký + lấy danh sách ready)
+// UC-125: Back Stock Alert
+// API đăng ký email nhận thông báo + kiểm tra danh sách đã có hàng lại.
+// Middleware: KHÔNG yêu cầu login/admin, KHÔNG upload file.
 router.post('/back-stock/subscribe', subscribeBackStockAlert);
 router.get('/back-stock/ready', getReadyBackStockAlerts);
 
-// Compare books
+// UC-127: Compare Book
+// API lấy dữ liệu nhiều sách để frontend render bảng so sánh.
+// Middleware: KHÔNG yêu cầu login/admin, KHÔNG upload file.
 router.get('/compare', compareBooks);
 
 export default router;

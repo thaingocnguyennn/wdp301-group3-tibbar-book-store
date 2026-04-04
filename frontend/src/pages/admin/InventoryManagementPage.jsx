@@ -48,10 +48,12 @@ export default function InventoryManagementPage() {
     loadData(1, q.trim());
   };
 
+  // UC-124 (Admin): đếm số đầu sách sắp hết hàng theo ngưỡng <= 5 để cảnh báo trên dashboard.
   const lowStockCount = rows.filter((item) => Number(item.stock || 0) > 0 && Number(item.stock || 0) <= 5).length;
   const outOfStockCount = rows.filter((item) => Number(item.stock || 0) <= 0).length;
 
   const getStockBadge = (stock) => {
+    // UC-124: Chuẩn hóa trạng thái tồn kho để hiển thị badge cảnh báo rõ ràng.
     if (stock <= 0) {
       return { text: "Out of stock", style: styles.stockBadgeOut };
     }

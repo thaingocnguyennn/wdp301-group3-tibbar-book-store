@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
-// Lưu email đăng ký nhận thông báo khi sách có hàng lại
+// UC-125: Lưu đăng ký nhận thông báo khi sách có hàng lại.
+// Dữ liệu chính: book + email + trạng thái active + thời điểm đã thông báo.
 const backStockSubscriptionSchema = new mongoose.Schema(
   {
     book: {
@@ -28,7 +29,7 @@ const backStockSubscriptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// 1 email chỉ đăng ký 1 lần cho 1 sách
+// UC-125: 1 email chỉ đăng ký 1 lần cho 1 sách để tránh spam/trùng dữ liệu.
 backStockSubscriptionSchema.index({ book: 1, email: 1 }, { unique: true });
 
 const BackStockSubscription = mongoose.model('BackStockSubscription', backStockSubscriptionSchema);

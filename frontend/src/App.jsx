@@ -137,7 +137,7 @@ function AppContent() {
         {/* Public Routes - No authentication required */}
         <Route path="/" element={<RoleBasedHome />} />
         <Route path="/newest" element={<NewestPage />} />
-        {/* UC-27: Trang chi tiết sách hiển thị nút Add to Cart cho người dùng. */}
+        {/* UC-27 + UC-124 + UC-125 + UC-127: Book Detail (add cart, stock alert, back-stock, compare). */}
         <Route path="/books/:id" element={<BookDetailPage />} />
         <Route
           path="/books/:id/read"
@@ -397,6 +397,7 @@ function AppContent() {
           path="/admin/inventory"
           element={
             <ProtectedRoute adminOnly>
+              {/* UC-124: Màn hình admin theo dõi cảnh báo low stock/out of stock. */}
               <InventoryManagementPage />
             </ProtectedRoute>
           }

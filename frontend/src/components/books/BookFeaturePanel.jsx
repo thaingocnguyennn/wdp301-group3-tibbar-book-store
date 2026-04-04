@@ -8,6 +8,11 @@ export default function BookFeaturePanel({
   showStockAlert = true,
   showBackStock = true,
 }) {
+  // UC-124 + UC-125 + UC-127 (components/books):
+  // Component này render 3 chức năng tại Book Detail:
+  // - UC-124: Cảnh báo sắp hết hàng/hết hàng.
+  // - UC-125: Form đăng ký báo có hàng qua email.
+  // - UC-127: Thêm/bỏ sách vào danh sách so sánh và render bảng so sánh.
   const threshold = 5;
   const stock = Number(book?.stock || 0);
   const isEbook = Boolean(book?.isEbook);
@@ -22,6 +27,7 @@ export default function BookFeaturePanel({
 
   const readCompareIds = () => {
     try {
+      // Đọc compare IDs từ localStorage, chỉ giữ ObjectId hợp lệ.
       const raw = JSON.parse(localStorage.getItem("compareBookIds") || "[]");
       return Array.isArray(raw) ? raw.filter((id) => /^[a-f\d]{24}$/i.test(String(id))) : [];
     } catch {
@@ -35,10 +41,12 @@ export default function BookFeaturePanel({
   const isInCompare = useMemo(() => compareIds.includes(currentId), [compareIds, currentId]);
 
   useEffect(() => {
+    // Đồng bộ compareIds ra localStorage để giữ trạng thái sau refresh.
     localStorage.setItem("compareBookIds", JSON.stringify(compareIds));
   }, [compareIds]);
 
   useEffect(() => {
+    // Lắng nghe thay đổi compare từ tab khác hoặc từ BookDetailPage (custom event).
     const syncCompare = () => setCompareIds(readCompareIds());
     window.addEventListener("storage", syncCompare);
     window.addEventListener("compare-updated", syncCompare);
@@ -51,11 +59,13 @@ export default function BookFeaturePanel({
   useEffect(() => {
     const loadCompare = async () => {
       setCompareError("");
+      // UC-127: Cần ít nhất 2 sách mới hiển thị bảng so sánh.
       if (compareIds.length < 2) {
         setCompareData([]);
         return;
       }
 
+      // Gọi API so sánh sách theo danh sách compareIds.
       const res = await compareBooksApi(compareIds);
       const payload = Array.isArray(res?.data?.data)
         ? res.data.data
@@ -77,15 +87,20 @@ export default function BookFeaturePanel({
   const onToggleCompare = () => {
     if (!currentId) return;
     setCompareIds((prev) => {
+      // UC-127: Nếu đã có thì bỏ khỏi danh sách so sánh.
       if (prev.includes(currentId)) return prev.filter((id) => id !== currentId);
+      // Giới hạn tối đa 4 sách để tránh bảng quá rộng/khó đọc.
       if (prev.length >= 4) return prev;
+      // Thêm sách hiện tại vào danh sách so sánh.
       return [...prev, currentId];
     });
   };
 
   const onSubscribe = async () => {
     try {
+      // UC-125: Reset thông báo cũ trước khi gửi đăng ký mới.
       setMsg("");
+      // Gọi API đăng ký back-stock alert theo bookId + email.
       const res = await subscribeBackStockAlertApi({ bookId: currentId, email });
       setMsg(res?.data?.message || res?.message || "Đăng ký thành công");
     } catch (error) {
@@ -103,6 +118,7 @@ export default function BookFeaturePanel({
         backgroundColor: "#f8fafc",
       }}
     >
+      {/* UC-124: Hiển thị cảnh báo tồn kho cho sách giấy (không áp dụng ebook). */}
       {!isEbook && showStockAlert && (isLowStock || isOutOfStock) && (
         <div
           style={{
@@ -115,6 +131,7 @@ export default function BookFeaturePanel({
         </div>
       )}
 
+      {/* UC-127: Nút thêm/bỏ sách khỏi danh sách so sánh. */}
       {showToggle && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button
@@ -137,6 +154,7 @@ export default function BookFeaturePanel({
         </div>
       )}
 
+      {/* UC-125: Chỉ hiển thị form đăng ký khi sách giấy đang hết hàng. */}
       {!isEbook && showBackStock && isOutOfStock && (
         <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
           <input
@@ -178,6 +196,7 @@ export default function BookFeaturePanel({
         </div>
       )}
 
+      {/* UC-127: Bảng so sánh các tiêu chí chính (author/price/rating/stock). */}
       {compareData.length >= 2 && (
         <div style={{ marginTop: 12, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", borderRadius: 8 }}>
