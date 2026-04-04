@@ -28,6 +28,7 @@ const ProfilePage = () => {
   const [profileUser, setProfileUser] = useState(null);
 
   // Coin system states
+  //khởi tạo trạng thái cho hệ thống coin, lịch sử giao dịch, trạng thái check-in và thông báo check-in
   const [coinStatus, setCoinStatus] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [checkInLoading, setCheckInLoading] = useState(false);
@@ -36,7 +37,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     fetchProfile();
-    fetchCoinStatus();
+    fetchCoinStatus(); //hàm để lấy trạng thái coin của người dùng khi trang được tải
   }, []);
 
   const fetchProfile = async () => {
@@ -54,31 +55,42 @@ const ProfilePage = () => {
     }
   };
 
+  // hàm để lấy trạng thái coin của người dùng
   const fetchCoinStatus = async () => {
     try {
+      // gọi API để lấy trạng thái coin của người dùng
       const response = await coinApi.getCoinStatus();
+      // cập nhật trạng thái coin vào state
       setCoinStatus(response.data);
     } catch (err) {
       console.error('Failed to load coin status:', err);
     }
   };
 
+  // hàm để lấy lịch sử giao dịch coin của người dùng
   const fetchTransactionHistory = async () => {
     try {
+      // gọi API để lấy lịch sử giao dịch coin của người dùng (ví dụ: trang 1, 10 giao dịch mỗi trang)
       const response = await coinApi.getTransactionHistory(1, 10);
+      // cập nhật lịch sử giao dịch vào state
       setTransactions(response.data.transactions);
     } catch (err) {
       console.error('Failed to load transaction history:', err);
     }
   };
 
+  // hàm để xử lý khi người dùng thực hiện check-in hàng ngày để nhận coin
   const handleCheckIn = async () => {
     setCheckInLoading(true);
     setCheckInMessage('');
     try {
+      // gọi API để thực hiện check-in và nhận coin
       const response = await coinApi.checkIn();
+      // cập nhật thông báo check-in thành công cùng với số coin thưởng nhận được
       setCheckInMessage(`🎉 ${response.message} You received ${response.data.reward} coins!`);
+      // sau khi check-in thành công, cập nhật lại trạng thái coin và lịch sử giao dịch để hiển thị thông tin mới nhất
       await fetchCoinStatus();
+      // tùy chọn: tự động hiển thị lịch sử giao dịch sau khi check-in thành công
       await fetchTransactionHistory();
       setTimeout(() => setCheckInMessage(''), 3000);
     } catch (err) {
@@ -88,13 +100,16 @@ const ProfilePage = () => {
     }
   };
 
+  // hàm để xử lý khi người dùng nhấn nút xem/ẩn lịch sử giao dịch coin
   const toggleTransactions = async () => {
+    // nếu lịch sử giao dịch chưa được tải, gọi API để lấy dữ liệu trước khi hiển thị
     if (!showTransactions) {
       await fetchTransactionHistory();
     }
     setShowTransactions(!showTransactions);
   };
 
+  // hàm để xử lý khi người dùng thay đổi thông tin trong form chỉnh sửa profile
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -103,6 +118,7 @@ const ProfilePage = () => {
     });
   };
 
+  // hàm để xử lý khi người dùng submit form chỉnh sửa profile
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -110,6 +126,7 @@ const ProfilePage = () => {
     setLoading(true);
 
     try {
+      // gọi API để cập nhật thông tin profile của người dùng với dữ liệu từ form
       await userApi.updateProfile(formData);
       await fetchProfile();
       setMessage('Profile updated successfully!');
@@ -121,12 +138,14 @@ const ProfilePage = () => {
     }
   };
 
+  // hàm để xử lý khi người dùng nhấn nút chỉnh sửa profile, đặt lại thông báo và lỗi, và chuyển sang chế độ chỉnh sửa
   const handleEditClick = () => {
     setMessage('');
     setError('');
     setIsEditing(true);
   };
 
+  // hàm để xử lý khi người dùng nhấn nút hủy chỉnh sửa, đặt lại dữ liệu form về giá trị hiện tại của profile, đặt lại thông báo và lỗi, và thoát chế độ chỉnh sửa
   const handleCancel = () => {
     if (profileUser) {
       setFormData({

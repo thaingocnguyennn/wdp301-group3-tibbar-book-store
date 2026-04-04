@@ -11,27 +11,31 @@ class CoinService {
   /**
    * Check if user can check in today
    */
+  //hàm kiểm tra xem người dùng đã thực hiện check-in hôm nay chưa, dựa trên thông tin lastCheckIn trong cơ sở dữ liệu
   canCheckInToday(lastCheckIn) {
+    // Nếu lastCheckIn chưa có, nghĩa là chưa từng check-in, nên có thể check-in được
     if (!lastCheckIn) return true;
 
+    // So sánh ngày hiện tại với ngày của lastCheckIn để xác định xem đã check-in hôm nay chưa
     const now = new Date();
+    // Chuyển lastCheckIn thành đối tượng Date nếu nó là chuỗi
     const lastCheckInDate = new Date(lastCheckIn);
 
-    // Set both dates to start of day for comparison
+    // Tạo đối tượng Date chỉ chứa phần ngày (không có giờ, phút, giây) để so sánh
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Tạo đối tượng Date chỉ chứa phần ngày của lastCheckIn
     const lastCheckInStart = new Date(
       lastCheckInDate.getFullYear(),
       lastCheckInDate.getMonth(),
       lastCheckInDate.getDate()
     );
 
-    // Can check in if last check-in was before today
+    // Nếu todayStart lớn hơn lastCheckInStart, nghĩa là đã qua ngày mới và có thể check-in được
     return todayStart > lastCheckInStart;
   }
 
-  /**
-   * Calculate if the streak continues or breaks
-   */
+  //hàm tính toán chuỗi check-in liên tiếp của người dùng dựa trên ngày check-in cuối cùng và chuỗi hiện tại
+  // , để xác định phần thưởng coin tương ứng
   calculateStreak(lastCheckIn, currentStreak) {
     if (!lastCheckIn) return 1; // First check-in
 
@@ -59,47 +63,52 @@ class CoinService {
     }
   }
 
-  /**
-   * Calculate coin reward based on streak
-   */
+  //hàm tính toán phần thưởng coin dựa trên chuỗi check-in liên tiếp mới, với phần thưởng cao hơn khi đạt chuỗi 7 ngày
   calculateReward(newStreak) {
+    // Nếu đạt chuỗi 7 ngày, trả về phần thưởng bonus, ngược lại trả về phần thưởng check-in hàng ngày
     if (newStreak === CoinService.STREAK_RESET_DAY) {
+      // Nếu đạt chuỗi 7 ngày, trả về phần thưởng bonus
       return CoinService.STREAK_BONUS_REWARD;
     }
+    // Ngược lại, trả về phần thưởng check-in hàng ngày
     return CoinService.DAILY_CHECKIN_REWARD;
   }
 
-  /**
-   * Perform daily check-in
-   */
+  //hàm xử lý khi người dùng thực hiện check-in hàng ngày để kiếm coin,
+  //  bao gồm kiểm tra điều kiện check-in, tính toán phần thưởng dựa trên chuỗi check-in liên tiếp,
+  //  cập nhật số dư coin và tạo bản ghi giao dịch
   async dailyCheckIn(userId) {
+    // Lấy user từ cơ sở dữ liệu để kiểm tra và cập nhật thông tin check-in
     const user = await User.findById(userId);
+    // Nếu không tìm thấy user, trả về lỗi
     if (!user) {
       throw ApiError.notFound('User not found');
     }
 
-    // Check if user already checked in today
+    // Kiểm tra xem user đã check-in hôm nay chưa, nếu rồi thì trả về lỗi
     if (!this.canCheckInToday(user.lastCheckIn)) {
       throw ApiError.badRequest('You have already checked in today. Come back tomorrow!');
     }
 
-    // Calculate new streak
+    // Tính toán chuỗi check-in liên tiếp mới dựa trên ngày check-in cuối cùng và chuỗi hiện tại của user
     const newStreak = this.calculateStreak(user.lastCheckIn, user.checkInStreak);
 
-    // Calculate reward
+    // Tính toán phần thưởng coin dựa trên chuỗi check-in liên tiếp mới
     const reward = this.calculateReward(newStreak);
 
-    // Update user
+    // Cập nhật số dư coin, ngày check-in cuối cùng và chuỗi check-in liên tiếp của user trong cơ sở dữ liệu
     user.coinBalance += reward;
     user.lastCheckIn = new Date();
     user.checkInStreak = newStreak;
     await user.save();
 
-    // Create transaction record
+    // Tạo bản ghi giao dịch coin cho hoạt động check-in này, 
+    // bao gồm loại giao dịch, số lượng coin, mô tả và số dư sau giao dịch
     const description = newStreak === CoinService.STREAK_RESET_DAY
       ? `Daily check-in bonus (7-day streak completed!)`
       : `Daily check-in bonus (Day ${newStreak})`;
 
+      // Tạo bản ghi giao dịch coin cho hoạt động check-in này
     await CoinTransaction.create({
       userId: user._id,
       type: 'CHECKIN',
@@ -108,6 +117,8 @@ class CoinService {
       balanceAfter: user.coinBalance
     });
 
+    // Trả về kết quả bao gồm phần thưởng nhận được, số dư coin mới, 
+    // chuỗi check-in hiện tại, và ngày có thể check-in tiếp theo
     return {
       reward,
       newBalance: user.coinBalance,
@@ -116,9 +127,7 @@ class CoinService {
     };
   }
 
-  /**
-   * Get next available check-in date
-   */
+  //hàm tính toán ngày có thể check-in tiếp theo, thường là ngày hôm sau vào lúc 00:00:00
   getNextCheckInDate() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -126,15 +135,17 @@ class CoinService {
     return tomorrow;
   }
 
-  /**
-   * Deduct coins from user (used during order checkout)
-   */
+  //hàm xử lý khi admin muốn trừ coin từ tài khoản của một người dùng, yêu cầu cung cấp user ID, 
+  // số lượng coin cần trừ, order ID liên quan (nếu có), và mô tả lý do
   async deductCoins(userId, amount, orderId, description) {
+    // Lấy user từ cơ sở dữ liệu để kiểm tra và cập nhật số dư coin
     const user = await User.findById(userId);
+    // Nếu không tìm thấy user, trả về lỗi
     if (!user) {
       throw ApiError.notFound('User not found');
     }
 
+    // Kiểm tra nếu số dư coin của user không đủ để trừ, trả về lỗi
     if (user.coinBalance < amount) {
       throw ApiError.badRequest('Insufficient coin balance');
     }
@@ -142,6 +153,8 @@ class CoinService {
     user.coinBalance -= amount;
     await user.save();
 
+    // Tạo bản ghi giao dịch coin cho hoạt động trừ coin này, bao gồm loại giao dịch, 
+    // số lượng coin, mô tả, order ID liên quan (nếu có), và số dư sau giao dịch
     await CoinTransaction.create({
       userId: user._id,
       type: 'ORDER_DISCOUNT',
@@ -154,35 +167,12 @@ class CoinService {
     return user.coinBalance;
   }
 
-  /**
-   * Add coins to user (admin adjustment or refund)
-   */
-  async addCoins(userId, amount, description, type = 'ADMIN_ADJUST') {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw ApiError.notFound('User not found');
-    }
-
-    user.coinBalance += amount;
-    await user.save();
-
-    await CoinTransaction.create({
-      userId: user._id,
-      type,
-      amount,
-      description,
-      balanceAfter: user.coinBalance
-    });
-
-    return user.coinBalance;
-  }
-
-  /**
-   * Get user's coin transaction history
-   */
+  //hàm lấy lịch sử giao dịch coin của người dùng với phân trang và lọc theo loại giao dịch
+  // trả về kết quả đã được phân trang
   async getTransactionHistory(userId, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
+    // Truy vấn đồng thời để lấy danh sách giao dịch đã phân trang và tổng số giao dịch để tính toán phân trang
     const [transactions, total] = await Promise.all([
       CoinTransaction.find({ userId })
         .populate('orderId', 'orderNumber')
@@ -193,6 +183,7 @@ class CoinService {
       CoinTransaction.countDocuments({ userId })
     ]);
 
+    // Trả về kết quả bao gồm danh sách giao dịch đã phân trang và thông tin phân trang
     return {
       transactions,
       pagination: {
@@ -204,17 +195,20 @@ class CoinService {
     };
   }
 
-  /**
-   * Get user's coin balance and check-in status
-   */
+  //hàm lấy coin status của người dùng
   async getCoinStatus(userId) {
+    // Lấy user từ cơ sở dữ liệu để lấy thông tin trạng thái coin
     const user = await User.findById(userId).select('coinBalance lastCheckIn checkInStreak');
+    // Nếu không tìm thấy user, trả về lỗi
     if (!user) {
       throw ApiError.notFound('User not found');
     }
 
+    // Tính toán xem user có thể check-in hôm nay hay không dựa trên thông tin lastCheckIn
     const canCheckIn = this.canCheckInToday(user.lastCheckIn);
 
+    // Trả về kết quả bao gồm số dư coin, trạng thái check-in hôm nay, 
+    // chuỗi check-in hiện tại, và ngày có thể check-in tiếp theo
     return {
       coinBalance: user.coinBalance,
       lastCheckIn: user.lastCheckIn,
@@ -224,9 +218,8 @@ class CoinService {
     };
   }
 
-  /**
-   * Calculate maximum coins that can be used for an order
-   */
+  //hàm tính toán số coin tối đa có thể sử dụng cho một đơn hàng 
+  // dựa trên số dư coin của người dùng và tổng giá trị đơn hàng
   calculateMaxCoinsUsable(userCoinBalance, orderTotal) {
     return Math.min(userCoinBalance, orderTotal);
   }

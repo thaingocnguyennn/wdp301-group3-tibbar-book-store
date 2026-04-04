@@ -206,15 +206,6 @@ class OrderService {
         await Order.findByIdAndDelete(order._id);
       }
 
-      if (coinsDeducted > 0 && userId) {
-        await coinService.addCoins(
-          userId,
-          coinsDeducted,
-          `Rollback coin deduction for failed order flow`,
-          "ADMIN_ADJUST",
-        );
-      }
-
       if (stockReservations.length > 0) {
         await this.restoreStockReservations(stockReservations);
       }

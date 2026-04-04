@@ -10,12 +10,8 @@ const router = express.Router();
 router.use(authenticate);
 
 // User routes
-router.post('/check-in', coinController.checkIn);
-router.get('/status', coinController.getCoinStatus);
-router.get('/transactions', coinController.getTransactionHistory);
-
-// Admin routes
-router.post('/admin/add', authorize(ROLES.ADMIN), coinController.adminAddCoins);
-router.post('/admin/deduct', authorize(ROLES.ADMIN), coinController.adminDeductCoins);
+router.post('/check-in', coinController.checkIn); // Daily check-in to earn coins
+router.get('/status', coinController.getCoinStatus); // Get current coin balance and check-in status
+router.get('/transactions', coinController.getTransactionHistory); // Get coin transaction history with pagination and filtering
 
 export default router;
