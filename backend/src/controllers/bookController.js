@@ -10,10 +10,19 @@ const __dirname = path.dirname(__filename);
 const uploadsRoot = path.resolve(__dirname, "../../uploads");
 
 class BookController {
+  // UC-11: Controller xử lý request lấy danh sách sách công khai
+  // Endpoint: GET /api/books (có query params cho filter và pagination)
+  // Luồng xử lý:
+  // 1. Nhận req.query chứa filters (category, author, price range, search, page, limit)
+  // 2. Gọi bookService.getPublicBooks() để xử lý logic nghiệp vụ
+  // 3. Trả về response thành công với data books và pagination
+  // 4. Nếu có lỗi, chuyển cho error handler middleware
   async getPublicBooks(req, res, next) {
     try {
+      // Lấy filters từ query parameters và gọi service
       const result = await bookService.getPublicBooks(req.query);
 
+      // Trả về response thành công với dữ liệu sách và pagination
       return ApiResponse.success(
         res,
         HTTP_STATUS.OK,
@@ -21,6 +30,7 @@ class BookController {
         result,
       );
     } catch (error) {
+      // Chuyển lỗi cho middleware error handler
       next(error);
     }
   }
@@ -53,31 +63,55 @@ class BookController {
       next(error);
     }
   }
+  // UC-15: Controller xử lý request lấy chi tiết sách
+  // Endpoint: GET /api/books/:id
+  // Luồng xử lý:
+  // 1. Nhận book ID từ URL params
+  // 2. Gọi bookService.getBookById() để lấy thông tin sách
+  // 3. Nếu user đã đăng nhập, thêm sách vào recently viewed
+  // 4. Trả về response thành công với data book
+  // 5. Nếu có lỗi, chuyển cho error handler middleware
   async getBookById(req, res, next) {
     try {
+      // Lấy thông tin sách từ service theo ID
       const book = await bookService.getBookById(req.params.id);
-      // Lưu recently viewed khi user xem chi tiết
+
+      // Nếu user đã đăng nhập, lưu sách vào recently viewed
       if (req.user) {
         await bookService.addToRecentlyViewed(req.user._id, req.params.id);
       }
 
+      // Trả về response thành công với dữ liệu sách
       return ApiResponse.success(res, HTTP_STATUS.OK, MESSAGES.BOOK_FETCHED, {
         book,
       });
     } catch (error) {
+      // Chuyển lỗi cho middleware error handler
       next(error);
     }
   }
 
+  // UC-60: Lấy sách bán chạy nhất cho homepage
+  // Endpoint: GET /books/best-selling?limit=8
+  // Luồng xử lý:
+  // 1. Nhận query parameter limit (mặc định 8)
+  // 2. Gọi bookService.getBestSellingBooks() để lấy dữ liệu từ DB
+  // 3. Trả về response thành công với danh sách sách
+  // 4. Nếu có lỗi, chuyển cho error handler
   async getBestSellingBooks(req, res, next) {
     try {
+      // Lấy limit từ query params, mặc định 8 sách
       const limit = req.query.limit ? parseInt(req.query.limit) : 8;
+
+      // Gọi service để lấy danh sách sách bán chạy
       const books = await bookService.getBestSellingBooks(limit);
 
+      // Trả về response thành công với dữ liệu sách
       return ApiResponse.success(res, HTTP_STATUS.OK, MESSAGES.BOOKS_FETCHED, {
         books,
       });
     } catch (error) {
+      // Chuyển lỗi cho middleware error handler
       next(error);
     }
   }

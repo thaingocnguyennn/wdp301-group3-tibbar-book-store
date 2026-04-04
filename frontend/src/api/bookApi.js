@@ -1,22 +1,44 @@
 import axiosInstance from "./axios.js";
 
 export const bookApi = {
+  // UC-11: API lấy danh sách sách công khai với bộ lọc
+  // Endpoint: GET /api/books
+  // Query params: category, author, minPrice, maxPrice, search, page, limit
+  // Mô tả: Gọi API backend để lấy danh sách sách với các filter criteria và pagination
+  // Trả về: { success: true, message: "...", data: { books: [...], pagination: {...} } }
   getPublicBooks: async (params) => {
+    // Gửi GET request đến endpoint /books với query params chứa filters
     const response = await axiosInstance.get("/books", { params });
+    // Trả về data từ response
     return response.data;
   },
 
+  // UC-13: API lấy sách mới nhất
+  // Endpoint: GET /api/books/newest?limit=10
+  // Mô tả: Gọi API backend để lấy sách được thêm gần đây nhất
+  // Tham số: limit - số lượng sách trả về (mặc định 10)
+  // Trả về: { success: true, message: "...", data: { books: [...] } }
   getNewestBooks: async (limit = 10) => {
+    // Gửi GET request đến endpoint newest với query param limit
     const response = await axiosInstance.get("/books/newest", {
       params: { limit },
     });
+    // Trả về data từ response
     return response.data;
   },
 
+  // UC-60: Lấy sách bán chạy nhất cho homepage
+  // UC-60: API lấy danh sách sách bán chạy nhất
+  // Endpoint: GET /api/books/best-selling?limit=8
+  // Mô tả: Gọi API backend để lấy sách bán chạy nhất cho homepage
+  // Tham số: limit - số lượng sách trả về (mặc định 8)
+  // Trả về: { success: true, message: "...", data: { books: [...] } }
   getBestSellingBooks: async (limit = 8) => {
+    // Gửi GET request đến endpoint best-selling với query param limit
     const response = await axiosInstance.get("/books/best-selling", {
       params: { limit },
     });
+    // Trả về data từ response (đã được xử lý bởi axiosInstance)
     return response.data;
   },
 
@@ -27,8 +49,15 @@ export const bookApi = {
     return response.data;
   },
 
+  // UC-15: API lấy thông tin chi tiết của một cuốn sách
+  // Endpoint: GET /api/books/:id
+  // Mô tả: Gọi API backend để lấy thông tin đầy đủ của một cuốn sách cụ thể
+  // Tham số: id - ID của cuốn sách
+  // Trả về: { success: true, message: "...", data: { book: {...} } }
   getBookById: async (id) => {
+    // Gửi GET request đến endpoint /books/:id để lấy chi tiết sách
     const response = await axiosInstance.get(`/books/${id}`);
+    // Trả về data từ response
     return response.data;
   },
 

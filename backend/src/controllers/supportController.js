@@ -9,6 +9,15 @@ const validateCustomer = (req) => {
   }
 };
 
+// SupportController xử lý REST API cho support chat (customer + admin)
+// UC-120: Admin reply
+// - admin gọi /api/admin/support/conversations/:conversationId/messages
+// - supportService.sendAdminMessage xử lý logic, cập nhật unread counters, lưu db
+// - socket emit cập nhật realtime cho customer và admin
+// UC-121: Support history (chat conversation, message history)
+// - customer gọi /api/support/conversation -> getMyConversation
+// - admin gọi /api/admin/support/conversations/:id/messages -> getAdminConversationMessages
+// UC-123: Ticket status (có ở Support System, không phải Chat inbox)
 class SupportController {
   async getMyConversation(req, res, next) {
     try {

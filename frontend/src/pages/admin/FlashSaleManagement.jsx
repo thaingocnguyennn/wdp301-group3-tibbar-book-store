@@ -2,14 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { bookApi } from "../../api/bookApi";
 import { flashSaleApi } from "../../api/flashSaleApi";
 
+// Số sách bắt buộc trong mỗi chiến dịch flash sale
 const REQUIRED_BOOK_COUNT = 5;
 
+// Hàm tạo danh sách slot trống để trưng bày sách flash sale
 const createEmptySlots = (defaultDiscount = 10) =>
   Array.from({ length: REQUIRED_BOOK_COUNT }, () => ({
     bookId: "",
     discountPercent: defaultDiscount,
   }));
 
+// Định dạng thời gian đếm ngược từ milliseconds thành HH:MM:SS
 const formatCountdown = (remainingMs) => {
   const totalSeconds = Math.max(0, Math.floor(Number(remainingMs || 0) / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -19,11 +22,18 @@ const formatCountdown = (remainingMs) => {
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
 };
 
+// Component: Trang quản lý flash sale cho admin
+// Tính năng: Tạo, cập nhật, xóa chiến dịch flash sale
 const FlashSaleManagement = () => {
+  // State: Danh sách sách (để chọn vào flash sale)
   const [books, setBooks] = useState([]);
+  // State: Chiến dịch flash sale hiện tại
   const [campaign, setCampaign] = useState(null);
+  // State: Thời gian còn lại của chiến dịch (milliseconds)
   const [remainingMs, setRemainingMs] = useState(0);
+  // State: Thời lượng chiến dịch (phút)
   const [durationMinutes, setDurationMinutes] = useState(10);
+  // State: Các cài đặt flash sale từ backend
   const [settings, setSettings] = useState({
     minDiscountPercent: 10,
     maxDiscountPercent: 50,
@@ -31,12 +41,15 @@ const FlashSaleManagement = () => {
     defaultDurationMinutes: 10,
     requiredBookCount: REQUIRED_BOOK_COUNT,
   });
+  // State: Danh sách slot sách flash sale (5 slot)
   const [slots, setSlots] = useState(createEmptySlots(10));
+  // State: Lưu trữ trạng thái loading/saving
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // Tính toán danh sách tùy chọn sách để chọn (value + label)
   const bookOptions = useMemo(() => {
     return books.map((book) => ({
       value: book._id,
@@ -44,10 +57,12 @@ const FlashSaleManagement = () => {
     }));
   }, [books]);
 
+  // Khôi động: Lấy dữ liệu khi tải trang
   useEffect(() => {
     fetchInitialData();
   }, []);
 
+  // Cập nhật bộ đếm ngược thời gian chiến dịch mỗi 1 giây
   useEffect(() => {
     if (!campaign?.endsAt) return undefined;
 
@@ -66,6 +81,7 @@ const FlashSaleManagement = () => {
     return () => clearInterval(intervalId);
   }, [campaign]);
 
+  // Lấy danh sách sách công khai từ backend
   const fetchBooks = async () => {
     const response = await bookApi.getAllBooksAdmin({
       visibility: "public",
@@ -76,6 +92,7 @@ const FlashSaleManagement = () => {
     setBooks(response?.data?.books || []);
   };
 
+  // Lấy thông tin chiến dịch flash sale hiện tại từ backend
   const fetchCurrentCampaign = async () => {
     const response = await flashSaleApi.getCurrentFlashSaleAdmin();
     const currentCampaign = response?.data?.campaign || null;

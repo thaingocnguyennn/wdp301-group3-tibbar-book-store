@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { newsApi } from "../../api/newsApi";
 
+//khoi tao hook de luu du lieu va cap nhat du lieu
 const NewsManagement = () => {
   const [newsList, setNewsList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,18 +13,23 @@ const NewsManagement = () => {
     content: "",
   });
 
+  //ham lay url server tu bien moi truong va loai bo /api neu co
   const serverBaseUrl = useMemo(() => {
     const api = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
     return api.replace(/\/api\/?$/, "");
   }, []);
 
+  //load du lieu goi ham fetchnews khi component duoc render lan dau tien
   useEffect(() => {
     fetchNews();
   }, []);
 
+  //ham lay danh sach news tu backend
   const fetchNews = async () => {
     try {
+      //goi ham getallnewsadmin de lay danh sach news
       const response = await newsApi.getAllNewsAdmin();
+      //luu danh sach news vao state
       setNewsList(response.data.news || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load news");
@@ -32,28 +38,36 @@ const NewsManagement = () => {
     }
   };
 
+  //ham reset form
   const resetForm = () => {
     setFormData({ title: "", content: "" });
     setSelectedFile(null);
     setEditingNews(null);
   };
 
+  //ham submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
+    //goi formdata
     const payload = new FormData();
+    //truyen du lieu
     payload.append("title", formData.title);
     payload.append("content", formData.content);
 
+    //neu co file anh duoc upload thi them vao payload
     if (selectedFile) {
       payload.append("image", selectedFile);
     }
 
     try {
+      //neu edit thi goi ham update
       if (editingNews) {
+        //goi ham update va truyen id va payload vao
         await newsApi.updateNews(editingNews._id, payload);
         setMessage("News updated successfully");
+        //nguoc lai thi goi ham create
       } else {
         await newsApi.createNews(payload);
         setMessage("News created successfully");
@@ -66,6 +80,7 @@ const NewsManagement = () => {
     }
   };
 
+  //ham edit de lay du lieu edit
   const handleEdit = (news) => {
     setEditingNews(news);
     setFormData({
@@ -75,10 +90,13 @@ const NewsManagement = () => {
     setSelectedFile(null);
   };
 
+  //ham delete
   const handleDelete = async (news) => {
+    //neu cancel thi return
     if (!window.confirm("Delete this news article?")) return;
 
     try {
+      //goi ham delete
       await newsApi.deleteNews(news._id);
       setMessage("News deleted");
       fetchNews();

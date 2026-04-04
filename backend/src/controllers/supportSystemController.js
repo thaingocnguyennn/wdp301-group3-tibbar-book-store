@@ -9,6 +9,9 @@ const ensureCustomer = (req) => {
   }
 };
 
+// Support System Controller (Ticket system)
+// UC-122 Ticket system (Customer create ticket, history)
+// UC-123 Ticket status (Admin update status)
 class SupportSystemController {
   async getIssueCatalog(_req, res, next) {
     try {

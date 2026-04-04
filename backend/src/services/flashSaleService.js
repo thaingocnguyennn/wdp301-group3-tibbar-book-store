@@ -4,13 +4,16 @@ import FlashSaleCampaign from "../models/FlashSaleCampaign.js";
 import ApiError from "../utils/ApiError.js";
 import { BOOK_VISIBILITY } from "../config/constants.js";
 
-const MIN_DISCOUNT_PERCENT = 10;
-const MAX_DISCOUNT_PERCENT = 50;
-const MAX_DURATION_MINUTES = 30;
-const DEFAULT_DURATION_MINUTES = 10;
-const MAX_BOOKS_PER_CAMPAIGN = 5;
+// Các hằng số cấu hình cho flash sale
+const MIN_DISCOUNT_PERCENT = 10; // Giảm giá tối thiểu
+const MAX_DISCOUNT_PERCENT = 50; // Giảm giá tối đa
+const MAX_DURATION_MINUTES = 30; // Thời lượng tối đa (phút)
+const DEFAULT_DURATION_MINUTES = 10; // Thời lượng mặc định (phút)
+const MAX_BOOKS_PER_CAMPAIGN = 5; // Số sách tối đa trong một chiến dịch
 
+// Service để xử lý logic liên quan đến flash sale
 class FlashSaleService {
+  // Xác thực và chuẩn hóa thời lượng của chiến dịch flash sale (tính bằng phút)
   normalizeDurationMinutes(value) {
     const normalized = Number(value ?? DEFAULT_DURATION_MINUTES);
 
@@ -27,7 +30,9 @@ class FlashSaleService {
     return normalized;
   }
 
+  // Xác thực và chuẩn hóa danh sách sách tham gia flash sale
   normalizeFlashSaleItems(items) {
+    // Kiểm tra phải có đúng 5 sách
     if (!Array.isArray(items) || items.length !== MAX_BOOKS_PER_CAMPAIGN) {
       throw ApiError.badRequest(`Please select exactly ${MAX_BOOKS_PER_CAMPAIGN} books`);
     }
@@ -35,17 +40,20 @@ class FlashSaleService {
     const seenIds = new Set();
 
     return items.map((item, index) => {
+      // Lấy bookId từ các trường có thể
       const bookId = item?.bookId || item?.book || item?._id;
       if (!bookId || !mongoose.Types.ObjectId.isValid(bookId)) {
         throw ApiError.badRequest(`Invalid book at slot ${index + 1}`);
       }
 
       const normalizedId = String(bookId);
+      // Kiểm tra không được trùng sách
       if (seenIds.has(normalizedId)) {
         throw ApiError.badRequest("Duplicate books are not allowed in flash sale");
       }
       seenIds.add(normalizedId);
 
+      // Xác thực phần trăm giảm giá
       const discountPercent = Number(item?.discountPercent);
       if (!Number.isFinite(discountPercent) || !Number.isInteger(discountPercent)) {
         throw ApiError.badRequest(`Discount at slot ${index + 1} must be an integer`);
@@ -67,6 +75,7 @@ class FlashSaleService {
     });
   }
 
+  // Kiểm tra các sách có tồn tại và là công khai (public)
   async validateBooksExist(items) {
     const bookIds = items.map((item) => item.book);
     const books = await Book.find({
@@ -81,14 +90,17 @@ class FlashSaleService {
     }
   }
 
+  // Lấy chiến dịch flash sale hiện tại (đang hoạt động và trong thời gian)
   async getCurrentCampaign() {
     const now = new Date();
 
+    // Tự động cập nhật trạng thái: vô hiệu hóa những chiến dịch đã hết hạn
     await FlashSaleCampaign.updateMany(
       { isActive: true, endsAt: { $lte: now } },
       { $set: { isActive: false } },
     );
 
+    // Tìm chiến dịch đang hoạt động
     const campaign = await FlashSaleCampaign.findOne({
       isActive: true,
       startsAt: { $lte: now },
@@ -105,17 +117,22 @@ class FlashSaleService {
     return campaign || null;
   }
 
+  // Chuyển đổi dữ liệu chiến dịch từ database thành DTO (Data Transfer Object) cho frontend
   mapCampaignToDto(campaign) {
     if (!campaign) return null;
 
     const now = Date.now();
+    // Tính thời gian còn lại (tính bằng milliseconds)
     const remainingMs = Math.max(0, new Date(campaign.endsAt).getTime() - now);
 
+    // Biến đổi danh sách sách: thêm giá flash sale và các thông tin khác
     const books = (campaign.books || [])
       .filter((item) => item?.book)
       .map((item) => {
         const originalPrice = Number(item.book.price || 0);
+        // Tính số tiền giảm giá
         const discountAmount = Math.round((originalPrice * item.discountPercent) / 100);
+        // Tính giá flash sale (sau giảm)
         const flashSalePrice = Math.max(0, originalPrice - discountAmount);
 
         return {
@@ -140,12 +157,14 @@ class FlashSaleService {
     };
   }
 
+  // Lấy thông tin flash sale đang hoạt động dưới dạng DTO
   async getActiveFlashSale() {
     const campaign = await this.getCurrentCampaign();
     return this.mapCampaignToDto(campaign);
   }
 
-  // Get discount map for current flash sale: { bookId -> discountPercent }
+  // Lấy bản đồ giảm giá của chiến dịch hiện tại: { bookId -> discountPercent }
+  // Dùng để tính giá trên giỏ hàng, checkout, etc.
   async getFlashSaleDiscountMap() {
     const campaign = await this.getCurrentCampaign();
     if (!campaign) return {};
@@ -158,17 +177,24 @@ class FlashSaleService {
     }, {});
   }
 
+  // Tạo mới hoặc cập nhật chiến dịch flash sale
   async upsertCurrentFlashSale(payload, adminId) {
+    // Xác thực danh sách sách
     const items = this.normalizeFlashSaleItems(payload?.books);
+    // Xác thực thời lượng
     const durationMinutes = this.normalizeDurationMinutes(payload?.durationMinutes);
 
+    // Kiểm tra các sách có tồn tại
     await this.validateBooksExist(items);
 
     const startsAt = new Date();
+    // Tính thời điểm kết thúc dựa vào thời lượng
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
 
+    // Vô hiệu hóa tất cả chiến dịch flash sale trước đó đang hoạt động
     await FlashSaleCampaign.updateMany({ isActive: true }, { $set: { isActive: false } });
 
+    // Tạo chiến dịch flash sale mới
     const campaign = await FlashSaleCampaign.create({
       books: items,
       startsAt,
@@ -177,6 +203,7 @@ class FlashSaleService {
       createdBy: adminId || undefined,
     });
 
+    // Lấy lại chiến dịch vừa tạo với đầy đủ thông tin sách
     const populatedCampaign = await FlashSaleCampaign.findById(campaign._id)
       .populate({
         path: "books.book",
@@ -188,6 +215,7 @@ class FlashSaleService {
     return this.mapCampaignToDto(populatedCampaign);
   }
 
+  // Xóa/hủy tất cả chiến dịch flash sale đang hoạt động
   async clearCurrentFlashSale() {
     const result = await FlashSaleCampaign.updateMany(
       { isActive: true },
@@ -197,6 +225,7 @@ class FlashSaleService {
     return result.modifiedCount || 0;
   }
 
+  // Lấy các cài đặt flash sale (dùng cho admin panel)
   getSettings() {
     return {
       minDiscountPercent: MIN_DISCOUNT_PERCENT,

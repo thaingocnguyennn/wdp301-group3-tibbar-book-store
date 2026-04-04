@@ -7,12 +7,12 @@ import { newsUpload } from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(authorize(ROLES.ADMIN));
+router.use(authenticate); // yeu cau xac thuc cho tat ca cac route trong router nay
+router.use(authorize(ROLES.ADMIN)); // yeu cau nguoi dung phai co quyen admin de truy cap cac route trong router nay
 
-router.get("/", adminNewsController.getAllNews);
-router.post("/", newsUpload.single("image"), adminNewsController.createNews);
-router.put("/:id", newsUpload.single("image"), adminNewsController.updateNews);
-router.delete("/:id", adminNewsController.deleteNews);
+router.get("/", adminNewsController.getAllNews); //get all news cho admin
+router.post("/", newsUpload.single("image"), adminNewsController.createNews); //ham tao news moi
+router.put("/:id", newsUpload.single("image"), adminNewsController.updateNews); //ham update news
+router.delete("/:id", adminNewsController.deleteNews); //ham delete news
 
 export default router;

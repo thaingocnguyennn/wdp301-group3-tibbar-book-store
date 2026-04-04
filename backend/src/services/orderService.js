@@ -11,7 +11,7 @@ import coinService from "./coinService.js";
 import { ROLES } from "../config/constants.js";
 import notificationService from "./notificationService.js";
 import flashSaleService from "./flashSaleService.js";
-const MAX_ORDERS = 20;//
+const MAX_ORDERS = 20; //
 const ASSIGNMENT_TIMEOUT = 100000; // 30s
 const RETURN_REQUEST_WINDOW_DAYS = 7;
 const ORDER_KINDS = {
@@ -118,12 +118,17 @@ class OrderService {
       return order.orderKind;
     }
 
-    const itemBooks = Array.isArray(order?.items) ? order.items.map((item) => item.book) : [];
+    const itemBooks = Array.isArray(order?.items)
+      ? order.items.map((item) => item.book)
+      : [];
     const populatedBooks = itemBooks.filter(
       (book) => typeof book === "object" && book !== null && "isEbook" in book,
     );
 
-    if (populatedBooks.length === itemBooks.length && populatedBooks.length > 0) {
+    if (
+      populatedBooks.length === itemBooks.length &&
+      populatedBooks.length > 0
+    ) {
       return this.determineOrderKindFromBooks(populatedBooks);
     }
 
@@ -135,7 +140,9 @@ class OrderService {
       return ORDER_KINDS.PHYSICAL;
     }
 
-    const books = await Book.find({ _id: { $in: bookIds } }).select("isEbook").lean();
+    const books = await Book.find({ _id: { $in: bookIds } })
+      .select("isEbook")
+      .lean();
     return this.determineOrderKindFromBooks(books);
   }
 
@@ -468,10 +475,12 @@ class OrderService {
   ) {
     const subtotal = items.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -625,17 +634,21 @@ class OrderService {
       throw ApiError.badRequest("Voucher code is required");
     }
 
-    const { validItems, orderKind } = await this.validateCartForCheckout(userId);
+    const { validItems, orderKind } =
+      await this.validateCartForCheckout(userId);
 
     // Get flash sale discount map for calculating prices
-    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+    const flashSaleDiscountMap =
+      await flashSaleService.getFlashSaleDiscountMap();
 
     const subtotal = validItems.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -737,15 +750,18 @@ class OrderService {
     }
 
     // Get flash sale discount map for calculating prices
-    const flashSaleDiscountMap = await flashSaleService.getFlashSaleDiscountMap();
+    const flashSaleDiscountMap =
+      await flashSaleService.getFlashSaleDiscountMap();
 
     // Calculate subtotal first (with flash sale prices if applicable)
     const subtotal = validItems.reduce((sum, item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const price = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const price =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
       return sum + price * item.quantity;
     }, 0);
 
@@ -791,10 +807,12 @@ class OrderService {
     // Prepare order items with snapshot of book data (using flash sale prices if applicable)
     const orderItems = validItems.map((item) => {
       const originalPrice = item.book.price;
-      const discountPercent = flashSaleDiscountMap[item.book._id.toString()] || 0;
-      const finalPrice = discountPercent > 0 
-        ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
-        : originalPrice;
+      const discountPercent =
+        flashSaleDiscountMap[item.book._id.toString()] || 0;
+      const finalPrice =
+        discountPercent > 0
+          ? originalPrice - Math.round((originalPrice * discountPercent) / 100)
+          : originalPrice;
 
       return {
         book: item.book._id,
@@ -949,42 +967,59 @@ class OrderService {
   }
 
   // Admin: get all orders with filters
+  // UC-61: Lấy tất cả orders cho admin với filter theo status/date
+  // Hỗ trợ filter: status, paymentStatus, search, fromDate, toDate
+  // UC-61: Lấy danh sách tất cả đơn hàng với bộ lọc (Admin order filtering)
+  // Luồng xử lý: Xây dựng filter object dựa trên các tham số đầu vào
+  // Hỗ trợ lọc theo status, paymentStatus, userId, date range, search text
+  // Populate thông tin user, shipper, và items.book để hiển thị chi tiết
+  // Trả về danh sách orders với pagination info
   async getAllOrders({
-    page = 1,
-    limit = 10,
-    status,
-    paymentStatus,
-    search,
-    userId,
-    fromDate,
-    toDate,
+    page = 1,        // Trang hiện tại (mặc định 1)
+    limit = 10,      // Số lượng orders mỗi trang (mặc định 10)
+    status,          // Lọc theo trạng thái đơn hàng
+    paymentStatus,   // Lọc theo trạng thái thanh toán
+    search,          // Tìm kiếm theo orderNumber hoặc thông tin user
+    userId,          // Lọc theo ID user cụ thể
+    fromDate,        // Lọc từ ngày (createdAt >= fromDate)
+    toDate,          // Lọc đến ngày (createdAt <= toDate)
   } = {}) {
+    // Tính toán skip cho pagination
     const skip = (page - 1) * limit;
+
+    // Khởi tạo object filter rỗng
     const filter = {};
 
+    // Lọc theo trạng thái đơn hàng nếu được chỉ định và khác "all"
     if (status && status !== "all") {
       filter.orderStatus = status;
     }
 
+    // Lọc theo trạng thái thanh toán nếu được chỉ định và khác "all"
     if (paymentStatus && paymentStatus !== "all") {
       filter.paymentStatus = paymentStatus;
     }
 
+    // Lọc theo user ID nếu được chỉ định
     if (userId) {
       filter.user = userId;
     }
 
+    // Lọc theo khoảng thời gian tạo đơn hàng
     if (fromDate || toDate) {
       filter.createdAt = {};
 
+      // Nếu có fromDate, lọc từ ngày đó trở đi
       if (fromDate) {
         filter.createdAt.$gte = this.normalizeDateBoundary(fromDate);
       }
 
+      // Nếu có toDate, lọc đến ngày đó trở về trước
       if (toDate) {
         filter.createdAt.$lte = this.normalizeDateBoundary(toDate, true);
       }
 
+      // Validate: fromDate phải <= toDate
       if (
         filter.createdAt.$gte &&
         filter.createdAt.$lte &&
@@ -996,43 +1031,52 @@ class OrderService {
       }
     }
 
+    // Tìm kiếm theo text (orderNumber hoặc thông tin user)
     if (search && search.trim()) {
+      // Tạo regex case-insensitive cho tìm kiếm
       const searchRegex = new RegExp(search.trim(), "i");
+
+      // Tìm user có email, firstName, hoặc lastName match với search
       const matchedUsers = await User.find({
         $or: [
           { email: searchRegex },
           { firstName: searchRegex },
           { lastName: searchRegex },
         ],
-      }).select("_id");
+      }).select("_id"); // Chỉ lấy _id
 
+      // Lấy danh sách user IDs từ kết quả tìm user
       const userIds = matchedUsers.map((user) => user._id);
 
+      // Tạo điều kiện OR: match orderNumber hoặc user trong danh sách userIds
       filter.$or = [
-        { orderNumber: searchRegex },
-        ...(userIds.length ? [{ user: { $in: userIds } }] : []),
+        { orderNumber: searchRegex }, // Tìm theo mã đơn hàng
+        ...(userIds.length ? [{ user: { $in: userIds } }] : []), // Tìm theo user nếu có
       ];
     }
 
+    // Thực hiện query song song: lấy orders và đếm tổng số
     const [orders, total] = await Promise.all([
+      // Query orders với filter, populate, sort, pagination
       Order.find(filter)
-        .populate("items.book")
-        .populate("user", "email firstName lastName")
-        .populate("shipper", "email firstName lastName")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Order.countDocuments(filter),
+        .populate("items.book") // Populate thông tin sách trong items
+        .populate("user", "email firstName lastName") // Populate thông tin user (chỉ lấy email, tên)
+        .populate("shipper", "email firstName lastName") // Populate thông tin shipper
+        .sort({ createdAt: -1 }) // Sort theo thời gian tạo giảm dần (mới nhất trước)
+        .skip(skip) // Bỏ qua số records theo pagination
+        .limit(limit) // Giới hạn số records trả về
+        .lean(), // Trả về plain object thay vì Mongoose document
+      Order.countDocuments(filter), // Đếm tổng số orders match filter
     ]);
 
+    // Trả về kết quả với orders và thông tin pagination
     return {
       orders,
       pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        total, // Tổng số orders
+        page, // Trang hiện tại
+        limit, // Số orders mỗi trang
+        totalPages: Math.ceil(total / limit), // Tổng số trang
       },
     };
   }
@@ -1143,10 +1187,7 @@ class OrderService {
       previousOrder.paymentMethod ||
       (orderKind === ORDER_KINDS.DIGITAL ? "VNPAY" : "COD");
 
-    if (
-      orderKind === ORDER_KINDS.DIGITAL &&
-      paymentMethodToUse !== "VNPAY"
-    ) {
+    if (orderKind === ORDER_KINDS.DIGITAL && paymentMethodToUse !== "VNPAY") {
       throw ApiError.badRequest(
         "E-book orders only support online payment via VNPay",
       );
@@ -1215,9 +1256,9 @@ class OrderService {
         author: book.author,
         price: book.price,
         quantity: book.isEbook ? 1 : item.quantity,
-        subtotal: Math.round(
-          book.price * (book.isEbook ? 1 : item.quantity) * 100,
-        ) / 100,
+        subtotal:
+          Math.round(book.price * (book.isEbook ? 1 : item.quantity) * 100) /
+          100,
       });
     }
 
@@ -1608,7 +1649,10 @@ class OrderService {
       return true;
     });
 
-    const totalRevenue = eligibleOrders.reduce((sum, order) => sum + order.total, 0);
+    const totalRevenue = eligibleOrders.reduce(
+      (sum, order) => sum + order.total,
+      0,
+    );
     const chartMap = {};
 
     eligibleOrders.forEach((order) => {
@@ -1662,18 +1706,31 @@ class OrderService {
     }
 
     if ((await this.resolveOrderKind(order)) === ORDER_KINDS.DIGITAL) {
-      throw ApiError.badRequest("Digital orders cannot be assigned to shippers");
+      throw ApiError.badRequest(
+        "Digital orders cannot be assigned to shippers",
+      );
     }
 
     if (!["PENDING", "PROCESSING", "SHIPPED"].includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Order can only be assigned while in PENDING or PROCESSING status"
+        "Order can only be assigned while in PENDING or PROCESSING status",
       );
     }
 
     // ⭐ THÊM ĐOẠN NÀY
+    
     const { province, district } = order.shippingAddress || {};
+    console.log("order shippingAddress:", order.shippingAddress);
 
+    console.log("shipper:", {
+      id: shipper?._id?.toString(),
+      role: shipper?.role,
+      isOnline: shipper?.isOnline,
+      isActive: shipper?.isActive,
+      addresses: shipper?.addresses,
+    });
+
+    console.log("order.shippingAddress:", order.shippingAddress);
     const matchAddress = shipper.addresses?.some(
       (addr) =>
         addr.province?.trim() === province?.trim() &&
@@ -1693,7 +1750,7 @@ class OrderService {
     const rejected = order.assignmentHistory?.some(
       (h) =>
         h.shipper.toString() === shipperId.toString() &&
-        h.status === "REJECTED"
+        h.status === "REJECTED",
     );
 
     if (rejected) {
@@ -1730,7 +1787,6 @@ class OrderService {
     this.handleAssignmentTimeout(order._id, shipper._id);
     await order.populate("shipper", "email firstName lastName");
 
-
     return order;
   }
   // Lấy số lượng đơn hàng đang được giao (SHIPPED hoặc PROCESSING) của shipper để kiểm tra giới hạn 20 đơn hàng
@@ -1761,7 +1817,7 @@ class OrderService {
 
     if (!allowedStatuses.includes(order.orderStatus)) {
       throw ApiError.badRequest(
-        "Auto assign only works for PENDING or PROCESSING orders"
+        "Auto assign only works for PENDING or PROCESSING orders",
       );
     }
     const { province, district } = order.shippingAddress || {};
@@ -2047,7 +2103,7 @@ class OrderService {
       orders,
     };
   }
-  // 
+  //
   async handleAssignmentTimeout(orderId, shipperId) {
     setTimeout(async () => {
       try {

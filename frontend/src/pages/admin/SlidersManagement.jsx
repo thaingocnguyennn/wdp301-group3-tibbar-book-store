@@ -83,14 +83,28 @@ const SlidersManagement = () => {
     }
   };
 
+  // UC-16: Xử lý xóa slider (Admin delete slider)
+  // Luồng xử lý:
+  // 1. Hiển thị confirm dialog hỏi user có chắc muốn xóa không
+  // 2. Nếu user xác nhận, gọi sliderApi.deleteSlider() với ID slider
+  // 3. Hiển thị success message
+  // 4. Gọi fetchSliders() để refresh danh sách sliders
+  // 5. Nếu có lỗi, hiển thị error message
   const handleDelete = async (slider) => {
+    // Hiển thị confirm dialog
     if (!window.confirm("Delete this slider?")) return;
 
     try {
+      // Gọi API xóa slider
       await sliderApi.deleteSlider(slider._id);
+
+      // Hiển thị success message
       setMessage("Slider deleted");
+
+      // Refresh danh sách sliders
       fetchSliders();
     } catch (error) {
+      // Hiển thị error message
       setMessage(error.response?.data?.message || "Delete failed");
     }
   };

@@ -168,83 +168,123 @@ class BookService {
     return books.map((book) => this.sanitizePublicBook(book));
   }
 
+  // UC-11: Hiển thị danh sách sách có sẵn (Book list)
+  // Luồng xử lý: Từ HomePage, user xem danh sách sách công khai với khả năng filter và pagination
+  // Bắt đầu: User truy cập HomePage, component tự động gọi fetchBooks()
+  // Xử lý chính: bookService.getPublicBooks() xây dựng query MongoDB với các filter criteria
+  // Cuối cùng: Trả về danh sách books và pagination info, hiển thị trên UI HomePage
   async getPublicBooks(filters = {}) {
+    // Trích xuất các filter parameters từ input
     const {
-      category,
-      author,
-      minPrice,
-      maxPrice,
-      search,
-      page = PAGINATION.DEFAULT_PAGE,
-      limit = PAGINATION.DEFAULT_LIMIT,
+      category,    // Filter theo category ID
+      author,      // Filter theo tác giả (regex case-insensitive)
+      minPrice,    // Filter giá tối thiểu
+      maxPrice,    // Filter giá tối đa
+      search,      // Tìm kiếm full-text
+      page = PAGINATION.DEFAULT_PAGE,     // Trang hiện tại (mặc định 1)
+      limit = PAGINATION.DEFAULT_LIMIT,   // Số sách mỗi trang (mặc định 12)
     } = filters;
 
+    // Khởi tạo query cơ bản: chỉ lấy sách có visibility PUBLIC
     const query = { visibility: BOOK_VISIBILITY.PUBLIC };
 
+    // Áp dụng filter theo category nếu được chỉ định
     if (category) {
       query.category = category;
     }
 
+    // Áp dụng filter theo tác giả với regex case-insensitive
     if (author) {
       query.author = new RegExp(author, "i");
     }
 
+    // Áp dụng filter theo khoảng giá
     if (minPrice !== undefined || maxPrice !== undefined) {
       query.price = {};
+      // Lọc giá >= minPrice nếu có
       if (minPrice !== undefined) query.price.$gte = Number(minPrice);
+      // Lọc giá <= maxPrice nếu có
       if (maxPrice !== undefined) query.price.$lte = Number(maxPrice);
     }
 
+    // Áp dụng tìm kiếm full-text nếu có search term
     if (search) {
       query.$text = { $search: search };
     }
 
+    // Tính toán skip cho pagination
     const skip = (Number(page) - 1) * Number(limit);
+    // Giới hạn limit tối đa để tránh quá tải
     const actualLimit = Math.min(Number(limit), PAGINATION.MAX_LIMIT);
 
+    // Thực hiện query song song: lấy books và đếm tổng số
     const [books, totalBooks] = await Promise.all([
+      // Query books với filters, populate category, loại bỏ ebookFile
       Book.find(query)
-        .populate("category", "name")
-        .select("-ebookFile")
-        .skip(skip)
-        .limit(actualLimit)
-        .sort({ createdAt: -1 })
-        .lean(),
+        .populate("category", "name")  // Populate tên category
+        .select("-ebookFile")          // Loại bỏ field ebookFile khỏi kết quả
+        .skip(skip)                    // Bỏ qua records theo pagination
+        .limit(actualLimit)            // Giới hạn số records trả về
+        .sort({ createdAt: -1 })       // Sort theo thời gian tạo giảm dần (mới nhất trước)
+        .lean(),                       // Trả về plain object thay vì Mongoose document
+      // Đếm tổng số books match query để tính pagination
       Book.countDocuments(query),
     ]);
 
+    // Trả về kết quả với books đã sanitize và thông tin pagination
     return {
-      books: this.sanitizePublicBooks(books),
+      books: this.sanitizePublicBooks(books),  // Sanitize dữ liệu sách công khai
       pagination: {
-        currentPage: Number(page),
-        totalPages: Math.ceil(totalBooks / actualLimit),
-        totalBooks,
-        limit: actualLimit,
+        currentPage: Number(page),                    // Trang hiện tại
+        totalPages: Math.ceil(totalBooks / actualLimit), // Tổng số trang
+        totalBooks,                                   // Tổng số sách
+        limit: actualLimit,                            // Số sách mỗi trang
       },
     };
   }
 
+  // UC-13: Lấy sách mới nhất (Newest book)
+  // Luồng xử lý: Hiển thị sách được thêm gần đây nhất trên homepage
+  // Bắt đầu: HomePage gọi fetchPersonalizedBooks(), nếu không có personalized thì fallback sang getNewestBooks()
+  // Xử lý chính: Query MongoDB lấy sách PUBLIC, sort theo createdAt giảm dần, limit số lượng
+  // Cuối cùng: Trả về danh sách sách mới nhất, hiển thị trong section "Có thể bạn quan tâm"
   async getNewestBooks(limit = 10) {
+    // Query lấy sách có visibility PUBLIC
     const books = await Book.find({ visibility: BOOK_VISIBILITY.PUBLIC })
-      .populate("category", "name")
-      .select("-ebookFile")
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+      .populate("category", "name")  // Populate thông tin category (chỉ lấy name)
+      .select("-ebookFile")          // Loại bỏ field ebookFile (không cần cho display)
+      .sort({ createdAt: -1 })       // Sort theo thời gian tạo giảm dần (mới nhất trước)
+      .limit(limit)                  // Giới hạn số lượng sách trả về
+      .lean();                       // Trả về plain object để tối ưu performance
 
+    // Sanitize dữ liệu sách công khai trước khi trả về
     return this.sanitizePublicBooks(books);
   }
 
+  // UC-60: Lấy danh sách sách bán chạy nhất (Best selling book)
+  // Luồng xử lý: Aggregate từ collection Order để tính tổng số lượng bán của mỗi sách
+  // Chỉ tính các đơn hàng đã giao thành công (DELIVERED), sau đó sort theo số lượng bán giảm dần
+  // Cuối cùng populate thông tin sách và category, chỉ trả về sách có visibility PUBLIC
   async getBestSellingBooks(limit = 8) {
+    // Giới hạn số lượng sách trả về, tối đa PAGINATION.MAX_LIMIT
     const actualLimit = Math.min(Number(limit) || 8, PAGINATION.MAX_LIMIT);
 
+    // Pipeline aggregate MongoDB để tính toán sách bán chạy
     const bestSellers = await Order.aggregate([
+      // Bước 1: Lọc chỉ lấy các đơn hàng đã giao thành công
+      // Điều kiện: orderStatus phải là "DELIVERED"
       {
         $match: {
           orderStatus: "DELIVERED",
         },
       },
+      // Bước 2: Unwind mảng items để mỗi item thành một document riêng
+      // Điều này cho phép group theo từng sách trong đơn hàng
       { $unwind: "$items" },
+      // Bước 3: Group theo ID sách, tính tổng số lượng bán và doanh thu
+      // _id: ID của sách (items.book)
+      // soldQuantity: Tổng số lượng bán (sum của items.quantity)
+      // soldRevenue: Tổng doanh thu (sum của items.subtotal)
       {
         $group: {
           _id: "$items.book",
@@ -252,8 +292,13 @@ class BookService {
           soldRevenue: { $sum: "$items.subtotal" },
         },
       },
+      // Bước 4: Sort theo số lượng bán giảm dần, sau đó theo doanh thu giảm dần
+      // Ưu tiên sách bán nhiều nhất
       { $sort: { soldQuantity: -1, soldRevenue: -1 } },
+      // Bước 5: Giới hạn số lượng kết quả trả về
       { $limit: actualLimit },
+      // Bước 6: Lookup thông tin sách từ collection "books"
+      // Liên kết theo _id (ID sách) để lấy chi tiết sách
       {
         $lookup: {
           from: "books",
@@ -262,12 +307,17 @@ class BookService {
           as: "book",
         },
       },
+      // Bước 7: Unwind mảng book để chuyển thành object
       { $unwind: "$book" },
+      // Bước 8: Lọc chỉ lấy sách có visibility PUBLIC
+      // Loại bỏ sách ẩn hoặc riêng tư
       {
         $match: {
           "book.visibility": BOOK_VISIBILITY.PUBLIC,
         },
       },
+      // Bước 9: Lookup thông tin category từ collection "categories"
+      // Liên kết theo book.category để lấy tên category
       {
         $lookup: {
           from: "categories",
@@ -276,6 +326,8 @@ class BookService {
           as: "category",
         },
       },
+      // Bước 10: Thêm field category vào book object
+      // Nếu có category thì lấy _id và name, ngược lại null
       {
         $addFields: {
           "book.category": {
@@ -290,6 +342,8 @@ class BookService {
           },
         },
       },
+      // Bước 11: Merge thông tin sách với soldQuantity và soldRevenue
+      // Thay thế root document bằng object kết hợp
       {
         $replaceRoot: {
           newRoot: {
@@ -305,6 +359,7 @@ class BookService {
       },
     ]);
 
+    // Sanitize dữ liệu sách công khai trước khi trả về
     return this.sanitizePublicBooks(bestSellers);
   }
 
@@ -540,18 +595,26 @@ class BookService {
     };
   }
 
+  // UC-15: Lấy thông tin chi tiết của một cuốn sách
+  // Luồng xử lý: Từ BookDetailPage, user click vào sách để xem chi tiết
+  // Bắt đầu: Frontend gọi API getBookById với book ID
+  // Xử lý chính: Query MongoDB tìm sách theo ID và visibility PUBLIC, populate category
+  // Cuối cùng: Trả về thông tin sách đầy đủ, hiển thị trên BookDetailPage
   async getBookById(bookId) {
+    // Query tìm sách theo ID và chỉ lấy sách PUBLIC
     const book = await Book.findOne({
       _id: bookId,
-      visibility: BOOK_VISIBILITY.PUBLIC,
+      visibility: BOOK_VISIBILITY.PUBLIC,  // Chỉ lấy sách công khai
     })
-      .populate("category", "name description")
-      .select("-ebookFile");
+      .populate("category", "name description")  // Populate thông tin category
+      .select("-ebookFile");                      // Loại bỏ ebookFile khỏi kết quả
 
+    // Nếu không tìm thấy sách, throw error
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
 
+    // Trả về thông tin sách
     return book;
   }
 

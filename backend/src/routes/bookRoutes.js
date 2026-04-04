@@ -8,6 +8,11 @@ const router = express.Router();
 
 router.get("/", bookController.getPublicBooks);
 router.get("/newest", bookController.getNewestBooks);
+// UC-60: Route lấy sách bán chạy nhất
+// Endpoint: GET /api/books/best-selling?limit=8
+// Mô tả: Trả về danh sách sách bán chạy nhất dựa trên số lượng bán từ đơn hàng đã giao
+// Query params: limit (số lượng sách trả về, mặc định 8)
+// Không cần authentication vì là dữ liệu công khai
 router.get("/best-selling", bookController.getBestSellingBooks);
 router.get(
   "/personalized",

@@ -135,9 +135,7 @@ const orderSchema = new mongoose.Schema(
       district: { type: String, default: "" },
       commune: { type: String, default: "" },
       description: { type: String, default: "" },
-      // 🔥 THÊM 2 FIELD NÀY
-      latitude: { type: Number, default: null },
-      longitude: { type: Number, default: null },
+     
     },
 
     // Voucher (placeholder for future module)

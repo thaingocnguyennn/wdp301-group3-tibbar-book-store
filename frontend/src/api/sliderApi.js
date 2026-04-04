@@ -1,8 +1,14 @@
 import axiosInstance from "./axios.js";
 
 export const sliderApi = {
+  // UC-14: API lấy sliders công khai cho homepage
+  // Endpoint: GET /api/sliders
+  // Mô tả: Gọi API backend để lấy danh sách sliders hiển thị trên carousel homepage
+  // Trả về: { success: true, message: "...", data: { sliders: [...] } }
   getPublicSliders: async () => {
+    // Gửi GET request đến endpoint /sliders để lấy sliders công khai
     const response = await axiosInstance.get("/sliders");
+    // Trả về data từ response
     return response.data;
   },
 
@@ -35,8 +41,15 @@ export const sliderApi = {
     return response.data;
   },
 
+  // UC-16: API xóa slider (Admin)
+  // Endpoint: DELETE /api/admin/sliders/:id
+  // Mô tả: Gọi API backend để xóa slider khỏi hệ thống
+  // Tham số: id - ID của slider cần xóa
+  // Trả về: { success: true, message: "Slider deleted" }
   deleteSlider: async (id) => {
+    // Gửi DELETE request đến endpoint admin/sliders/:id
     const response = await axiosInstance.delete(`/admin/sliders/${id}`);
+    // Trả về data từ response
     return response.data;
   },
 };
