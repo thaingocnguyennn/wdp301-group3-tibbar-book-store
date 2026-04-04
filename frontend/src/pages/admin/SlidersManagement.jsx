@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { sliderApi } from "../../api/sliderApi";
 
 const SlidersManagement = () => {
+  // UC-25 + UC-26 (Màn hình quản trị slider):
+  // File này là nơi admin thao tác trực tiếp trên giao diện (pages/admin).
+  // - UC-25: Sửa slider hiện có (nút Edit -> submit form)
+  // - UC-26: Bật/tắt hiển thị slider (nút Hide/Show)
   const [sliders, setSliders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -22,11 +26,13 @@ const SlidersManagement = () => {
 
   const fetchSliders = async () => {
     try {
+      // Lấy danh sách slider (bao gồm cả public/hidden) để admin quản lý trên màn hình này.
       const res = await sliderApi.getAllSlidersAdmin();
       setSliders(res.data.sliders || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load sliders");
     } finally {
+      // Dù thành công hay thất bại đều tắt trạng thái loading để render UI.
       setLoading(false);
     }
   };
@@ -40,23 +46,31 @@ const SlidersManagement = () => {
   };
 
   const handleSubmit = async (e) => {
+    // Chặn reload trang khi submit form.
     e.preventDefault();
+    // Xóa thông báo cũ trước khi xử lý request mới.
     setMessage("");
 
+    // Dùng FormData vì payload có thể chứa file ảnh.
     const payload = new FormData();
     if (selectedFile) {
+      // Nếu admin chọn ảnh mới thì đính kèm file để backend lưu uploads/sliders.
       payload.append("image", selectedFile);
     }
+    // Luôn gửi visibility để backend biết trạng thái hiển thị hiện tại.
     payload.append("visibility", formData.visibility);
 
     try {
+      // UC-25: Nếu đang ở chế độ edit thì gọi API cập nhật slider theo ID.
       if (editingSlider) {
         await sliderApi.updateSlider(editingSlider._id, payload);
         setMessage("Slider updated successfully");
       } else {
+        // Trường hợp không có editingSlider thì đây là luồng tạo mới.
         await sliderApi.createSlider(payload);
         setMessage("Slider created successfully");
       }
+      // Reset form + tải lại danh sách để phản ánh dữ liệu mới ngay trên màn hình.
       resetForm();
       fetchSliders();
     } catch (error) {
@@ -65,6 +79,7 @@ const SlidersManagement = () => {
   };
 
   const handleEdit = (slider) => {
+    // UC-25: Đưa dữ liệu slider lên form để admin chỉnh sửa trên màn hình.
     setEditingSlider(slider);
     setFormData({
       visibility: slider.visibility || "public",
@@ -74,9 +89,11 @@ const SlidersManagement = () => {
 
   const toggleVisibility = async (slider) => {
     try {
+      // UC-26: Đảo trạng thái public <-> hidden rồi gửi lên backend.
       const newVisibility =
         slider.visibility === "public" ? "hidden" : "public";
       await sliderApi.updateVisibility(slider._id, newVisibility);
+      // Tải lại danh sách để badge/nút hiển thị đúng trạng thái mới.
       fetchSliders();
     } catch (error) {
       setMessage("Failed to update visibility");
@@ -177,12 +194,14 @@ const SlidersManagement = () => {
               </div>
               <div style={styles.cardContent}>
                 <div style={styles.cardActions}>
+                  {/* UC-25: Nút Edit mở luồng sửa slider ngay trên trang này. */}
                   <button
                     style={styles.editBtn}
                     onClick={() => handleEdit(slider)}
                   >
                     Edit
                   </button>
+                  {/* UC-26: Nút Hide/Show điều khiển slider có hiển thị cho người dùng hay không. */}
                   <button
                     style={styles.visibilityBtn}
                     onClick={() => toggleVisibility(slider)}

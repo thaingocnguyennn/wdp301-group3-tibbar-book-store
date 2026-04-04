@@ -14,10 +14,14 @@ class CartController {
 
   async addToCart(req, res, next) {
     try {
+      // UC-27: Controller nhận request thêm vào giỏ từ frontend Book Detail.
+      // bookId và quantity được gửi từ body request.
       const { bookId, quantity } = req.body;
       const cart = await cartService.addToCart(
+        // userId lấy từ middleware authenticate (decode token).
         req.user.userId,
         bookId,
+        // Chuẩn hóa quantity về Number, mặc định 1 nếu thiếu.
         Number(quantity) || 1,
       );
       return ApiResponse.success(res, HTTP_STATUS.OK, "Cart updated", { cart });

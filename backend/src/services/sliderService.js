@@ -36,13 +36,18 @@ class SliderService {
   }
 
   async updateSlider(id, data) {
+    // UC-25: Logic thật sự cập nhật slider nằm ở service này.
+    // Dùng findByIdAndUpdate để ghi dữ liệu mới vào MongoDB.
     const slider = await Slider.findByIdAndUpdate(
       id,
+      // Chỉ cập nhật các field có trong payload.
       { $set: data },
+      // new: true để trả về bản ghi sau cập nhật; runValidators để kiểm tra schema.
       { new: true, runValidators: true },
     );
 
     if (!slider) {
+      // Không tìm thấy slider theo ID thì trả lỗi 404.
       throw ApiError.notFound("Slider not found");
     }
 
@@ -50,6 +55,8 @@ class SliderService {
   }
 
   async updateVisibility(id, visibility) {
+    // UC-26: Logic thật sự bật/tắt hiển thị slider nằm ở đây.
+    // Chỉ cập nhật trường visibility, giữ nguyên các trường còn lại.
     const slider = await Slider.findByIdAndUpdate(
       id,
       { visibility },
@@ -57,6 +64,7 @@ class SliderService {
     );
 
     if (!slider) {
+      // Nếu ID không hợp lệ hoặc không tồn tại, trả lỗi rõ ràng cho controller.
       throw ApiError.notFound("Slider not found");
     }
 

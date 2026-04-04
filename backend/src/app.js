@@ -114,10 +114,12 @@ app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/categories", categoryRoutes); // Admin categories (same routes, protected)
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/sliders", sliderRoutes);
+// UC-25 + UC-26: Mount route quản trị slider (sửa slider, bật/tắt visibility).
 app.use("/api/admin/sliders", adminSliderRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/vouchers", adminVoucherRoutes);
 app.use("/api/vouchers", voucherRoutes);
+// UC-27: Mount route giỏ hàng (bao gồm thêm sách vào giỏ từ Book Detail).
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);

@@ -7,7 +7,9 @@ import { sliderUpload } from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
+// Bắt buộc đăng nhập trước khi vào nhóm API admin slider.
 router.use(authenticate);
+// Bắt buộc quyền admin cho toàn bộ endpoint bên dưới.
 router.use(authorize(ROLES.ADMIN));
 
 router.get("/", adminSliderController.getAllSliders);
@@ -16,11 +18,14 @@ router.post(
   sliderUpload.single("image"),
   adminSliderController.createSlider,
 );
+// UC-25: API sửa slider hiện có (admin).
 router.put(
   "/:id",
+  // Middleware nhận file ảnh mới (nếu admin upload lại ảnh slider).
   sliderUpload.single("image"),
   adminSliderController.updateSlider,
 );
+// UC-26: API bật/tắt hiển thị slider (public/hidden).
 router.patch("/:id/visibility", adminSliderController.updateVisibility);
 router.delete("/:id", adminSliderController.deleteSlider);
 

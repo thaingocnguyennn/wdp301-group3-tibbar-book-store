@@ -43,19 +43,24 @@ class AdminSliderController {
 
   async updateSlider(req, res, next) {
     try {
+      // UC-25: Controller nhận dữ liệu sửa slider từ admin (có thể kèm ảnh mới).
+      // Chỉ gom các field được phép cập nhật từ request body.
       const updatePayload = {
         
         visibility: req.body.visibility,
       };
 
       if (req.file) {
+        // Nếu có ảnh mới thì ghi đè imageUrl sang file vừa upload.
         updatePayload.imageUrl = `/uploads/sliders/${req.file.filename}`;
       }
 
+      // Loại bỏ các key undefined để tránh ghi đè dữ liệu cũ bằng undefined.
       Object.keys(updatePayload).forEach((key) =>
         updatePayload[key] === undefined ? delete updatePayload[key] : null,
       );
 
+      // Gọi service để thực hiện cập nhật thật sự ở tầng business/data.
       const slider = await sliderService.updateSlider(
         req.params.id,
         updatePayload,
@@ -71,6 +76,8 @@ class AdminSliderController {
 
   async updateVisibility(req, res, next) {
     try {
+      // UC-26: Controller chỉ cập nhật trường visibility để ẩn/hiện slider.
+      // Lấy trạng thái mới (public/hidden) từ body.
       const { visibility } = req.body;
       const slider = await sliderService.updateVisibility(
         req.params.id,

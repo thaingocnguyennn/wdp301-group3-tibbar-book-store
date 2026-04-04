@@ -34,6 +34,7 @@ const sliderSchema = new mongoose.Schema(
       trim: true,
     },
     visibility: {
+      // UC-26: Trạng thái hiển thị slider cho người dùng (public hoặc hidden).
       type: String,
       enum: Object.values(BOOK_VISIBILITY),
       default: BOOK_VISIBILITY.PUBLIC,
