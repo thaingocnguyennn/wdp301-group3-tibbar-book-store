@@ -1,6 +1,8 @@
 import axiosInstance from "./axios.js";
 
 export const cartApi = {
+  // API layer cho UC-27/UC-28:
+  // BookDetail/CartPage -> CartContext -> cartApi -> backend /api/cart.
   getCart: async () => {
     const response = await axiosInstance.get("/cart");
     return response.data;

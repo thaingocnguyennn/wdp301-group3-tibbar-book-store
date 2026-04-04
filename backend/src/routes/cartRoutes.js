@@ -4,7 +4,8 @@ import { authenticate } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// UC-27: Người dùng phải đăng nhập mới thao tác được với giỏ hàng.
+// UC-27 + UC-28: Bắt buộc đăng nhập trước khi thao tác giỏ hàng.
+// Route này không yêu cầu quyền admin và không dùng middleware upload file.
 router.use(authenticate);
 
 router.get("/", cartController.getCart);

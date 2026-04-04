@@ -120,6 +120,7 @@ app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/vouchers", adminVoucherRoutes);
 app.use("/api/vouchers", voucherRoutes);
 // UC-27 + UC-28: Mount route giỏ hàng (thêm sách, cập nhật số lượng, xóa item).
+// Tất cả endpoint trong /api/cart đều đi qua authenticate tại cartRoutes.
 app.use("/api/cart", cartRoutes);
 // UC-44: Mount route đơn hàng (bao gồm API xem lịch sử đơn hàng của người dùng).
 app.use("/api/orders", orderRoutes);
