@@ -476,12 +476,14 @@ class OrderService {
     }, 0);
 
     const discount = voucherDiscount;
+    // Tổng tiền = Subtotal + Shipping Fee - Voucher Discount - Coin Discount
     const total = subtotal + shippingFee - discount - coinDiscount;
 
     return {
       subtotal: Math.round(subtotal * 100) / 100,
       discount: Math.round(discount * 100) / 100,
       shippingFee: Math.round(shippingFee * 100) / 100,
+      //coinDiscount có thể được tính toán dựa trên số coin người dùng muốn sử dụng và tỷ lệ quy đổi coin -> VND
       coinDiscount: Math.round(coinDiscount * 100) / 100,
       total: Math.max(0, Math.round(total * 100) / 100), // Ensure total is never negative
     };
@@ -770,13 +772,16 @@ class OrderService {
       );
 
     // Calculate coin discount if user wants to use coins
+    //Tính toán số coin có thể sử dụng tối đa dựa trên balance của user và order amount sau khi đã trừ voucher
     let coinsToUse = 0;
     if (useCoin) {
       const orderAmountAfterVoucher = orderAmount - voucherDiscount;
+      //gọi service tính toán số coin tối đa có thể sử dụng dựa trên balance của user và order amount sau khi đã trừ voucher
       coinsToUse = coinService.calculateMaxCoinsUsable(
         user.coinBalance,
         orderAmountAfterVoucher,
       );
+      // Log thông tin chi tiết về việc sử dụng coin
       console.log("💰 [OrderService] Coin usage:", {
         userBalance: user.coinBalance,
         orderAmountAfterVoucher,
@@ -880,7 +885,9 @@ class OrderService {
       });
 
       // Deduct coins from user if coins were used
+      // Log thông tin chi tiết về việc trừ coin trước khi thực hiện
       if (coinsToUse > 0) {
+        //Gọi service để trừ coin từ tài khoản user, ghi log chi tiết về giao dịch này
         await coinService.deductCoins(
           userId,
           coinsToUse,
