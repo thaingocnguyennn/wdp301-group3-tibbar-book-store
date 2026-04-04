@@ -1129,7 +1129,13 @@ const BookDetailPage = () => {
                 )}
               </div>
 
-              {/* Compare table dưới Reviews & Writing */}
+              {/*
+                UC-124/125/127 tại pages/BookDetailPage:
+                - UC-124: Cảnh báo sắp hết hàng/hết hàng.
+                - UC-125: Đăng ký báo có hàng.
+                - UC-127: Bảng so sánh sách.
+                UI/logic chi tiết nằm ở components/books/BookFeaturePanel.
+              */}
               {book?._id && (
                 <BookFeaturePanel
                   book={book}

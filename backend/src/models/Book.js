@@ -115,6 +115,7 @@ bookSchema.virtual('inStock').get(function() {
 
 // Virtual for low stock warning (customer/admin UI có thể dùng trực tiếp)
 bookSchema.virtual('isLowStock').get(function() {
+  // UC-124: Ngưỡng low stock lấy từ env để dễ cấu hình theo môi trường.
   const threshold = Number(process.env.LOW_STOCK_THRESHOLD || 5);
   return this.stock <= threshold;
 });
