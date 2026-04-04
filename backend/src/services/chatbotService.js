@@ -2,6 +2,10 @@ import axios from "axios";
 import ApiError from "../utils/ApiError.js";
 
 class ChatbotService {
+  // UC-128:
+  // - Logic thật sự của chatbot nằm ở service này.
+  // - Không có model lưu trữ riêng trong backend/src/models cho chatbot.
+  // - Dữ liệu xử lý theo thời gian thực: message/history/context -> gọi LLM provider -> trả reply.
   getConfig() {
     // Đọc cấu hình provider LLM từ env để dễ đổi model/endpoint mà không sửa code.
     return {
@@ -12,7 +16,7 @@ class ChatbotService {
   }
 
   buildSystemPrompt(context = {}) {
-    // Tạo system prompt động theo ngữ cảnh trang và trạng thái đăng nhập.
+    // Tạo system prompt động theo ngữ cảnh trang và trạng thái đăng nhập để bot gợi ý đúng trọng tâm.
     const page = context.page || "unknown";
     const role = context.userRole || "guest";
     const isAuthenticated = Boolean(context.isAuthenticated);

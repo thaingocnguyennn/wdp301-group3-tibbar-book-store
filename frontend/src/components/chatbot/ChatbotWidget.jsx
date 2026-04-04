@@ -16,8 +16,10 @@ const initialBotMessage = {
 };
 
 const ChatbotWidget = () => {
-  // Chức năng chatbot nằm ở components/chatbot và được mount toàn cục trong App.
-  // Mục tiêu: nhận câu hỏi người dùng, gửi API backend, hiển thị câu trả lời + gợi ý.
+  // UC-128 (Chatbot):
+  // - Vị trí hiển thị: components/chatbot, mount toàn cục trong App.
+  // - Mục tiêu: tự động gợi ý thông tin/yêu cầu cơ bản cho khách hàng.
+  // - Luồng gọi: ChatbotWidget -> frontend/src/api/chatbotApi -> /api/chatbot/ask.
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
 
@@ -54,7 +56,7 @@ const ChatbotWidget = () => {
         message,
         messages: conversationHistory,
         context: {
-          // UC-45: Truyền page hiện tại để chatbot có thể hướng dẫn xem chi tiết đơn đúng ngữ cảnh.
+          // UC-128: Truyền ngữ cảnh trang hiện tại để bot trả lời/gợi ý phù hợp tình huống.
           page: location.pathname,
           isAuthenticated,
           userRole: user?.role || "guest",
