@@ -124,8 +124,8 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/shipper", shipperRoutes);
 app.use("/api/coins", coinRoutes);
-app.use("/api/news", newsRoutes);
-app.use("/api/admin/news", adminNewsRoutes);
+app.use("/api/news", newsRoutes); // Public news routes
+app.use("/api/admin/news", adminNewsRoutes); // Admin news routes
 app.use("/api/support", supportRoutes);
 app.use("/api/admin/support", adminSupportRoutes);
 app.use("/api/support-system", supportSystemRoutes);
