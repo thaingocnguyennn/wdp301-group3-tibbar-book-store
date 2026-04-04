@@ -943,15 +943,19 @@ class OrderService {
 
   // Get user orders
   async getUserOrders(userId, page = 1, limit = 10) {
+    // UC-44: Logic thật sự lấy lịch sử đơn hàng nằm ở service này.
+    // Tính vị trí bắt đầu dữ liệu theo trang hiện tại.
     const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
+      // Query các đơn của user, sắp xếp mới nhất trước, có phân trang.
       Order.find({ user: userId })
         .populate("items.book")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
+      // Đếm tổng số đơn để frontend render số trang.
       Order.countDocuments({ user: userId }),
     ]);
 

@@ -18,6 +18,8 @@ export const cartApi = {
   },
 
   updateCartItem: async (bookId, quantity) => {
+    // UC-28: API cập nhật số lượng item trong giỏ hàng.
+    // Endpoint thực tế: PATCH /api/cart/items/:bookId
     const response = await axiosInstance.patch(`/cart/items/${bookId}`, {
       quantity,
     });
@@ -25,6 +27,8 @@ export const cartApi = {
   },
 
   removeCartItem: async (bookId) => {
+    // UC-28: API xóa item khỏi giỏ hàng.
+    // Endpoint thực tế: DELETE /api/cart/items/:bookId
     const response = await axiosInstance.delete(`/cart/items/${bookId}`);
     return response.data;
   },

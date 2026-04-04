@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { flashSaleApi } from "../api/flashSaleApi";
 
 const CartPage = () => {
+  // UC-28 (Cart - Update/Remove item):
+  // Màn hình này cho phép người dùng tăng/giảm số lượng hoặc xóa sản phẩm khỏi giỏ.
   const { cart, update, remove } = useCart();
   const navigate = useNavigate();
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -165,6 +167,7 @@ const CartPage = () => {
                   <div style={styles.qtyControls}>
                     <button
                       style={styles.qtyButton}
+                      // UC-28: Giảm số lượng 1 đơn vị; nếu về 0 backend sẽ xử lý thành remove item.
                       onClick={() => update(item.book._id, item.quantity - 1)}
                     >
                       −
@@ -172,6 +175,7 @@ const CartPage = () => {
                     <span style={styles.qtyValue}>{item.quantity}</span>
                     <button
                       style={styles.qtyButton}
+                      // UC-28: Tăng số lượng 1 đơn vị và đồng bộ lại giỏ hàng.
                       onClick={() => update(item.book._id, item.quantity + 1)}
                     >
                       +
@@ -180,6 +184,7 @@ const CartPage = () => {
                 )}
                 <button
                   style={styles.removeButton}
+                  // UC-28: Xóa hẳn item khỏi giỏ hàng.
                   onClick={() => remove(item.book._id)}
                 >
                   Remove

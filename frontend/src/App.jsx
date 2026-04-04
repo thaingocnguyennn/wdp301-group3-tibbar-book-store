@@ -188,6 +188,7 @@ function AppContent() {
           path="/orders"
           element={
             <ProtectedRoute>
+              {/* UC-44: Màn hình hiển thị danh sách đơn hàng đã/đang xử lý của người dùng. */}
               <OrderHistoryPage />
             </ProtectedRoute>
           }
@@ -232,6 +233,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        {/* UC-28: Màn hình giỏ hàng cho phép cập nhật số lượng hoặc xóa item. */}
         <Route path="/cart" element={<CartPage />} />
         <Route path="/wishlist" element={<Wishlist />} />
         <Route

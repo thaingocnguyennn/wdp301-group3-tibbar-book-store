@@ -119,8 +119,9 @@ app.use("/api/admin/sliders", adminSliderRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/vouchers", adminVoucherRoutes);
 app.use("/api/vouchers", voucherRoutes);
-// UC-27: Mount route giỏ hàng (bao gồm thêm sách vào giỏ từ Book Detail).
+// UC-27 + UC-28: Mount route giỏ hàng (thêm sách, cập nhật số lượng, xóa item).
 app.use("/api/cart", cartRoutes);
+// UC-44: Mount route đơn hàng (bao gồm API xem lịch sử đơn hàng của người dùng).
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes);

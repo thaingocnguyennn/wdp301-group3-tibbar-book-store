@@ -32,6 +32,7 @@ class CartController {
 
   async updateCartItem(req, res, next) {
     try {
+      // UC-28: Controller nhận yêu cầu đổi số lượng item trong giỏ.
       const { quantity } = req.body;
       const cart = await cartService.updateItem(
         req.user.userId,
@@ -46,6 +47,7 @@ class CartController {
 
   async removeCartItem(req, res, next) {
     try {
+      // UC-28: Controller nhận yêu cầu xóa item theo bookId khỏi giỏ.
       const cart = await cartService.removeItem(
         req.user.userId,
         req.params.bookId,
