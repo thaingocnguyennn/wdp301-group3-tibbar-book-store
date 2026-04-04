@@ -5,8 +5,14 @@ import { HTTP_STATUS } from "../config/constants.js";
 class ChatbotController {
   async ask(req, res, next) {
     try {
+      // UC-45 (Chatbot): nhận câu hỏi, ngữ cảnh trang và trả lời hướng dẫn xem chi tiết đơn.
+      // Input từ frontend: message (câu hỏi), messages (lịch sử), context (metadata).
       const { message, messages, context } = req.body;
 
+      // Làm giàu context từ middleware auth:
+      // - biết user có đăng nhập không
+      // - biết vai trò user
+      // - biết userId để hạn chế trả lời sai ngữ cảnh dữ liệu cá nhân
       const enrichedContext = {
         ...(context || {}),
         isAuthenticated: Boolean(req.user),
@@ -20,6 +26,7 @@ class ChatbotController {
         context: enrichedContext,
       });
 
+      // Trả response chuẩn ApiResponse cho frontend widget render.
       return ApiResponse.success(
         res,
         HTTP_STATUS.OK,

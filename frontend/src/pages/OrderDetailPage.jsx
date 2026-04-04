@@ -81,6 +81,8 @@ const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const serverBaseUrl = apiBase.replace(/\/api\/?$/, "");
 
 const OrderDetailPage = () => {
+  // UC-45 (Chatbot - View order detail):
+  // Trang này hiển thị chi tiết một đơn hàng cụ thể theo orderId trên URL.
   const { id } = useParams();
   const navigate = useNavigate();
   const [rating, setRating] = useState(0);
@@ -102,14 +104,18 @@ const OrderDetailPage = () => {
   });
 
   useEffect(() => {
+    // Mỗi khi id thay đổi (đi từ danh sách đơn sang đơn khác), tải lại chi tiết đơn.
     fetchOrderDetail();
   }, [id]);
 
   const fetchOrderDetail = async () => {
     try {
+      // B1: Bật loading và xóa lỗi cũ trước khi gọi API chi tiết đơn.
       setLoading(true);
       setError("");
+      // B2: Gọi endpoint /api/orders/:id để lấy đầy đủ thông tin đơn hàng.
       const response = await orderApi.getOrderById(id);
+      // B3: Lưu dữ liệu đơn vào state để render toàn bộ thông tin chi tiết.
       setOrder(response.data.order);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load order detail");
@@ -119,6 +125,7 @@ const OrderDetailPage = () => {
   };
 
   const handleCancelOrder = async () => {
+    // Chỉ cho hủy khi đơn còn ở trạng thái PENDING.
     if (!order || order.orderStatus !== "PENDING") return;
 
     try {

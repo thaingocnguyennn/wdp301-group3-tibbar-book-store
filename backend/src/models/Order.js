@@ -47,6 +47,7 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
     // UC-44: Dữ liệu lịch sử đơn hàng được đọc từ bảng Order theo user này.
+    // UC-45: Khi xem chi tiết đơn, frontend đọc đầy đủ items từ đây.
     items: [orderItemSchema],
     shipper: {
       type: mongoose.Schema.Types.ObjectId,

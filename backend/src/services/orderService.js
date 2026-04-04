@@ -1670,6 +1670,7 @@ class OrderService {
   }
 
   async getOrderById(orderId, userId = null) {
+    // UC-45: Logic thật sự lấy chi tiết đơn hàng nằm ở đây.
     const order = await Order.findById(orderId)
       .populate("user", "email firstName lastName")
       .populate("shipper", "email firstName lastName")
@@ -1680,6 +1681,7 @@ class OrderService {
     }
 
     if (userId && order.user?._id?.toString() !== userId.toString()) {
+      // Chặn user xem đơn không thuộc về mình.
       throw ApiError.forbidden("You are not authorized to view this order");
     }
 

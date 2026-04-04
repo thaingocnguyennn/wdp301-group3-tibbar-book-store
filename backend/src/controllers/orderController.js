@@ -96,9 +96,11 @@ class OrderController {
   // Get single order by ID
   async getOrderById(req, res, next) {
     try {
+      // UC-45: Controller nhận orderId để trả về chi tiết đơn hàng.
       const userId = req.user._id;
       const orderId = req.params.id;
 
+      // Gọi service để lấy dữ liệu đơn và kiểm tra quyền truy cập của user.
       const order = await orderService.getOrderById(orderId, userId);
 
       return ApiResponse.success(

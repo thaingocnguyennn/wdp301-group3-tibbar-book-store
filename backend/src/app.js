@@ -121,7 +121,7 @@ app.use("/api/admin/vouchers", adminVoucherRoutes);
 app.use("/api/vouchers", voucherRoutes);
 // UC-27 + UC-28: Mount route giỏ hàng (thêm sách, cập nhật số lượng, xóa item).
 app.use("/api/cart", cartRoutes);
-// UC-44: Mount route đơn hàng (bao gồm API xem lịch sử đơn hàng của người dùng).
+// UC-44 + UC-45: Mount route đơn hàng (xem lịch sử + xem chi tiết đơn hàng).
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes); // User address management routes
@@ -138,6 +138,7 @@ app.use("/api/book-features", bookFeatureRoutes);
 app.use("/api/admin/inventory", adminInventoryRoutes);
 app.use("/api/flash-sale", flashSaleRoutes);
 app.use("/api/admin/flash-sale", adminFlashSaleRoutes);
+// Mount API chatbot để frontend widget gọi endpoint /api/chatbot/ask.
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/cvs", cvRoutes);
 app.use("/api/admin/cvs", adminCvRoutes);

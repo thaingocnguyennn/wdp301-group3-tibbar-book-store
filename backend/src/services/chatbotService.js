@@ -3,6 +3,7 @@ import ApiError from "../utils/ApiError.js";
 
 class ChatbotService {
   getConfig() {
+    // Đọc cấu hình provider LLM từ env để dễ đổi model/endpoint mà không sửa code.
     return {
       baseUrl: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
       apiKey: process.env.GROQ_API_KEY,
@@ -11,6 +12,7 @@ class ChatbotService {
   }
 
   buildSystemPrompt(context = {}) {
+    // Tạo system prompt động theo ngữ cảnh trang và trạng thái đăng nhập.
     const page = context.page || "unknown";
     const role = context.userRole || "guest";
     const isAuthenticated = Boolean(context.isAuthenticated);
@@ -38,11 +40,13 @@ Store facts you may use:
 - Orders above 200,000 VND get free shipping.
 - Ebooks require successful payment before access.
 - Customers can use vouchers if valid and meeting conditions.
+- Nếu người dùng hỏi chi tiết đơn hàng, hướng dẫn vào trang /orders và chọn đơn cần xem hoặc mở trực tiếp /orders/:id khi đã có mã đơn.
 - If chatbot cannot solve an issue, suggest using support chat.
 `.trim();
   }
 
   buildConversation(messages = [], userMessage = "", context = {}) {
+    // Chuẩn hóa history để tránh payload quá dài hoặc sai định dạng role/content.
     const normalizedHistory = Array.isArray(messages)
       ? messages
           .filter(
@@ -61,6 +65,7 @@ Store facts you may use:
 
     const finalMessages = [
       {
+        // System message đặt nguyên tắc trả lời trước khi gửi sang LLM.
         role: "system",
         content: this.buildSystemPrompt(context),
       },
@@ -68,6 +73,7 @@ Store facts you may use:
     ];
 
     if (userMessage?.trim()) {
+      // Append câu hỏi mới nhất của user vào cuối hội thoại.
       finalMessages.push({
         role: "user",
         content: userMessage.trim(),
@@ -78,6 +84,7 @@ Store facts you may use:
   }
 
   buildSuggestions(userMessage = "", reply = "") {
+    // Sinh gợi ý follow-up theo từ khóa để UX chat tự nhiên hơn.
     const source = `${userMessage} ${reply}`.toLowerCase();
 
     if (source.includes("ship")) {
@@ -132,6 +139,7 @@ Store facts you may use:
     }
 
     try {
+      // Payload gửi sang provider dạng chat completion.
       const payload = {
         model,
         temperature: 0.3,
@@ -154,12 +162,14 @@ Store facts you may use:
         response?.data?.choices?.[0]?.message?.content?.trim() ||
         "Xin lỗi, mình chưa có câu trả lời phù hợp lúc này.";
 
+      // Trả kết quả chuẩn cho controller gồm reply + suggestions + model.
       return {
         reply,
         suggestions: this.buildSuggestions(message, reply),
         model,
       };
     } catch (error) {
+      // Chuẩn hóa thông điệp lỗi từ provider để dễ debug/giám sát.
       const providerMessage =
         error?.response?.data?.error?.message ||
         error?.response?.data?.message ||

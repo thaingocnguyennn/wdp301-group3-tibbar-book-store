@@ -51,6 +51,8 @@ export const authenticate = async (req, res, next) => {
 
 export const optionalAuthenticate = async (req, res, next) => {
   try {
+    // Middleware này phù hợp cho chatbot: cho phép cả guest và user đã đăng nhập truy cập.
+    // Nếu có token hợp lệ thì gắn req.user; nếu không có thì vẫn cho đi tiếp.
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
