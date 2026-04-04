@@ -30,6 +30,7 @@ const bookSchema = new mongoose.Schema({
     min: [0, 'Price cannot be negative']
   },
   stock: {
+    // UC-126: Số lượng tồn kho còn lại theo từng đầu sách, hiển thị ở Inventory Management.
     type: Number,
     default: 0,
     min: [0, 'Stock cannot be negative']

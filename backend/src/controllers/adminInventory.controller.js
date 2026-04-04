@@ -10,11 +10,14 @@ import Book from "../models/Book.js";
  */
 export const getInventoryStock = async (req, res, next) => {
   try {
+    // UC-126: Controller xử lý trực tiếp tại đây (hiện chưa tách riêng service adminInventoryService).
+    // B1: Chuẩn hóa query đầu vào để tránh lỗi kiểu dữ liệu.
     const q = String(req.query.q || "").trim();
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const skip = (page - 1) * limit;
 
+    // B2: Nếu có từ khóa q thì lọc theo title (không phân biệt hoa thường).
     const match = q
       ? {
           title: { $regex: q, $options: "i" },
@@ -22,6 +25,7 @@ export const getInventoryStock = async (req, res, next) => {
       : {};
 
     // Mỗi sách là 1 "type" trong tồn kho, lấy số lượng còn lại ở field stock.
+    // B3: Chạy song song 3 truy vấn để tối ưu tốc độ phản hồi.
     const [rows, totalTypesAgg, totalRemainingAgg] = await Promise.all([
       Book.find(match)
         .select("_id title author stock category imageUrl")
@@ -36,9 +40,11 @@ export const getInventoryStock = async (req, res, next) => {
       ]),
     ]);
 
+    // B4: Chuẩn hóa số liệu tổng để trả về frontend.
     const totalTypes = Number(totalTypesAgg || 0);
     const totalRemaining = Number(totalRemainingAgg?.[0]?.totalRemaining || 0);
 
+    // B5: Trả payload gồm data theo từng đầu sách + meta phân trang + tổng tồn kho.
     return res.status(200).json({
       message: "Lấy dữ liệu tồn kho thành công",
       data: rows.map((b) => ({

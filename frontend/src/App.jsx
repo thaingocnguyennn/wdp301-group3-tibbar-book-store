@@ -403,7 +403,7 @@ function AppContent() {
           path="/admin/inventory"
           element={
             <ProtectedRoute adminOnly>
-              {/* UC-124: Màn hình admin theo dõi cảnh báo low stock/out of stock. */}
+              {/* UC-124 + UC-126: Màn hình admin xem cảnh báo low stock và tổng tồn kho theo từng đầu sách. */}
               <InventoryManagementPage />
             </ProtectedRoute>
           }
