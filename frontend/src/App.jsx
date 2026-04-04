@@ -197,6 +197,7 @@ function AppContent() {
           path="/orders/:id"
           element={
             <ProtectedRoute>
+              {/* UC-45: Màn hình hiển thị chi tiết một đơn hàng cụ thể của khách hàng. */}
               <OrderDetailPage />
             </ProtectedRoute>
           }
@@ -424,6 +425,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!isReaderRoute && <SupportSystemWidget />}
+      {/* Chatbot hiển thị dạng widget nổi ở mọi trang (trừ reader route). */}
       {!isReaderRoute && <ChatbotWidget />}
       {!isReaderRoute && <Footer />}
     </div>

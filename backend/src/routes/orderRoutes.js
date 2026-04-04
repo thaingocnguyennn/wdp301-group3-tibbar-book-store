@@ -38,6 +38,7 @@ router.get("/:id/invoice", orderController.downloadInvoice);
 router.post("/:id/return-refund", orderController.submitReturnRefundRequest);
 
 // Get single order by ID
+// UC-45: API xem chi tiết một đơn hàng cụ thể.
 router.get("/:id", orderController.getOrderById);
 
 // Cancel order

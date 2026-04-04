@@ -16,6 +16,8 @@ const initialBotMessage = {
 };
 
 const ChatbotWidget = () => {
+  // Chức năng chatbot nằm ở components/chatbot và được mount toàn cục trong App.
+  // Mục tiêu: nhận câu hỏi người dùng, gửi API backend, hiển thị câu trả lời + gợi ý.
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
 
@@ -25,6 +27,8 @@ const ChatbotWidget = () => {
   const [messages, setMessages] = useState([initialBotMessage]);
 
   const conversationHistory = useMemo(() => {
+    // Chuẩn hóa lịch sử hội thoại trước khi gửi API:
+    // chỉ giữ role user/assistant và nội dung text để backend dễ xử lý.
     return messages
       .filter((item) => item.role === "user" || item.role === "assistant")
       .map((item) => ({
@@ -34,25 +38,30 @@ const ChatbotWidget = () => {
   }, [messages]);
 
   const sendMessage = async (rawMessage) => {
+    // B1: Làm sạch input; nếu rỗng hoặc đang loading thì không gửi request mới.
     const message = String(rawMessage || "").trim();
     if (!message || loading) return;
 
+    // B2: Đẩy tin nhắn của user lên UI ngay để tạo cảm giác phản hồi tức thì.
     const nextUserMessage = { role: "user", content: message };
     setMessages((prev) => [...prev, nextUserMessage]);
     setInput("");
     setLoading(true);
 
     try {
+      // B3: Gọi API chatbot, gửi kèm context hiện tại của trang/người dùng.
       const response = await chatbotApi.ask({
         message,
         messages: conversationHistory,
         context: {
+          // UC-45: Truyền page hiện tại để chatbot có thể hướng dẫn xem chi tiết đơn đúng ngữ cảnh.
           page: location.pathname,
           isAuthenticated,
           userRole: user?.role || "guest",
         },
       });
 
+      // B4: Ghi câu trả lời của bot vào danh sách message để render ra khung chat.
       setMessages((prev) => [
         ...prev,
         {
@@ -62,6 +71,7 @@ const ChatbotWidget = () => {
         },
       ]);
     } catch (error) {
+      // B5: Nếu API lỗi, hiển thị thông báo fallback thân thiện cho người dùng.
       setMessages((prev) => [
         ...prev,
         {
@@ -73,11 +83,13 @@ const ChatbotWidget = () => {
         },
       ]);
     } finally {
+      // B6: Kết thúc request, mở lại khả năng gửi tin nhắn tiếp theo.
       setLoading(false);
     }
   };
 
   const handleSubmit = (event) => {
+    // Chặn reload trang và chuyển sang luồng gửi tin nhắn bằng JS.
     event.preventDefault();
     sendMessage(input);
   };

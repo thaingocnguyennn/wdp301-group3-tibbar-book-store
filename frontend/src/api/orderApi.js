@@ -33,6 +33,8 @@ export const orderApi = {
 
   // Get order by ID
   getOrderById: async (orderId) => {
+    // UC-45: Lấy thông tin chi tiết của một đơn hàng cụ thể.
+    // Endpoint thực tế: GET /api/orders/:id
     const response = await axiosInstance.get(`/orders/${orderId}`);
     return response.data;
   },
