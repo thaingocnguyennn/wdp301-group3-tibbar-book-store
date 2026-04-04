@@ -3,6 +3,7 @@ import { addressApi } from '../api/addressApi';
 import { useNavigate } from 'react-router-dom';
 
 const AddressPage = () => {
+  //khai báo các state và hook cần thiết
   const navigate = useNavigate();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,13 +21,17 @@ const AddressPage = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  //fetch danh sách địa chỉ khi component được mount
   useEffect(() => {
+    //gọi hàm fetchAddresses để lấy dữ liệu địa chỉ từ server
     fetchAddresses();
   }, []);
 
+  //hàm để lấy danh sách địa chỉ
   const fetchAddresses = async () => {
     setLoading(true);
     try {
+      //gọi API để lấy danh sách địa chỉ
       const response = await addressApi.getAddresses();
       setAddresses(response.data || []);
     } catch (err) {
@@ -36,6 +41,7 @@ const AddressPage = () => {
     }
   };
 
+  //hàm để reset form và đóng form sau khi thêm/sửa địa chỉ
   const resetForm = () => {
     setFormData({
       fullName: '',
@@ -52,11 +58,13 @@ const AddressPage = () => {
     setError('');
   };
 
+  //hàm để mở form thêm địa chỉ mới
   const handleAddClick = () => {
     resetForm();
     setIsFormOpen(true);
   };
 
+  //hàm để mở form chỉnh sửa địa chỉ đã tồn tại
   const handleEditClick = (address) => {
     setEditingAddress(address);
     setFormData({
@@ -73,6 +81,7 @@ const AddressPage = () => {
     setError('');
   };
 
+  //hàm để xử lý thay đổi dữ liệu trong form
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -81,6 +90,7 @@ const AddressPage = () => {
     });
   };
 
+  //hàm để xử lý submit form thêm/sửa địa chỉ
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -88,13 +98,17 @@ const AddressPage = () => {
     setLoading(true);
 
     try {
+      //nếu đang chỉnh sửa địa chỉ thì gọi API cập nhật, ngược lại gọi API thêm mới
       if (editingAddress) {
+        //gọi API để cập nhật địa chỉ đã tồn tại
         await addressApi.updateAddress(editingAddress._id, formData);
         setMessage('Address updated successfully');
       } else {
+        //gọi API để thêm địa chỉ mới
         await addressApi.addAddress(formData);
         setMessage('Address added successfully');
       }
+      //cập nhật lại danh sách địa chỉ sau khi thêm/sửa thành công
       await fetchAddresses();
       setTimeout(() => {
         resetForm();
@@ -106,15 +120,19 @@ const AddressPage = () => {
     }
   };
 
+  //hàm để xử lý xóa địa chỉ
   const handleDelete = async (address) => {
+    //xác nhận trước khi xóa địa chỉ
     if (!window.confirm('Are you sure you want to delete this address?')) {
       return;
     }
 
     setLoading(true);
     try {
+      //gọi API để xóa địa chỉ
       await addressApi.deleteAddress(address._id);
       setMessage('Address deleted successfully');
+      //cập nhật lại danh sách địa chỉ sau khi xóa thành công
       await fetchAddresses();
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
@@ -125,7 +143,9 @@ const AddressPage = () => {
     }
   };
 
+  //hàm để xử lý đặt địa chỉ mặc định
   const handleSetDefault = async (address) => {
+    //nếu địa chỉ đã là mặc định thì không cần gọi API
     if (address.isDefault) {
       return;
     }
@@ -135,8 +155,10 @@ const AddressPage = () => {
     setError('');
 
     try {
+      //gọi API để đặt địa chỉ làm mặc định
       await addressApi.setDefaultAddress(address._id);
       setMessage('Default address updated successfully');
+      //cập nhật lại danh sách địa chỉ sau khi cập nhật thành công
       await fetchAddresses();
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
