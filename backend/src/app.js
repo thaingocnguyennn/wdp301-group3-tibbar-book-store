@@ -107,9 +107,9 @@ app.get("/health", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/books", bookRoutes);
+app.use("/api/books", bookRoutes); // Public book routes (listing, details, etc.)
 app.use("/api/categories", categoryRoutes); // Public categories
-app.use("/api/admin/books", adminBookRoutes);
+app.use("/api/admin/books", adminBookRoutes); // Admin book management routes (CRUD, visibility, preview management)
 app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/categories", categoryRoutes); // Admin categories (same routes, protected)
 app.use("/api/wishlist", wishlistRoutes);

@@ -909,6 +909,7 @@ class BookService {
     );
   }
 
+  // hàm getAllBooksAdmin lấy danh sách tất cả sách 
   async getAllBooksAdmin(filters = {}) {
     const {
       category,
@@ -951,18 +952,22 @@ class BookService {
     };
   }
 
+  //Tạo sách mới 
   async createBook(bookData) {
     const categoryExists = await Category.findById(bookData.category);
     if (!categoryExists || categoryExists.isDeleted) {
       throw ApiError.badRequest("Invalid category");
     }
 
+    //gọi hàm create để tạo sách mới
     const book = await Book.create(bookData);
+    //populate thông tin category sau khi tạo sách
     await book.populate("category", "name");
 
     return book;
   }
 
+  // Cập nhật thông tin sách (Admin)
   async updateBook(bookId, updateData) {
     if (updateData.category) {
       const categoryExists = await Category.findById(updateData.category);
@@ -971,6 +976,7 @@ class BookService {
       }
     }
 
+    //gọi hàm findByIdAndUpdate để cập nhật thông tin sách
     const book = await Book.findByIdAndUpdate(
       bookId,
       { $set: updateData },
@@ -984,7 +990,9 @@ class BookService {
     return book;
   }
 
+  // Cập nhật trường visibility của sách
   async updateVisibility(bookId, visibility) {
+    //gọi hàm findByIdAndUpdate để cập nhật trường visibility của sách
     const book = await Book.findByIdAndUpdate(
       bookId,
       { visibility },
@@ -998,15 +1006,20 @@ class BookService {
     return book;
   }
 
+  // Cập nhật toàn bộ mảng previewPages của sách
   async updatePreviewPages(bookId, previewPages = []) {
+    // Validate previewPages phải là mảng và có ít nhất 1 trang xem trước
     if (!Array.isArray(previewPages) || previewPages.length === 0) {
+      // Nếu không có trang xem trước nào được cung cấp, throw error
       throw ApiError.badRequest("Please upload at least one preview image");
     }
 
+    // Giới hạn tối đa 10 trang xem trước để tránh quá tải
     if (previewPages.length > 10) {
       throw ApiError.badRequest("Preview pages cannot exceed 10 images");
     }
 
+    // Cập nhật trường previewPages của sách với mảng mới
     const book = await Book.findByIdAndUpdate(
       bookId,
       { $set: { previewPages } },
@@ -1020,45 +1033,58 @@ class BookService {
     return book;
   }
 
+  // Quản lý trang xem trước (Preview page) của sách
   async managePreviewPage(bookId, { operation, pageNumber, previewPageUrl }) {
+    // Chuẩn hóa operation và pageNumber để đảm bảo tính nhất quán
     const normalizedOperation = String(operation || "").toLowerCase();
+    // Chuyển pageNumber thành số nguyên
     const position = Number(pageNumber);
 
+    // Validate pageNumber phải là số nguyên dương
     if (!Number.isInteger(position) || position < 1) {
       throw ApiError.badRequest("Page number must be a positive integer");
     }
 
+    // Validate operation phải là một trong "insert", "replace", "delete"
     if (!["insert", "replace", "delete"].includes(normalizedOperation)) {
       throw ApiError.badRequest("Invalid preview operation");
     }
 
+    // Tìm sách theo ID
     const book = await Book.findById(bookId);
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }
 
+    // Lấy mảng previewPages hiện tại, đảm bảo luôn là mảng
     const currentPages = Array.isArray(book.previewPages)
       ? [...book.previewPages]
       : [];
 
+      // Xử lý theo từng loại operation
     if (normalizedOperation === "insert") {
+      // Với insert, previewPageUrl là bắt buộc để biết URL của trang xem trước mới
       if (!previewPageUrl) {
         throw ApiError.badRequest("Preview image is required for insert");
       }
+      // Giới hạn tối đa 10 trang xem trước
       if (currentPages.length >= 10) {
         throw ApiError.badRequest(
           "Cannot insert more preview pages. Maximum is 10",
         );
       }
+      // Với insert, vị trí hợp lệ là từ 1 đến currentPages.length + 1 (cho phép chèn vào cuối)
       if (position > currentPages.length + 1) {
         throw ApiError.badRequest(
           `Insert page must be between 1 and ${currentPages.length + 1}`,
         );
       }
 
+      // Chèn URL trang xem trước mới vào vị trí mong muốn (position - 1 do mảng bắt đầu từ 0)
       currentPages.splice(position - 1, 0, previewPageUrl);
     }
 
+    // Với replace và delete, vị trí hợp lệ là từ 1 đến currentPages.length (phải có trang để thay thế hoặc xóa)
     if (normalizedOperation === "replace") {
       if (!previewPageUrl) {
         throw ApiError.badRequest("Preview image is required for replace");
@@ -1075,6 +1101,7 @@ class BookService {
       currentPages[position - 1] = previewPageUrl;
     }
 
+    // Với delete, chỉ cần vị trí hợp lệ để xóa trang xem trước hiện tại
     if (normalizedOperation === "delete") {
       if (currentPages.length === 0) {
         throw ApiError.badRequest("No preview page to delete");
@@ -1095,9 +1122,12 @@ class BookService {
     return book;
   }
 
+  //hàm xóa sách
   async deleteBook(bookId) {
+    // Tìm và xóa sách theo ID
     const book = await Book.findByIdAndDelete(bookId);
 
+    // Nếu không tìm thấy sách, throw error
     if (!book) {
       throw ApiError.notFound(MESSAGES.NOT_FOUND);
     }

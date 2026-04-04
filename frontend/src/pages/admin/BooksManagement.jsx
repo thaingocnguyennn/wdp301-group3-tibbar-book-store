@@ -12,10 +12,10 @@ const BooksManagement = () => {
   const [imageInputKey, setImageInputKey] = useState(0);
   const [ebookFile, setEbookFile] = useState(null);
   const [ebookInputKey, setEbookInputKey] = useState(0);
-  const [showPreviewForm, setShowPreviewForm] = useState(false);
-  const [previewBook, setPreviewBook] = useState(null);
-  const [previewFiles, setPreviewFiles] = useState([]);
-  const [previewInputKey, setPreviewInputKey] = useState(0);
+  const [showPreviewForm, setShowPreviewForm] = useState(false); //state de dieu khien viec hien thi form quan ly preview
+  const [previewBook, setPreviewBook] = useState(null); //khoi tao state de luu tru sach dang duoc chon de quan ly preview
+  const [previewFiles, setPreviewFiles] = useState([]); //state de luu tru cac file anh preview duoc chon trong form quan ly preview
+  const [previewInputKey, setPreviewInputKey] = useState(0); //state de reset input file khi dong mo form quan ly preview
   const [insertPageNumber, setInsertPageNumber] = useState(1);
   const [replacePageNumber, setReplacePageNumber] = useState(1);
   const [deletePageNumber, setDeletePageNumber] = useState(1);
@@ -37,17 +37,24 @@ const BooksManagement = () => {
     isEbook: false
   });
   const [message, setMessage] = useState('');
+  // Lấy URL cơ sở của API từ biến môi trường và loại bỏ phần "/api" nếu có
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const serverBaseUrl = apiBase.replace(/\/api\/?$/, '');
 
+  // Fetch sách và danh mục khi component được mount
   useEffect(() => {
+    // Khi component được mount, ta sẽ gọi API để lấy danh sách sách và danh mục
     fetchBooks();
+    // Đồng thời, ta cũng gọi API để lấy danh sách các thể loại sách có sẵn
     fetchCategories();
   }, []);
 
+  // Hàm để gọi API lấy danh sách sách dành cho admin
   const fetchBooks = async () => {
     try {
+      // Gọi API để lấy tất cả sách dành cho admin
       const response = await bookApi.getAllBooksAdmin();
+      // Nếu thành công, ta sẽ cập nhật state 'books' với dữ liệu nhận được từ API
       setBooks(response.data.books);
     } catch (error) {
       console.error('Error fetching books:', error);
@@ -56,26 +63,33 @@ const BooksManagement = () => {
     }
   };
 
+  // Hàm để gọi API lấy danh sách các thể loại sách
   const fetchCategories = async () => {
     try {
+      // Gọi API để lấy tất cả các thể loại sách
       const response = await categoryApi.getAllCategories();
+      // Nếu thành công, ta sẽ cập nhật state 'categories' với dữ liệu nhận được từ API
       setCategories(response.data.categories);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
   };
 
+  // Hàm xử lý khi người dùng submit form tạo mới hoặc cập nhật sách
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
 
+    // Tạo một đối tượng FormData để gửi dữ liệu bao gồm cả file ảnh và file ebook (nếu có)
     const payload = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
+      // Chỉ thêm vào payload nếu giá trị không rỗng, không undefined và không null
       if (value !== undefined && value !== null && value !== '') {
         payload.append(key, value);
       }
     });
 
+    // Nếu có file ảnh mới được chọn, ta sẽ thêm nó vào payload
     if (imageFile) {
       payload.append('image', imageFile);
     }
@@ -84,15 +98,19 @@ const BooksManagement = () => {
       payload.append('ebook', ebookFile);
     }
 
+    // Nếu đang chỉnh sửa một cuốn sách, ta sẽ gọi API cập nhật, ngược lại sẽ gọi API tạo mới
     try {
       if (editingBook) {
+        // Nếu đang chỉnh sửa, ta sẽ gọi API cập nhật sách với ID của sách đang chỉnh sửa và payload chứa dữ liệu mới
         await bookApi.updateBook(editingBook._id, payload);
         setMessage('Book updated successfully');
       } else {
+        // Nếu không đang chỉnh sửa, tức là đang tạo mới, ta sẽ gọi API tạo sách với payload chứa dữ liệu của sách mới
         await bookApi.createBook(payload);
         setMessage('Book created successfully');
       }
       
+      //reset form sau khi tạo mới hoặc cập nhật thành công để xóa dữ liệu cũ và ẩn form
       resetForm();
       fetchBooks();
     } catch (error) {
@@ -100,8 +118,11 @@ const BooksManagement = () => {
     }
   };
 
+  // Hàm xử lý khi người dùng nhấn nút "Edit" để chỉnh sửa một cuốn sách
   const handleEdit = (book) => {
+    // Khi người dùng nhấn "Edit", ta sẽ cập nhật state 'editingBook' với cuốn sách được chọn để chỉnh sửa
     setEditingBook(book);
+    // Đồng thời, ta sẽ điền dữ liệu của cuốn sách đó vào form để người dùng có thể chỉnh sửa
     setFormData({
       title: book.title,
       author: book.author,
@@ -120,28 +141,37 @@ const BooksManagement = () => {
     setShowForm(true);
   };
 
+  // Hàm xử lý khi người dùng nhấn nút "Delete" để xóa một cuốn sách
   const handleDelete = async (id) => {
+    // Trước khi xóa, ta sẽ hiển thị một hộp thoại xác nhận để tránh việc xóa nhầm
     if (!window.confirm('Are you sure you want to delete this book?')) return;
 
     try {
+      // Nếu người dùng xác nhận, ta sẽ gọi API để xóa sách với ID của sách cần xóa
       await bookApi.deleteBook(id);
       setMessage('Book deleted successfully');
+      // Sau khi xóa thành công, ta sẽ gọi lại hàm fetchBooks để cập nhật lại danh sách sách hiển thị
       fetchBooks();
     } catch (error) {
       setMessage('Failed to delete book');
     }
   };
 
+  // Hàm xử lý khi người dùng nhấn nút để thay đổi trạng thái hiển thị của sách (public/hidden)
   const toggleVisibility = async (book) => {
     try {
+      // Khi người dùng nhấn nút, ta sẽ xác định trạng thái hiển thị mới bằng cách kiểm tra trạng thái hiện tại của sách
       const newVisibility = book.visibility === 'public' ? 'hidden' : 'public';
+      // Sau đó, ta sẽ gọi API để cập nhật trạng thái hiển thị của sách với ID của sách và trạng thái mới
       await bookApi.updateVisibility(book._id, newVisibility);
+      //gọi lại hàm fetchBooks để cập nhật lại danh sách sách hiển thị với trạng thái mới
       fetchBooks();
     } catch (error) {
       setMessage('Failed to update visibility');
     }
   };
 
+  // Hàm để reset form về trạng thái ban đầu sau khi tạo mới hoặc cập nhật thành công, hoặc khi người dùng nhấn "Cancel"
   const resetForm = () => {
     setFormData({
       title: '',
@@ -164,6 +194,7 @@ const BooksManagement = () => {
     setEbookInputKey((prev) => prev + 1);
   };
 
+  // Hàm để mở form quản lý preview cho một cuốn sách cụ thể
   const openPreviewForm = (book) => {
     setPreviewBook(book);
     setPreviewFiles([]);
@@ -181,6 +212,7 @@ const BooksManagement = () => {
     setMessage('');
   };
 
+  // Hàm để đóng form quản lý preview và reset các state liên quan
   const closePreviewForm = () => {
     setShowPreviewForm(false);
     setPreviewBook(null);
@@ -192,167 +224,224 @@ const BooksManagement = () => {
     setReplaceFileKey((prev) => prev + 1);
   };
 
+  // Hàm để giải quyết URL của ảnh preview
   const resolveImageUrl = (path) => {
+    // Nếu path đã là một URL đầy đủ, trả về nó. Nếu không, kết hợp với serverBaseUrl để tạo thành URL đầy đủ.
     if (!path) return '';
+    // Nếu path đã bắt đầu bằng "http", ta sẽ coi đó là một URL đầy đủ và trả về nó
     return path.startsWith('http') ? path : `${serverBaseUrl}/${String(path).replace(/^\/+/, '')}`;
   };
 
+  // Hàm để làm mới thông tin của sách đang được xem trước trong danh sách sau khi có sự thay đổi về preview
   const refreshPreviewBookInList = async (updatedBook) => {
+    // Nếu updatedBook không có _id, ta sẽ gọi lại fetchBooks để làm mới toàn bộ danh sách
     if (!updatedBook?._id) {
+      //  goi ham fetchBooks để đảm bảo dữ liệu hiển thị là chính xác
       await fetchBooks();
       return;
     }
 
+    // Nếu có _id, ta sẽ cập nhật thông tin của sách đó trong state 'books' 
+    // bằng cách duyệt qua danh sách sách hiện tại và thay thế sách có _id trùng khớp bằng updatedBook
     setBooks((prevBooks) => prevBooks.map((book) => (book._id === updatedBook._id ? updatedBook : book)));
     setPreviewBook(updatedBook);
+    // Sau khi cập nhật thông tin sách trong danh sách, ta sẽ điều chỉnh lại các state liên quan
+    //  đến quản lý preview để đảm bảo chúng phù hợp với số lượng trang preview mới của sách
     const previewCount = Array.isArray(updatedBook.previewPages) ? updatedBook.previewPages.length : 0;
+    // Điều chỉnh lại số trang tối đa có thể chèn, thay thế hoặc xóa dựa trên số lượng trang preview hiện tại của sách
     setInsertPageNumber(Math.min(insertPageNumber, previewCount + 1));
+    // Điều chỉnh lại số trang tối đa có thể thay thế hoặc xóa dựa trên số lượng trang preview hiện tại của sách
     setReplacePageNumber(previewCount > 0 ? Math.min(replacePageNumber || 1, previewCount) : 0);
+    // Điều chỉnh lại số trang tối đa có thể xóa dựa trên số lượng trang preview hiện tại của sách
     setDeletePageNumber(previewCount > 0 ? Math.min(deletePageNumber || 1, previewCount) : 0);
   };
 
+  // Hàm xử lý khi người dùng chọn file ảnh preview mới trong form quản lý preview
   const handlePreviewFilesChange = (e) => {
+    // Khi người dùng chọn file mới, ta sẽ chuyển FileList thành một mảng để dễ dàng xử lý
     const selectedFiles = Array.from(e.target.files || []);
 
+    // Nếu số lượng file được chọn vượt quá 10, ta sẽ hiển thị một thông báo lỗi và chỉ giữ lại 10 file đầu tiên
     if (selectedFiles.length > 10) {
       setMessage('You can upload a maximum of 10 preview images');
       setPreviewFiles(selectedFiles.slice(0, 10));
       return;
     }
 
+    // Nếu số lượng file hợp lệ, ta sẽ cập nhật state 'previewFiles' với mảng file đã chọn
     setPreviewFiles(selectedFiles);
   };
 
+  // Hàm xử lý khi người dùng submit form quản lý preview để tải lên hoặc cập nhật các trang preview của sách
   const handlePreviewSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
 
+    // kiểm tra xem đã có sách nào được chọn để quản lý preview hay chưa
     if (!previewBook?._id) {
       setMessage('Please select a book for preview upload');
       return;
     }
 
+    // Kiểm tra xem người dùng đã chọn ít nhất một file ảnh preview nào để tải lên hay chưa
     if (previewFiles.length === 0) {
       setMessage('Please upload at least one preview image');
       return;
     }
 
+    // Kiểm tra xem số lượng file ảnh preview được chọn có vượt quá giới hạn tối đa là 10 hay không
     if (previewFiles.length > 10) {
       setMessage('You can upload a maximum of 10 preview images');
       return;
     }
 
+    // Tạo một đối tượng FormData để gửi dữ liệu các file ảnh preview mới được chọn
     const payload = new FormData();
+    // Thêm từng file ảnh preview vào payload với tên trường 'previewPages' để gửi lên API
     previewFiles.forEach((file) => payload.append('previewPages', file));
+    // Kiểm tra xem sách đã có trang preview nào trước đó hay chưa để quyết định gọi API cập nhật hay tải lên mới
     const hasExistingPreview = Array.isArray(previewBook?.previewPages) && previewBook.previewPages.length > 0;
 
     try {
+      //gọi API cập nhật trang preview với ID của sách và payload chứa các file ảnh mới
       if (hasExistingPreview) {
+        //gọi API cập nhật trang preview để thay thế toàn bộ các trang preview cũ bằng các trang mới được chọn
         await bookApi.updateBookPreview(previewBook._id, payload);
         setMessage('Preview pages updated successfully');
       } else {
+        //gọi API tải lên trang preview mới cho sách nếu trước đó chưa có trang preview nào
         await bookApi.uploadBookPreview(previewBook._id, payload);
         setMessage('Preview pages uploaded successfully');
       }
       closePreviewForm();
+      // gọi lại hàm fetchBooks để làm mới lại danh sách sách hiển thị với thông tin preview mới nhất
       fetchBooks();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to upload preview pages');
     }
   };
 
+  // Hàm xử lý "Insert" để chèn một trang preview mới vào một vị trí cụ thể trong danh sách trang preview của sách
   const handleInsertPreviewPage = async (e) => {
     e.preventDefault();
     setMessage('');
 
+    // Lấy danh sách các trang preview hiện tại của sách đang được quản lý preview
     const currentPages = Array.isArray(previewBook?.previewPages) ? previewBook.previewPages : [];
 
+    // Kiểm tra xem đã có sách nào được chọn để quản lý preview hay chưa
     if (!previewBook?._id) {
       setMessage('Please select a book first');
       return;
     }
 
+    // Kiểm tra xem người dùng đã chọn file ảnh preview nào để chèn vào chưa
     if (!insertPreviewFile) {
       setMessage('Please choose an image to insert');
       return;
     }
 
+    // Kiểm tra xem số trang preview hiện tại đã đạt giới hạn tối đa là 10 trang chưa, 
+    // nếu đã đạt thì không cho phép chèn thêm
     if (currentPages.length >= 10) {
       setMessage('Cannot insert. Maximum preview pages is 10');
       return;
     }
 
+    //formData để gửi yêu cầu chèn trang preview mới vào vị trí cụ thể trong danh sách trang preview của sách
     const payload = new FormData();
     payload.append('operation', 'insert');
     payload.append('pageNumber', String(insertPageNumber));
     payload.append('previewPage', insertPreviewFile);
 
     try {
+      // Gọi API để chèn trang preview mới vào sách với ID của sách và payload chứa thông tin trang preview mới và vị trí chèn
       const response = await bookApi.manageBookPreviewPage(previewBook._id, payload);
+      //hiển thị thông báo chèn trang preview thành công
       setMessage('Preview page inserted successfully');
+      //reset lại file input
       setInsertPreviewFile(null);
-      setInsertFileKey((prev) => prev + 1);
+      setInsertFileKey((prev) => prev + 1); // làm mới lại trang preview của sách 
+      // gọi hàm refreshPreviewBookInList để cập nhật lại thông tin sách 
+      // trong danh sách với thông tin trang preview mới nhất sau khi chèn thành công
       await refreshPreviewBookInList(response.data.book);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to insert preview page');
     }
   };
 
+  // Hàm xử lý "Replace" để thay thế một trang preview cụ thể bằng một trang mới được chọn
   const handleReplacePreviewPage = async (e) => {
     e.preventDefault();
     setMessage('');
 
+    // Lấy danh sách các trang preview hiện tại của sách đang được quản lý preview
     if (!previewBook?._id) {
       setMessage('Please select a book first');
       return;
     }
 
+    // Kiểm tra xem người dùng đã chọn file ảnh preview nào để thay thế chưa
     if (!replacePreviewFile) {
       setMessage('Please choose an image to replace');
       return;
     }
 
+    // Kiểm tra xem số trang preview hiện tại của sách có đủ để thay thế trang tại vị trí được chọn hay không
     if (!replacePageNumber || replacePageNumber < 1) {
       setMessage('Please choose a valid page number to replace');
       return;
     }
 
+    // Tạo một đối tượng FormData để gửi dữ liệu yêu cầu thay thế trang preview tại vị trí 
+    // cụ thể trong danh sách trang preview của sách
     const payload = new FormData();
     payload.append('operation', 'replace');
     payload.append('pageNumber', String(replacePageNumber));
     payload.append('previewPage', replacePreviewFile);
 
     try {
+      // Gọi API để thay thế trang preview tại vị trí cụ thể trong sách với ID của sách và payload 
+      // chứa thông tin trang preview mới và vị trí thay thế
       const response = await bookApi.manageBookPreviewPage(previewBook._id, payload);
       setMessage('Preview page replaced successfully');
       setReplacePreviewFile(null);
       setReplaceFileKey((prev) => prev + 1);
+      // gọi hàm refreshPreviewBookInList để cập nhật lại thông tin sách trong danh sách 
+      // với thông tin trang preview mới nhất sau khi thay thế thành công
       await refreshPreviewBookInList(response.data.book);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to replace preview page');
     }
   };
 
+  // Hàm xử lý "Delete" để xóa một trang preview cụ thể khỏi danh sách trang preview của sách
   const handleDeletePreviewPage = async () => {
     setMessage('');
 
+    // Kiểm tra xem đã có sách nào được chọn để quản lý preview hay chưa
     if (!previewBook?._id) {
       setMessage('Please select a book first');
       return;
     }
 
+    // Kiểm tra xem số trang preview hiện tại của sách có đủ để xóa trang tại vị trí được chọn hay không
     if (!deletePageNumber || deletePageNumber < 1) {
       setMessage('Please choose a valid page number to delete');
       return;
     }
 
+    // Tạo một đối tượng FormData để gửi dữ liệu yêu cầu xóa trang preview tại 
+    // vị trí cụ thể trong danh sách trang preview của sách
     const payload = new FormData();
     payload.append('operation', 'delete');
     payload.append('pageNumber', String(deletePageNumber));
 
     try {
+      // Gọi API để xóa trang preview tại vị trí cụ thể trong sách với ID
       const response = await bookApi.manageBookPreviewPage(previewBook._id, payload);
       setMessage('Preview page deleted successfully');
+        // gọi hàm refreshPreviewBookInList để cập nhật lại thông tin sách trong danh sách
       await refreshPreviewBookInList(response.data.book);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to delete preview page');

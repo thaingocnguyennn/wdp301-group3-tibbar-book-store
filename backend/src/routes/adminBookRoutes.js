@@ -16,13 +16,14 @@ const bookFields = adminBookCombinedUpload.fields([
   { name: 'ebook', maxCount: 1 },
 ]);
 
-router.get('/', adminBookController.getAllBooks);
-router.post('/', bookFields, adminBookController.createBook);
-router.put('/:id', bookFields, adminBookController.updateBook);
-router.patch('/:id/visibility', adminBookController.updateVisibility);
-router.post('/:id/preview', previewUpload.array('previewPages', 10), adminBookController.updatePreviewPages);
+router.get('/', adminBookController.getAllBooks); //lấy danh sách tất cả sách
+router.post('/', bookFields, adminBookController.createBook); //tạo mới một cuốn sách
+router.put('/:id', bookFields, adminBookController.updateBook); //cập nhật thông tin một cuốn sách
+router.patch('/:id/visibility', adminBookController.updateVisibility); //cập nhật trạng thái hiển thị của một cuốn sách
+//updatepreviewpages để cập nhật nhiều trang preview cùng lúc
+router.post('/:id/preview', previewUpload.array('previewPages', 10), adminBookController.updatePreviewPages); 
 router.put('/:id/preview', previewUpload.array('previewPages', 10), adminBookController.updatePreviewPages);
 router.patch('/:id/preview/manage', previewUpload.single('previewPage'), adminBookController.managePreviewPage);
-router.delete('/:id', adminBookController.deleteBook);
+router.delete('/:id', adminBookController.deleteBook); //xóa một cuốn sách
 
 export default router;
